@@ -1,0 +1,506 @@
+import { useState, useEffect, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { 
+  Settings, 
+  Save, 
+  Loader2, 
+  Globe, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Truck, 
+  Share2, 
+  ShieldCheck,
+  Flame,
+  Calendar,
+  Upload,
+  Trash2,
+  Image as ImageIcon
+} from 'lucide-react';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
+
+import { db } from '../../firebase/config';
+import { uploadImageToCloudinary } from '../../cloudinary/upload';
+
+export default function AdminSettings() {
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
+  // ব্র্যান্ড লোগো স্টেট
+  const [logoType, setLogoType] = useState<'text' | 'image'>('text');
+  const [logoUrl, setLogoUrl] = useState<string>('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
+
+  // স্টোর আইডেন্টিটি স্টেট
+  const [siteName, setSiteName] = useState<string>('ISAR Marketplace');
+  const [contactEmail, setContactEmail] = useState<string>('support@isar.com.bd');
+  const [contactPhone, setContactPhone] = useState<string>('+880 1234 567890');
+  const [officeAddress, setOfficeAddress] = useState<string>('Dhaka, Bangladesh');
+  
+  // ডেলিভারি চার্জ স্টেট
+  const [feeInsideDhaka, setFeeInsideDhaka] = useState<number>(60);
+  const [feeOutsideDhaka, setFeeOutsideDhaka] = useState<number>(150);
+
+  // সোশ্যাল মিডিয়া লিংক
+  const [facebookUrl, setFacebookUrl] = useState<string>('https://facebook.com');
+  const [instagramUrl, setInstagramUrl] = useState<string>('https://instagram.com');
+
+  // ফ্ল্যাশ সেল স্টেট
+  const [flashSaleActive, setFlashSaleActive] = useState<boolean>(true);
+  const [flashSaleTitle, setFlashSaleTitle] = useState<string>('Flash Sale Offers');
+  const [flashSaleDiscountText, setFlashSaleDiscountText] = useState<string>('Up to 50% Off');
+  const [flashSaleEndTime, setFlashSaleEndTime] = useState<string>('2026-08-30T23:59');
+
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSettings = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'general');
+        const snapshot = await getDoc(docRef);
+
+        if (snapshot.exists() && isMounted) {
+          const data = snapshot.data();
+          
+          if (data.logoType) setLogoType(data.logoType);
+          if (data.logoUrl) setLogoUrl(data.logoUrl);
+
+          if (data.siteName) setSiteName(data.siteName);
+          if (data.contactEmail) setContactEmail(data.contactEmail);
+          if (data.contactPhone) setContactPhone(data.contactPhone);
+          if (data.officeAddress) setOfficeAddress(data.officeAddress);
+          if (data.feeInsideDhaka !== undefined) setFeeInsideDhaka(data.feeInsideDhaka);
+          if (data.feeOutsideDhaka !== undefined) setFeeOutsideDhaka(data.feeOutsideDhaka);
+          if (data.facebookUrl) setFacebookUrl(data.facebookUrl);
+          if (data.instagramUrl) setInstagramUrl(data.instagramUrl);
+
+          if (data.flashSaleActive !== undefined) setFlashSaleActive(data.flashSaleActive);
+          if (data.flashSaleTitle) setFlashSaleTitle(data.flashSaleTitle);
+          if (data.flashSaleDiscountText) setFlashSaleDiscountText(data.flashSaleDiscountText);
+          if (data.flashSaleEndTime) setFlashSaleEndTime(data.flashSaleEndTime);
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    Promise.resolve().then(() => {
+      fetchSettings();
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // লোগো ছবি আপলোড হ্যান্ডলার
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setIsUploadingLogo(true);
+      const file = files[0];
+
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
+      const uploadedUrl = await uploadImageToCloudinary(file);
+      setLogoUrl(uploadedUrl);
+      setLogoType('image'); // লোগো আপলোড করলে স্বয়ংক্রিয়ভাবে ইমেজ মোডে যাবে
+      toast.success('Brand logo uploaded & ready!');
+    } catch (error: unknown) {
+      console.error('Logo upload error:', error);
+      const err = error as Error;
+      toast.error(err.message || 'Failed to upload logo');
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoFileInputRef.current) {
+        logoFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setIsSaving(true);
+      const docRef = doc(db, 'settings', 'general');
+
+      await setDoc(docRef, {
+        logoType,
+        logoUrl: logoUrl || '',
+        siteName,
+        contactEmail,
+        contactPhone,
+        officeAddress,
+        feeInsideDhaka: Number(feeInsideDhaka) || 0,
+        feeOutsideDhaka: Number(feeOutsideDhaka) || 0,
+        facebookUrl,
+        instagramUrl,
+        flashSaleActive,
+        flashSaleTitle: flashSaleTitle.trim() || 'Flash Sale Offers',
+        flashSaleDiscountText: flashSaleDiscountText.trim() || 'Up to 50% Off',
+        flashSaleEndTime,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      toast.success('Website settings & brand logo saved successfully!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to update settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+      <Helmet>
+        <title>Website Settings | ISAR Admin</title>
+      </Helmet>
+
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            <Settings className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-navy">Website Settings</h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Configure brand logo, contact details, live delivery rates and flash sale
+            </p>
+          </div>
+        </div>
+
+        <span className="text-xs font-semibold text-brand-green bg-brand-green/10 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+          <ShieldCheck className="w-4 h-4" /> Global Configuration
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="bg-white rounded-2xl p-12 text-center shadow-modern border border-gray-100 flex flex-col items-center justify-center">
+          <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+          <span className="text-xs text-gray-500 font-medium">Loading store settings...</span>
+        </div>
+      ) : (
+        <form onSubmit={handleSaveSettings} className="space-y-6">
+          
+          {/* Brand Logo Settings Card */}
+          <div className="bg-white rounded-2xl p-6 shadow-modern border border-gray-100 space-y-4">
+            <h2 className="text-base font-bold text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-purple-600" /> Brand Logo Control
+            </h2>
+
+            <div className="space-y-4">
+              
+              {/* Logo Mode Selection */}
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
+                  <input
+                    type="radio"
+                    name="logoType"
+                    value="text"
+                    checked={logoType === 'text'}
+                    onChange={() => setLogoType('text')}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  Text Logo ("ISAR")
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
+                  <input
+                    type="radio"
+                    name="logoType"
+                    value="image"
+                    checked={logoType === 'image'}
+                    onChange={() => setLogoType('image')}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  Custom Image Logo
+                </label>
+              </div>
+
+              {/* Logo Image Upload & Preview */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-center gap-6">
+                {logoUrl ? (
+                  <div className="relative w-32 h-16 rounded-xl bg-white border border-gray-200 p-2 flex items-center justify-center overflow-hidden">
+                    <img src={logoUrl} alt="Brand Logo" className="max-w-full max-h-full object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl('')}
+                      className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                      title="Remove Logo"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-32 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400 font-bold uppercase">
+                    No Logo
+                  </div>
+                )}
+
+                <div className="flex-1 space-y-2 text-center sm:text-left">
+                  <input
+                    type="file"
+                    ref={logoFileInputRef}
+                    onChange={handleLogoUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                    className="px-4 py-2 bg-navy hover:bg-navy-light text-white font-bold text-xs rounded-xl transition-all inline-flex items-center gap-2 shadow-sm disabled:opacity-50"
+                  >
+                    {isUploadingLogo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" /> Upload Brand Logo Image
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-gray-400">PNG, SVG or JPG (Transparent background recommended)</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Delivery Rates Settings */}
+          <div className="bg-white rounded-2xl p-6 shadow-modern border border-gray-100 space-y-4">
+            <h2 className="text-base font-bold text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
+              <Truck className="w-4 h-4 text-brand-green" /> Delivery Rate Settings (BDT)
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Inside Dhaka Delivery Fee (৳)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={feeInsideDhaka}
+                  onChange={(e) => setFeeInsideDhaka(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Outside Dhaka Delivery Fee (৳)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={feeOutsideDhaka}
+                  onChange={(e) => setFeeOutsideDhaka(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Flash Sale Countdown Controls */}
+          <div className="bg-white rounded-2xl p-6 shadow-modern border border-gray-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h2 className="text-base font-bold text-navy flex items-center gap-2">
+                <Flame className="w-5 h-5 text-amber-500" /> Flash Sale Countdown Control (Bangladesh Time)
+              </h2>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={flashSaleActive}
+                  onChange={(e) => setFlashSaleActive(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-green"></div>
+                <span className="ml-2 text-xs font-bold text-navy">
+                  {flashSaleActive ? 'Active (Live)' : 'Disabled (Hidden)'}
+                </span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Offer Heading *</label>
+                <input
+                  type="text"
+                  required
+                  value={flashSaleTitle}
+                  onChange={(e) => setFlashSaleTitle(e.target.value)}
+                  placeholder="e.g. Flash Sale Offers"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Discount Badge Text *</label>
+                <input
+                  type="text"
+                  required
+                  value={flashSaleDiscountText}
+                  onChange={(e) => setFlashSaleDiscountText(e.target.value)}
+                  placeholder="e.g. Up to 50% Off"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Offer End Date & Time *</label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="datetime-local"
+                    required
+                    value={flashSaleEndTime}
+                    onChange={(e) => setFlashSaleEndTime(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Store Identity & Contact Info */}
+          <div className="bg-white rounded-2xl p-6 shadow-modern border border-gray-100 space-y-4">
+            <h2 className="text-base font-bold text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" /> Store Identity & Contact Info
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-bold text-navy">Website Name *</label>
+                <div className="relative">
+                  <Globe className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    placeholder="ISAR Marketplace"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Helpline Mobile Number *</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="+880 1234 567890"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Support Email *</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="support@isar.com.bd"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-bold text-navy">Physical Office Address *</label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={officeAddress}
+                    onChange={(e) => setOfficeAddress(e.target.value)}
+                    placeholder="House #10, Road #2, Dhanmondi, Dhaka, Bangladesh"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Social Media Links */}
+          <div className="bg-white rounded-2xl p-6 shadow-modern border border-gray-100 space-y-4">
+            <h2 className="text-base font-bold text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
+              <Share2 className="w-4 h-4 text-purple-600" /> Social Media Links
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Facebook Page URL</label>
+                <input
+                  type="url"
+                  value={facebookUrl}
+                  onChange={(e) => setFacebookUrl(e.target.value)}
+                  placeholder="https://facebook.com/isarbd"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-navy">Instagram URL</label>
+                <input
+                  type="url"
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  placeholder="https://instagram.com/isarbd"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-8 py-3 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Saving Settings...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" /> Save Settings
+                </>
+              )}
+            </button>
+          </div>
+
+        </form>
+      )}
+
+    </div>
+  );
+}

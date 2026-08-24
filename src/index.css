@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-primary: #0056b3;
+  --color-primary-light: #3378c2;
+  --color-primary-dark: #004494;
+
+  --color-navy: #0B192C;
+  --color-navy-light: #1E3E62;
+
+  --color-secondary: #F8F9FA;
+  --color-secondary-dark: #E9ECEF;
+
+  --color-brand-gold: #D4AF37;
+  --color-brand-green: #28A745;
+
+  --color-surface: #FFFFFF;
+
+  /* Box Shadows */
+  --shadow-modern: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-modern-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+
+  /* Fonts */
+  --font-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-bengali: "Noto Sans Bengali", sans-serif;
+}
