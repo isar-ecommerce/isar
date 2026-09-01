@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { createOrder } from '../../services/orderService';
 import { executeBkashPayment } from '../../services/paymentService';
 import { 
@@ -23,38 +24,48 @@ import {
   sendAdminOrderAlert 
 } from '../../services/notificationService';
 import BkashAutomatedModal from '../../components/checkout/BkashAutomatedModal';
+import { 
+  BANGLADESH_DIVISIONS, 
+  getDistrictsByDivision, 
+  getUpazilasByDistrict 
+} from '../../data/bangladeshGeoData';
 import type { ShippingAddress, PaymentMethod } from '../../types/order';
-
-// বাংলাদেশ বিভাগসমূহ
-const BD_DIVISIONS = [
-  'Dhaka',
-  'Chittagong',
-  'Rajshahi',
-  'Khulna',
-  'Barisal',
-  'Sylhet',
-  'Rangpur',
-  'Mymensingh'
-];
 
 export default function Checkout() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { items, getSubtotal, getDiscount, getTotal, deliveryFee, appliedCoupon, clearCart } = useCartStore();
+  const { 
+    items, 
+    getSubtotal, 
+    getDiscount, 
+    getTotal, 
+    deliveryFee, 
+    setDeliveryFee, 
+    appliedCoupon, 
+    clearCart 
+  } = useCartStore();
+
+  const { feeInsideDhaka, feeOutsideDhaka } = useSettingsStore();
 
   const subtotal = getSubtotal();
   const discount = getDiscount();
   const total = getTotal();
 
-  // শিপিং ফরম স্টেট
+  // কাস্টমার ইনফো স্টেট
   const [fullName, setFullName] = useState<string>(() => user?.displayName || '');
   const [phone, setPhone] = useState<string>(() => user?.phoneNumber || '');
   const [alternatePhone, setAlternatePhone] = useState<string>('');
+  
+  // ৩-টিয়ার বাংলাদেশ এড্রেস স্টেট
   const [division, setDivision] = useState<string>('Dhaka');
-  const [district, setDistrict] = useState<string>('');
-  const [upazila, setUpazila] = useState<string>('');
+  const [district, setDistrict] = useState<string>('Dhaka');
+  const [upazila, setUpazila] = useState<string>('Dhanmondi');
   const [fullAddress, setFullAddress] = useState<string>('');
   const [deliveryNotes, setDeliveryNotes] = useState<string>('');
+
+  // জেলা ও থানা তালিকা ফিল্টার স্টেট
+  const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
+  const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
 
   // পেমেন্ট স্টেট
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
@@ -68,6 +79,41 @@ export default function Checkout() {
       navigate('/cart');
     }
   }, [items, navigate]);
+
+  // বিভাগ পরিবর্তন হ্যান্ডলার (স্বয়ংক্রিয়ভাবে জেলা ও থানা ফিল্টার করবে)
+  const handleDivisionChange = (newDivision: string) => {
+    setDivision(newDivision);
+    const districts = getDistrictsByDivision(newDivision);
+    setAvailableDistricts(districts);
+
+    const firstDistrict = districts[0]?.name || '';
+    setDistrict(firstDistrict);
+
+    const upazilas = getUpazilasByDistrict(newDivision, firstDistrict);
+    setAvailableUpazilas(upazilas);
+    setUpazila(upazilas[0] || '');
+
+    // ডেলিভারি চার্জ অটোমেটিক পরিবর্তন
+    if (newDivision === 'Dhaka' && firstDistrict === 'Dhaka') {
+      setDeliveryFee(feeInsideDhaka || 60);
+    } else {
+      setDeliveryFee(feeOutsideDhaka || 150);
+    }
+  };
+
+  // জেলা পরিবর্তন হ্যান্ডলার (স্বয়ংক্রিয়ভাবে থানা ফিল্টার করবে)
+  const handleDistrictChange = (newDistrict: string) => {
+    setDistrict(newDistrict);
+    const upazilas = getUpazilasByDistrict(division, newDistrict);
+    setAvailableUpazilas(upazilas);
+    setUpazila(upazilas[0] || '');
+
+    if (division === 'Dhaka' && newDistrict === 'Dhaka') {
+      setDeliveryFee(feeInsideDhaka || 60);
+    } else {
+      setDeliveryFee(feeOutsideDhaka || 150);
+    }
+  };
 
   // ফর্ম ভ্যালিডেশন
   const validateForm = () => {
@@ -90,8 +136,8 @@ export default function Checkout() {
     phone: phone.trim(),
     alternatePhone: alternatePhone.trim() || undefined,
     division,
-    district: district.trim(),
-    upazila: upazila.trim(),
+    district,
+    upazila,
     fullAddress: fullAddress.trim(),
     deliveryNotes: deliveryNotes.trim() || undefined,
   });
@@ -128,14 +174,23 @@ export default function Checkout() {
         paymentMethod: 'cod',
       });
 
-      // স্বয়ংক্রিয় SMS ও Email নোটিফিকেশন
+      // স্বয়ংক্রিয় SMS ও Email নোটিফিকেশন ইঞ্জিন
       sendOrderConfirmationSMS(phone.trim(), order.orderNumber, total);
       sendOrderConfirmationEmail(order);
       sendAdminOrderAlert(order);
 
       clearCart();
       toast.success(`Order placed successfully! Tracking ID: ${order.orderNumber}`);
-      navigate('/orders');
+
+      // সরাসরি মানি রিসিট ও ইনভয়েস পেজে রিডাইরেক্ট করা
+      navigate('/order-success', {
+        state: {
+          order: {
+            ...order,
+            totalAmount: total,
+          },
+        },
+      });
     } catch (error) {
       console.error('Order creation error:', error);
       toast.error('Failed to place order. Please try again.');
@@ -165,17 +220,24 @@ export default function Checkout() {
         paymentMethod: 'bkash',
       });
 
-      // ফায়ারস্টোর পেমেন্ট রেকর্ডে ট্রানজেকশন আপডেট
       await executeBkashPayment(order.id, order.orderNumber, total, bkashPhone, trxId);
 
-      // কাস্টমার ও অ্যাডমিন নোটিফিকেশন
       sendOrderConfirmationSMS(phone.trim(), order.orderNumber, total);
       sendOrderConfirmationEmail(order);
       sendAdminOrderAlert(order);
 
       clearCart();
       toast.success(`Paid & Order Confirmed! TrxID: ${trxId}`);
-      navigate('/orders');
+      
+      navigate('/order-success', {
+        state: {
+          order: {
+            ...order,
+            paymentStatus: 'paid',
+            totalAmount: total,
+          },
+        },
+      });
     } catch (error) {
       console.error('Bkash post-payment order creation error:', error);
       toast.error('Payment verified, but failed to record order.');
@@ -206,7 +268,7 @@ export default function Checkout() {
           {/* Left Column: Shipping Address & Payment Method */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Delivery Address Card */}
+            {/* Delivery Address Card (3-Tier Cascading Selectors) */}
             <div className="bg-white rounded-2xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -214,7 +276,7 @@ export default function Checkout() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-navy">Shipping & Delivery Address</h2>
-                  <p className="text-xs text-gray-500">Please provide your valid Bangladeshi address for delivery</p>
+                  <p className="text-xs text-gray-500">Select your Division, District, and Thana for accurate delivery</p>
                 </div>
               </div>
 
@@ -267,67 +329,69 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Division Dropdown */}
+                {/* Tier 1: Division Dropdown */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-navy">Division *</label>
+                  <label className="text-xs font-bold text-navy">বিভাগ (Division) *</label>
                   <select
                     value={division}
-                    onChange={(e) => setDivision(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                    onChange={(e) => handleDivisionChange(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
                   >
-                    {BD_DIVISIONS.map((div) => (
-                      <option key={div} value={div}>{div}</option>
+                    {BANGLADESH_DIVISIONS.map((d) => (
+                      <option key={d.name} value={d.name}>{d.name}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* District */}
+                {/* Tier 2: District Dropdown (Filtered based on Division) */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-navy">District *</label>
-                  <input
-                    type="text"
-                    required
+                  <label className="text-xs font-bold text-navy">জেলা (District) *</label>
+                  <select
                     value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
-                    placeholder="e.g. Dhaka or Gazipur"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
-                  />
+                    onChange={(e) => handleDistrictChange(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                  >
+                    {availableDistricts.map((dist) => (
+                      <option key={dist.name} value={dist.name}>{dist.name}</option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Upazila / Thana */}
+                {/* Tier 3: Upazila / Thana Dropdown (Filtered based on District) */}
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Upazila / Thana *</label>
-                  <input
-                    type="text"
-                    required
+                  <label className="text-xs font-bold text-navy">থানা / উপজেলা (Upazila / Thana) *</label>
+                  <select
                     value={upazila}
                     onChange={(e) => setUpazila(e.target.value)}
-                    placeholder="e.g. Dhanmondi, Mirpur, or Savar"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
-                  />
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                  >
+                    {availableUpazilas.map((upa) => (
+                      <option key={upa} value={upa}>{upa}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Full Street Address */}
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Full Address (House, Road, Area) *</label>
+                  <label className="text-xs font-bold text-navy">বিস্তারিত ঠিকানা (বাড়ি, রোড, এলাকা) *</label>
                   <textarea
                     required
-                    rows={3}
+                    rows={2}
                     value={fullAddress}
                     onChange={(e) => setFullAddress(e.target.value)}
-                    placeholder="e.g. House #12, Road #4, Block #B, Mirpur-10, Dhaka"
+                    placeholder="যেমন: হাউজ #১২, রোড #৪, ব্লক #বি, শান্তিনগর"
                     className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors resize-none"
                   />
                 </div>
 
                 {/* Delivery Notes */}
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Special Delivery Notes (Optional)</label>
+                  <label className="text-xs font-bold text-navy">ডেলিভারি নোট (ঐচ্ছিক)</label>
                   <input
                     type="text"
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
-                    placeholder="e.g. Call before delivery or leave with security"
+                    placeholder="যেমন: ডেলিভারির আগে ফোন দিন"
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -436,7 +500,7 @@ export default function Checkout() {
                 </div>
 
                 <div className="flex justify-between text-gray-600">
-                  <span>Delivery Charge</span>
+                  <span>Delivery Charge ({division === 'Dhaka' && district === 'Dhaka' ? 'Inside Dhaka' : 'Outside Dhaka'})</span>
                   <span className="font-bold text-navy">৳{deliveryFee.toLocaleString()}</span>
                 </div>
 

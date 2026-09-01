@@ -14,9 +14,9 @@ import {
   ArrowLeft, 
   Share2, 
   CreditCard, 
-  Zap,
-  Tag,
-  RotateCcw
+  Zap, 
+  Tag, 
+  RotateCcw 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,6 +25,7 @@ import { useCartStore } from '../../store/cartStore';
 import { useWishlistStore } from '../../store/wishlistStore';
 import type { Product } from '../../types/product';
 import ExpressOrderModal from '../../components/product/ExpressOrderModal';
+import ProductReviews from '../../components/product/ProductReviews';
 
 // টেস্ট করার জন্য ফলব্যাক ক্যাটালগ
 const MOCK_CATALOG: Product[] = [
@@ -298,7 +299,7 @@ export default function ProductDetail() {
             {/* Left Column: Premium Framed Image Gallery */}
             <div className="space-y-4">
               
-              {/* Main Product Frame (Clean White Surface, uncropped object-contain with 3D drop shadow) */}
+              {/* Main Product Frame */}
               <div className="relative aspect-square max-h-115 rounded-3xl overflow-hidden bg-gray-50/50 border border-gray-100 shadow-inner flex items-center justify-center p-6 group">
                 <img 
                   src={product.images[selectedImageIndex] || product.images[0] || 'https://via.placeholder.com/600'} 
@@ -309,21 +310,21 @@ export default function ProductDetail() {
                 {/* Top Share Button */}
                 <button 
                   onClick={handleShare}
-                  className="absolute top-4 right-4 p-2.5 bg-white/90 hover:bg-white rounded-full text-gray-700 shadow-md backdrop-blur-sm transition-all border border-gray-100 hover:scale-110"
+                  className="absolute top-4 right-4 p-2.5 bg-white/90 hover:bg-white rounded-full text-gray-700 shadow-md backdrop-blur-sm transition-all border border-gray-100 hover:scale-110 cursor-pointer"
                   aria-label="Share product"
                 >
                   <Share2 className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Thumbnails Row (If multiple images exist) */}
+              {/* Thumbnails Row */}
               {product.images.length > 1 && (
                 <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1">
                   {product.images.map((img, idx) => (
                     <button
                       key={idx}
                       onClick={() => setSelectedImageIndex(idx)}
-                      className={`relative w-20 h-20 rounded-2xl overflow-hidden bg-white p-2 border-2 transition-all shrink-0 flex items-center justify-center ${
+                      className={`relative w-20 h-20 rounded-2xl overflow-hidden bg-white p-2 border-2 transition-all shrink-0 flex items-center justify-center cursor-pointer ${
                         selectedImageIndex === idx 
                           ? 'border-primary shadow-md scale-105' 
                           : 'border-gray-200 hover:border-gray-300 opacity-70 hover:opacity-100'
@@ -405,7 +406,7 @@ export default function ProductDetail() {
                     <button 
                       onClick={() => handleQuantityChange('decrease')}
                       disabled={quantity <= 1}
-                      className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors"
+                      className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors cursor-pointer"
                       aria-label="Decrease quantity"
                     >
                       <Minus className="w-4 h-4" />
@@ -414,7 +415,7 @@ export default function ProductDetail() {
                     <button 
                       onClick={() => handleQuantityChange('increase')}
                       disabled={quantity >= product.stock}
-                      className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors"
+                      className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors cursor-pointer"
                       aria-label="Increase quantity"
                     >
                       <Plus className="w-4 h-4" />
@@ -429,7 +430,7 @@ export default function ProductDetail() {
                   <button
                     onClick={() => setIsExpressModalOpen(true)}
                     disabled={product.stock === 0}
-                    className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-emerald-600 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95"
+                    className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-emerald-600 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95 cursor-pointer"
                   >
                     <Zap className="w-5 h-5 fill-current" />
                     সরাসরি অর্ডার করুন (1-Click Order)
@@ -439,7 +440,7 @@ export default function ProductDetail() {
                     <button
                       onClick={handleAddToCart}
                       disabled={product.stock === 0}
-                      className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white py-3.5 px-6 rounded-2xl font-extrabold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white py-3.5 px-6 rounded-2xl font-extrabold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                       <ShoppingBag className="w-5 h-5" />
                       Add to Cart
@@ -447,7 +448,7 @@ export default function ProductDetail() {
 
                     <button
                       onClick={handleToggleWishlist}
-                      className={`p-3.5 rounded-2xl border transition-all ${
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
                         isWishlisted 
                           ? 'border-red-200 bg-red-50 text-red-500' 
                           : 'border-gray-200 bg-white text-gray-600 hover:text-red-500 hover:bg-gray-50'
@@ -488,11 +489,11 @@ export default function ProductDetail() {
         </div>
 
         {/* Tabs Section: Description & Specifications */}
-        <div className="bg-white rounded-3xl shadow-modern border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-modern border border-gray-100 overflow-hidden mb-10">
           <div className="flex border-b border-gray-100 bg-gray-50/50">
             <button
               onClick={() => setActiveTab('description')}
-              className={`px-6 py-4 font-extrabold text-xs sm:text-sm transition-colors border-b-2 ${
+              className={`px-6 py-4 font-extrabold text-xs sm:text-sm transition-colors border-b-2 cursor-pointer ${
                 activeTab === 'description' 
                   ? 'border-primary text-primary bg-white' 
                   : 'border-transparent text-gray-500 hover:text-navy'
@@ -503,7 +504,7 @@ export default function ProductDetail() {
             {product.specifications && product.specifications.length > 0 && (
               <button
                 onClick={() => setActiveTab('specifications')}
-                className={`px-6 py-4 font-extrabold text-xs sm:text-sm transition-colors border-b-2 ${
+                className={`px-6 py-4 font-extrabold text-xs sm:text-sm transition-colors border-b-2 cursor-pointer ${
                   activeTab === 'specifications' 
                     ? 'border-primary text-primary bg-white' 
                     : 'border-transparent text-gray-500 hover:text-navy'
@@ -536,6 +537,12 @@ export default function ProductDetail() {
             )}
           </div>
         </div>
+
+        {/* Customer Verified Photo Reviews & 5-Star Ratings Section */}
+        <ProductReviews 
+          productId={product.id} 
+          productName={product.name} 
+        />
 
       </div>
 
