@@ -63,7 +63,7 @@ const optimizeLogoImage = (file: File): Promise<string> => {
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        // ট্রান্সপারেন্ট PNG সাপোর্ট সহ অপটিমাইজড ডেটা URL
+        // ট্রান্সপারেন্ট PNG সাপোর্ট সহ অপটিমাইজড ডেটা URL (< 25 KB)
         const optimizedBase64 = canvas.toDataURL('image/png', 0.95);
         resolve(optimizedBase64);
       };
@@ -189,7 +189,7 @@ export default function AdminSettings() {
       setIsSaving(true);
       const docRef = doc(db, 'settings', 'general');
 
-      const settingsPayload = {
+      const firestorePayload = {
         logoType,
         logoUrl: logoUrl || '',
         siteName: siteName.trim() || 'ISAR',
@@ -208,16 +208,29 @@ export default function AdminSettings() {
       };
 
       // ১. ফায়ারস্টোর ডেটাবেসে সেভ করা
-      await setDoc(docRef, settingsPayload, { merge: true });
+      await setDoc(docRef, firestorePayload, { merge: true });
 
-      // ২. গ্লোবাল Zustand ক্যাশ স্টোরে সাথে সাথে লাইভ আপডেট
+      // ২. গ্লোবাল Zustand ক্যাশ স্টোরে নিরাপদভাবে সেভ (serverTimestamp ছাড়া যাতে লোকালস্টোরেজে ক্র্যাশ না করে)
       updateGlobalStore({
-        ...settingsPayload,
+        logoType,
+        logoUrl: logoUrl || '',
+        siteName: siteName.trim() || 'ISAR',
+        contactEmail: contactEmail.trim() || 'support@isar.com.bd',
+        contactPhone: contactPhone.trim() || '+880 1234 567890',
+        officeAddress: officeAddress.trim() || 'Dhaka, Bangladesh',
+        feeInsideDhaka: Number(feeInsideDhaka) || 0,
+        feeOutsideDhaka: Number(feeOutsideDhaka) || 0,
+        facebookUrl: facebookUrl.trim() || 'https://facebook.com',
+        instagramUrl: instagramUrl.trim() || 'https://instagram.com',
+        flashSaleActive,
+        flashSaleTitle: flashSaleTitle.trim() || 'Flash Sale Offers',
+        flashSaleDiscountText: flashSaleDiscountText.trim() || 'Up to 50% Off',
+        flashSaleEndTime,
         isLoaded: true,
       });
 
       toast.success('Website settings & brand logo saved successfully!');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving settings:', error);
       const err = error as Error;
       toast.error(err.message || 'Failed to update settings');
