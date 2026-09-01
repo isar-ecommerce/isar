@@ -249,10 +249,10 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Bar */}
-                <div className="w-full max-w-[42px] bg-gray-100 rounded-t-xl overflow-hidden relative flex items-end h-full">
+                <div className="w-full max-w-[10.5] bg-gray-100 rounded-t-xl overflow-hidden relative flex items-end h-full">
                   <div
                     style={{ height: `${item.heightPercent}%` }}
-                    className="w-full bg-gradient-to-t from-primary to-primary-light group-hover:from-brand-green group-hover:to-emerald-400 rounded-t-xl transition-all duration-500 shadow-sm"
+                    className="w-full bg-linear-to-t from-primary to-primary-light group-hover:from-brand-green group-hover:to-emerald-400 rounded-t-xl transition-all duration-500 shadow-sm"
                   />
                 </div>
 
