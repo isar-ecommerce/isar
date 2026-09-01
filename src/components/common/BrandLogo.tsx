@@ -45,48 +45,30 @@ export default function BrandLogo({
             />
           </div>
 
-          {/* লোগো ব্যাজের পাশে ব্র্যান্ডের নাম (ISAR Wordmark) */}
+          {/* লোগো ব্যাজের পাশে শুধুমাত্র ব্র্যান্ডের নাম (ISAR) */}
           {showTextBesideLogo && (
-            <div className="flex flex-col text-left">
-              <span
-                className={`font-black tracking-wider leading-none ${
-                  adminMode
-                    ? 'text-xl text-white'
-                    : 'text-xl sm:text-2xl text-navy group-hover:text-primary transition-colors'
-                }`}
-              >
-                {siteName.toUpperCase()}
-              </span>
-              <span
-                className={`text-[8px] font-bold tracking-[0.2em] uppercase mt-0.5 ${
-                  adminMode ? 'text-amber-400' : 'text-brand-gold'
-                }`}
-              >
-                Marketplace
-              </span>
-            </div>
+            <span
+              className={`font-black tracking-wider leading-none ${
+                adminMode
+                  ? 'text-xl text-white'
+                  : 'text-xl sm:text-2xl text-navy group-hover:text-primary transition-colors'
+              }`}
+            >
+              {siteName.toUpperCase()}
+            </span>
           )}
         </>
       ) : (
-        /* টেক্সট লোগো মোড */
-        <div className="flex flex-col text-left">
-          <span
-            className={`font-black tracking-tight leading-none ${
-              adminMode
-                ? 'text-2xl text-white'
-                : 'text-2xl sm:text-3xl text-primary'
-            }`}
-          >
-            {siteName.toUpperCase()}
-          </span>
-          <span
-            className={`text-[9px] font-bold tracking-[0.2em] uppercase mt-0.5 ${
-              adminMode ? 'text-amber-400' : 'text-brand-gold'
-            }`}
-          >
-            Premium
-          </span>
-        </div>
+        /* টেক্সট লোগো মোড (শুধুমাত্র ISAR) */
+        <span
+          className={`font-black tracking-tight leading-none ${
+            adminMode
+              ? 'text-2xl text-white'
+              : 'text-2xl sm:text-3xl text-primary'
+          }`}
+        >
+          {siteName.toUpperCase()}
+        </span>
       )}
     </div>
   );
