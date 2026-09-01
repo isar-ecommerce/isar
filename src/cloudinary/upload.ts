@@ -1,34 +1,69 @@
 /**
- * আসল ক্যামেরার ছবিকে ১০০% লসলেস (Lossless Original Quality) ডেটা ফরম্যাটে পড়ার ফাংশন
- * (কোনো প্রকার ব্লার বা পিক্সেল ড্রপ ছাড়াই ক্রিস্টাল ক্লিয়ার কোয়ালিটি নিশ্চিত করে)
+ * যেকোনো সাইজের (খাড়া, আড়াআড়ি বা বড়) ছবিকে স্বয়ংক্রিয়ভাবে ১:১ স্কয়ার (1000x1000px Ultra-HD)
+ * পারফেক্ট ফ্রেমে সেন্টারিং ও ক্রিস্টাল ক্লিয়ার কোয়ালিটিতে কনভার্ট করার ইঞ্জিন
  */
-const readOriginalFileAsDataUrl = (file: File): Promise<string> => {
+const frameImageToSquareHD = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-      } else {
-        reject(new Error('Failed to read original image file'));
-      }
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const targetSize = 1000; // স্ট্যান্ডার্ড ১:১ স্কয়ার (Ultra-HD 1000x1000)
+        const canvas = document.createElement('canvas');
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(event.target?.result as string);
+          return;
+        }
+
+        // ১. ব্যাকগ্রাউন্ডে পরিচ্ছন্ন সাদা ক্যানভাস তৈরি করা
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, targetSize, targetSize);
+
+        // ২. অরিজিনাল রেশিও বজায় রেখে সেন্টারিং ও স্কেলিং হিসাব করা
+        const scale = Math.min(targetSize / img.width, targetSize / img.height);
+        const drawWidth = img.width * scale;
+        const drawHeight = img.height * scale;
+        const offsetX = (targetSize - drawWidth) / 2;
+        const offsetY = (targetSize - drawHeight) / 2;
+
+        // ৩. হাই-কোয়ালিটি স্মুথিং ফিল্টার এনাবল করা
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // ৪. সেন্টারে ছবিটি নিখুঁতভাবে বসানো (কোনো বিকৃতি ছাড়া)
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+        // ৫. ০.৯৫ হাই-ডেফিনিশন কোয়ালিটিতে ডেটা রিটার্ন
+        const framedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        resolve(framedDataUrl);
+      };
+      img.onerror = (error) => reject(error);
     };
     reader.onerror = (error) => reject(error);
   });
 };
 
 /**
- * Cloudinary এবং ফুল-রেজোলিউশন অরিজিনাল ইমেজ আপলোড ইঞ্জিন
+ * Cloudinary এবং ১:১ স্কয়ার অটো-ফ্রেমড ইমেজ আপলোড ইঞ্জিন
  */
 export const uploadImageToCloudinary = async (file: File): Promise<string> => {
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
-  // ১. যদি ক্লাউডিনারি ক্রেডেনশিয়াল কনফিগার করা থাকে, তবে ক্লাউডিনারি ক্লাউডে ডিরেক্ট ফুল-কোয়ালিটি আপলোড করবে
+  // ১. ছবিকে আগে ১:১ স্কয়ার আল্ট্রা-এইচডি ফ্রেমে প্রসেস করা
+  const framedImageDataUrl = await frameImageToSquareHD(file);
+
+  // ২. যদি ক্লাউডিনারি ক্রেডেনশিয়াল থাকে, তবে ক্লাউডিনারি ক্লাউডে আপলোড করবে
   if (cloudName && uploadPreset && uploadPreset !== 'demo' && cloudName !== 'demo') {
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', framedImageDataUrl);
       formData.append('upload_preset', uploadPreset);
       formData.append('folder', 'isar_products');
 
@@ -45,10 +80,10 @@ export const uploadImageToCloudinary = async (file: File): Promise<string> => {
         return data.secure_url;
       }
     } catch (apiError) {
-      console.warn('Cloudinary direct upload warning, using lossless original fallback:', apiError);
+      console.warn('Cloudinary upload warning, using 1:1 HD fallback:', apiError);
     }
   }
 
-  // ২. ক্লাউডিনারি প্রি-সেট ছাড়া টেস্ট করার সময় সম্পূর্ণ ১০০% অরিজিনাল ক্যামেরা শার্প ইমেজ রিটার্ন করবে
-  return await readOriginalFileAsDataUrl(file);
+  // ৩. ফলব্যাক হিসেবে ১:১ স্কয়ার আল্ট্রা-এইচডি ইমেজ রিটার্ন করবে
+  return framedImageDataUrl;
 };
