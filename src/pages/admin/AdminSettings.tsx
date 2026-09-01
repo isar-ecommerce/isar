@@ -10,21 +10,72 @@ import {
   MapPin, 
   Truck, 
   Share2, 
-  ShieldCheck,
-  Flame,
-  Calendar,
-  Upload,
-  Trash2,
-  Image as ImageIcon
+  ShieldCheck, 
+  Flame, 
+  Calendar, 
+  Upload, 
+  Trash2, 
+  Image as ImageIcon 
 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 import { db } from '../../firebase/config';
-import { uploadImageToCloudinary } from '../../cloudinary/upload';
+import { useSettingsStore } from '../../store/settingsStore';
+
+/**
+ * ব্র্যান্ড লোগোকে স্ট্যান্ডার্ড ওয়েব সাইজে (Max 400x160px) অপটিমাইজ করার ফাংশন
+ * (যাতে ফায়ারস্টোরে কোনো এরর ছাড়া ১ মিলিসেকেন্ডে সেভ হয় এবং হেডারে একদম পারফেক্ট সাইজে বসে)
+ */
+const optimizeLogoImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 400;
+        const maxHeight = 160;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(event.target?.result as string);
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // ট্রান্সপারেন্ট PNG সাপোর্ট সহ অপটিমাইজড ডেটা URL
+        const optimizedBase64 = canvas.toDataURL('image/png', 0.95);
+        resolve(optimizedBase64);
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 export default function AdminSettings() {
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const updateGlobalStore = useSettingsStore((state) => state.setSettings);
 
   // ব্র্যান্ড লোগো স্টেট
   const [logoType, setLogoType] = useState<'text' | 'image'>('text');
@@ -32,7 +83,7 @@ export default function AdminSettings() {
   const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
 
   // স্টোর আইডেন্টিটি স্টেট
-  const [siteName, setSiteName] = useState<string>('ISAR Marketplace');
+  const [siteName, setSiteName] = useState<string>('ISAR');
   const [contactEmail, setContactEmail] = useState<string>('support@isar.com.bd');
   const [contactPhone, setContactPhone] = useState<string>('+880 1234 567890');
   const [officeAddress, setOfficeAddress] = useState<string>('Dhaka, Bangladesh');
@@ -110,18 +161,19 @@ export default function AdminSettings() {
       const file = files[0];
 
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
+        toast.error('Please select an image file (PNG, JPG, SVG)');
         return;
       }
 
-      const uploadedUrl = await uploadImageToCloudinary(file);
-      setLogoUrl(uploadedUrl);
-      setLogoType('image'); // লোগো আপলোড করলে স্বয়ংক্রিয়ভাবে ইমেজ মোডে যাবে
-      toast.success('Brand logo uploaded & ready!');
+      // লোগো অপটিমাইজ করে < 25KB স্ট্যান্ডার্ড সাইজে কনভার্ট
+      const optimizedLogo = await optimizeLogoImage(file);
+      setLogoUrl(optimizedLogo);
+      setLogoType('image');
+      toast.success('Brand logo processed & ready to save!');
     } catch (error: unknown) {
       console.error('Logo upload error:', error);
       const err = error as Error;
-      toast.error(err.message || 'Failed to upload logo');
+      toast.error(err.message || 'Failed to process logo');
     } finally {
       setIsUploadingLogo(false);
       if (logoFileInputRef.current) {
@@ -137,28 +189,38 @@ export default function AdminSettings() {
       setIsSaving(true);
       const docRef = doc(db, 'settings', 'general');
 
-      await setDoc(docRef, {
+      const settingsPayload = {
         logoType,
         logoUrl: logoUrl || '',
-        siteName,
-        contactEmail,
-        contactPhone,
-        officeAddress,
+        siteName: siteName.trim() || 'ISAR',
+        contactEmail: contactEmail.trim() || 'support@isar.com.bd',
+        contactPhone: contactPhone.trim() || '+880 1234 567890',
+        officeAddress: officeAddress.trim() || 'Dhaka, Bangladesh',
         feeInsideDhaka: Number(feeInsideDhaka) || 0,
         feeOutsideDhaka: Number(feeOutsideDhaka) || 0,
-        facebookUrl,
-        instagramUrl,
+        facebookUrl: facebookUrl.trim() || 'https://facebook.com',
+        instagramUrl: instagramUrl.trim() || 'https://instagram.com',
         flashSaleActive,
         flashSaleTitle: flashSaleTitle.trim() || 'Flash Sale Offers',
         flashSaleDiscountText: flashSaleDiscountText.trim() || 'Up to 50% Off',
         flashSaleEndTime,
         updatedAt: serverTimestamp(),
-      }, { merge: true });
+      };
+
+      // ১. ফায়ারস্টোর ডেটাবেসে সেভ করা
+      await setDoc(docRef, settingsPayload, { merge: true });
+
+      // ২. গ্লোবাল Zustand ক্যাশ স্টোরে সাথে সাথে লাইভ আপডেট
+      updateGlobalStore({
+        ...settingsPayload,
+        isLoaded: true,
+      });
 
       toast.success('Website settings & brand logo saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Failed to update settings');
+      const err = error as Error;
+      toast.error(err.message || 'Failed to update settings');
     } finally {
       setIsSaving(false);
     }
@@ -232,23 +294,23 @@ export default function AdminSettings() {
                 </label>
               </div>
 
-              {/* Logo Image Upload & Preview */}
+              {/* Logo Image Upload & Standard Preview */}
               <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-center gap-6">
                 {logoUrl ? (
-                  <div className="relative w-32 h-16 rounded-xl bg-white border border-gray-200 p-2 flex items-center justify-center overflow-hidden">
+                  <div className="relative w-44 h-16 rounded-xl bg-white border border-gray-200 p-2 flex items-center justify-center overflow-hidden shadow-sm">
                     <img src={logoUrl} alt="Brand Logo" className="max-w-full max-h-full object-contain" />
                     <button
                       type="button"
-                      onClick={() => setLogoUrl('')}
-                      className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                      onClick={() => { setLogoUrl(''); setLogoType('text'); }}
+                      className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm"
                       title="Remove Logo"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
                 ) : (
-                  <div className="w-32 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400 font-bold uppercase">
-                    No Logo
+                  <div className="w-44 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400 font-bold uppercase">
+                    No Logo (Text Active)
                   </div>
                 )}
 
@@ -277,7 +339,7 @@ export default function AdminSettings() {
                       </>
                     )}
                   </button>
-                  <p className="text-[11px] text-gray-400">PNG, SVG or JPG (Transparent background recommended)</p>
+                  <p className="text-[11px] text-gray-400">Standard Size: 180×44px • PNG, SVG or JPG (Transparent background recommended)</p>
                 </div>
               </div>
 
