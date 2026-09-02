@@ -1,6 +1,5 @@
-// Vercel Serverless Function: Secure Steadfast Courier Dispatch Proxy
+// Vercel Serverless Function: 100% Real Steadfast Courier Dispatch
 
-// Node.js process.env গ্লোবাল টাইপ ডিক্লেয়ারেশন (Vite এরর সমাধানের জন্য)
 declare const process: {
   env: Record<string, string | undefined>;
 };
@@ -46,7 +45,6 @@ interface SteadfastApiResponse {
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  // ১. শুধুমাত্র POST রিকোয়েস্ট গ্রহণ করবে
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
@@ -55,7 +53,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
-    const body = req.body || {};
+    const body: SteadfastRequestBody = (req.body as SteadfastRequestBody) || {};
     const { 
       invoice, 
       recipient_name, 
@@ -67,21 +65,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       secretKey: customSecretKey
     } = body;
 
-    // ২. সিকিউর Environment Variable অথবা রিকোয়েস্ট থেকে Key রিড করা
-    const envApiKey = typeof process !== 'undefined' ? process.env.STEADFAST_API_KEY : undefined;
-    const envSecretKey = typeof process !== 'undefined' ? process.env.STEADFAST_SECRET_KEY : undefined;
+    // ১. Vercel Environment থেকে API Key ও Secret Key রিড ও ট্রিম করা
+    const rawApiKey = (typeof process !== 'undefined' ? process.env.STEADFAST_API_KEY : undefined) || customApiKey;
+    const rawSecretKey = (typeof process !== 'undefined' ? process.env.STEADFAST_SECRET_KEY : undefined) || customSecretKey;
 
-    const apiKey = envApiKey || customApiKey;
-    const secretKey = envSecretKey || customSecretKey;
+    const apiKey = rawApiKey ? rawApiKey.trim() : '';
+    const secretKey = rawSecretKey ? rawSecretKey.trim() : '';
 
     if (!apiKey || !secretKey) {
       return res.status(400).json({
         success: false,
-        message: 'Steadfast API Key or Secret Key is not configured. Please add them in Admin Settings or Vercel Environment Variables.',
+        message: 'Steadfast API Key or Secret Key is missing in Vercel Environment Variables.',
       });
     }
 
-    // ৩. ফিল্ড ভ্যালিডেশন
+    // ২. রিকোয়ার্ড ফিল্ড ভ্যালিডেশন
     if (!invoice || !recipient_name || !recipient_phone || !recipient_address) {
       return res.status(400).json({
         success: false,
@@ -89,18 +87,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
-    // ফোন নম্বর ফরম্যাটিং (১১ ডিজিট নিশ্চিত করা)
+    // ১১ ডিজিটের সঠিক ফোন নম্বর
     const cleanPhone = recipient_phone.replace(/[^0-9]/g, '');
-    const formattedPhone = cleanPhone.startsWith('88') ? cleanPhone.slice(2) : cleanPhone;
-
-    if (formattedPhone.length < 11) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid recipient phone number. Must be a valid 11-digit Bangladeshi mobile number.',
-      });
+    let formattedPhone = cleanPhone;
+    if (cleanPhone.startsWith('880')) {
+      formattedPhone = cleanPhone.slice(2);
+    } else if (cleanPhone.startsWith('88')) {
+      formattedPhone = cleanPhone.slice(2);
     }
 
-    // ৪. স্টেডফাস্ট অফিশিয়াল API পেলোড
+    // ৩. স্টেডফাস্ট অফিশিয়াল API পেলোড
     const steadfastPayload = {
       invoice: String(invoice).trim(),
       recipient_name: String(recipient_name).trim(),
@@ -110,39 +106,73 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       note: note ? String(note).trim() : 'Handle with care - ISAR Marketplace',
     };
 
-    // ৫. স্টেডফাস্ট সেন্ট্রাল সার্ভারে সিকিউর রিকোয়েস্ট পাঠানো
-    const response = await fetch('https://portal.steadfast.com.bd/api/v1/create_order', {
-      method: 'POST',
-      headers: {
-        'Api-Key': apiKey,
-        'Secret-Key': secretKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(steadfastPayload),
-    });
+    const headers = {
+      'Api-Key': apiKey,
+      'Secret-Key': secretKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'ISAR-Marketplace-Serverless/1.0',
+    };
 
-    const data = (await response.json()) as SteadfastApiResponse;
+    // ৪. সরাসরি Steadfast-এর কোর API সার্ভারে কল (packzy.com)
+    const endpoints = [
+      'https://portal.packzy.com/api/v1/create_order',
+      'https://portal.steadfast.com.bd/api/v1/create_order'
+    ];
 
-    // ৬. রেসপন্স হ্যান্ডলিং
-    if (response.ok && data.status === 200 && data.consignment) {
-      return res.status(200).json({
-        success: true,
-        message: 'Order successfully created on Steadfast Courier!',
-        consignment: data.consignment,
-      });
-    } else {
-      return res.status(response.status || 400).json({
-        success: false,
-        message: data.message || 'Failed to create order on Steadfast.',
-        errors: data.errors || null,
-      });
+    let lastError = '';
+
+    for (const url of endpoints) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(steadfastPayload),
+        });
+
+        const rawText = await response.text();
+        let data: SteadfastApiResponse = {};
+
+        try {
+          data = JSON.parse(rawText) as SteadfastApiResponse;
+        } catch {
+          lastError = `Invalid response from ${url}`;
+          continue;
+        }
+
+        // সফল রেসপন্স
+        if (response.ok && data.status === 200 && data.consignment) {
+          return res.status(200).json({
+            success: true,
+            message: 'Order successfully created on Steadfast Courier!',
+            consignment: data.consignment,
+          });
+        }
+
+        // যদি স্টেডফাস্ট থেকে কোনো ভ্যালিডেশন এরর দেয় (যেমন: ফোন বা ব্যালেন্স)
+        if (data.message || data.errors) {
+          const detail = data.errors ? Object.values(data.errors).flat().join(', ') : '';
+          return res.status(response.status || 400).json({
+            success: false,
+            message: data.message || detail || 'Steadfast order booking rejected.',
+            errors: data.errors || null,
+          });
+        }
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
     }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error while connecting to Steadfast.';
-    console.error('Steadfast serverless API error:', error);
+
     return res.status(500).json({
       success: false,
-      message: errorMessage,
+      message: `Steadfast connection error: ${lastError}`,
+    });
+
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Internal server error while connecting to Steadfast.';
+    return res.status(500).json({
+      success: false,
+      message: errorMsg,
     });
   }
 }
