@@ -75,8 +75,15 @@ export interface Order {
   // অর্ডার বর্তমান অবস্থা
   status: OrderStatus;
   
+  // কুরিয়ার ও ট্র্যাকিং তথ্য
+  courierName?: string;     // যেমন: 'Steadfast' | 'Pathao' | 'RedX'
+  consignmentId?: string;   // কুরিয়ার কনসাইনমেন্ট আইডি
+  trackingCode?: string;    // কুরিয়ার পার্সেল ট্র্যাকিং কোড
+  trackingUrl?: string;     // সরাসরি ট্র্যাকিং লিংক
+  shippedAt?: unknown;      // কুরিয়ারে হস্তান্তরের সময়
+  
   // ট্র্যাকিং নোট ও হিস্ট্রি
-  statusHistory: Array<{
+  statusHistory?: Array<{
     status: OrderStatus;
     updatedAt: unknown;
     note?: string;
