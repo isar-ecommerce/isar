@@ -1,4 +1,5 @@
 // Vercel Serverless Function: 100% Real Steadfast Courier Dispatch
+// Fixed to handle both JSON and Plain Text responses (e.g. "Account is not active")
 
 declare const process: {
   env: Record<string, string | undefined>;
@@ -45,7 +46,6 @@ interface SteadfastApiResponse {
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  // ১. শুধুমাত্র POST রিকোয়েস্ট গ্রহণ করবে
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
@@ -66,7 +66,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       secretKey: customSecretKey
     } = body;
 
-    // ২. Vercel Environment Variables থেকে সিকিউর Key রিড ও ট্রিম করা
+    // ১. Vercel Environment Variables থেকে সিকিউর Key রিড করা
     const rawApiKey = (typeof process !== 'undefined' ? process.env.STEADFAST_API_KEY : undefined) || customApiKey;
     const rawSecretKey = (typeof process !== 'undefined' ? process.env.STEADFAST_SECRET_KEY : undefined) || customSecretKey;
 
@@ -80,7 +80,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
-    // ৩. রিকোয়ার্ড ফিল্ড ভ্যালিডেশন
+    // ২. ফিল্ড ভ্যালিডেশন
     if (!invoice || !recipient_name || !recipient_phone || !recipient_address) {
       return res.status(400).json({
         success: false,
@@ -97,7 +97,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       formattedPhone = cleanPhone.slice(2);
     }
 
-    // ৪. অফিশিয়াল Steadfast API V1 পেলোড
+    // ৩. অফিশিয়াল Steadfast API V1 পেলোড
     const steadfastPayload = {
       invoice: String(invoice).trim(),
       recipient_name: String(recipient_name).trim(),
@@ -112,60 +112,51 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       'Secret-Key': secretKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'User-Agent': 'ISAR-Marketplace-Serverless/1.0',
     };
 
-    // ৫. অফিশিয়াল Steadfast এপিআই সার্ভার রুট
-    const endpoints = [
-      'https://portal.steadfast.com.bd/api/v1/create_order',
-      'https://portal.packzy.com/api/v1/create_order'
-    ];
+    // ৪. সরাসরি Steadfast সেন্ট্রাল সার্ভারে কল
+    const response = await fetch('https://portal.steadfast.com.bd/api/v1/create_order', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(steadfastPayload),
+    });
 
-    let lastError = '';
+    const rawText = await response.text();
 
-    for (const url of endpoints) {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(steadfastPayload),
-        });
-
-        const rawText = await response.text();
-        let data: SteadfastApiResponse = {};
-
-        try {
-          data = JSON.parse(rawText) as SteadfastApiResponse;
-        } catch {
-          lastError = `Server returned non-JSON response from ${url}`;
-          continue;
-        }
-
-        // সফল পার্সেল বুকিং রেসপন্স (HTTP 200 & status 200)
-        if (response.ok && data.status === 200 && data.consignment) {
-          return res.status(200).json({
-            success: true,
-            message: 'Order successfully created on Steadfast Courier!',
-            consignment: data.consignment,
-          });
-        }
-
-        // যদি স্টেডফাস্ট রিজেক্ট করে
-        if (data.message || data.errors) {
-          const detail = data.errors ? Object.values(data.errors).flat().join(', ') : '';
-          return res.status(response.status || 400).json({
-            success: false,
-            message: data.message || detail || 'Steadfast order booking rejected.',
-            errors: data.errors || null,
-          });
-        }
-      } catch (err: unknown) {
-        lastError = err instanceof Error ? err.message : String(err);
-      }
+    // ৫. টেক্সট রেসপন্স হ্যান্ডলিং (যেমন: "Account is not active")
+    if (rawText.toLowerCase().includes('account is not active') || rawText.toLowerCase().includes('account is')) {
+      return res.status(400).json({
+        success: false,
+        message: 'আপনার Steadfast অ্যাকাউন্টটি এখনো অ্যাক্টিভ হয়নি। Steadfast কাস্টমার কেয়ার বা আপনার অ্যাকাউন্ট ম্যানেজারের সাথে যোগাযোগ করে অ্যাকাউন্টটি অ্যাক্টিভ করে নিন।',
+      });
     }
 
-    return res.status(500).json({
+    // ৬. JSON রেসপন্স পার্সিং
+    let data: SteadfastApiResponse = {};
+    try {
+      data = JSON.parse(rawText) as SteadfastApiResponse;
+    } catch {
+      return res.status(response.status || 400).json({
+        success: false,
+        message: rawText || 'Invalid response received from Steadfast.',
+      });
+    }
+
+    // সফল পার্সেল বুকিং
+    if (response.ok && data.status === 200 && data.consignment) {
+      return res.status(200).json({
+        success: true,
+        message: 'Order successfully created on Steadfast Courier!',
+        consignment: data.consignment,
+      });
+    }
+
+    // অন্যান্য ত্রুটি
+    const errorDetail = data.errors ? Object.values(data.errors).flat().join(', ') : '';
+    return res.status(response.status || 400).json({
       success: false,
-      message: `Steadfast connection error: ${lastError}`,
+      message: data.message || errorDetail || 'Steadfast order booking rejected.',
     });
 
   } catch (error: unknown) {
