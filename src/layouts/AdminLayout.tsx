@@ -13,7 +13,8 @@ import {
   X, 
   ExternalLink, 
   ShieldCheck, 
-  FileText 
+  FileText,
+  Ticket
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { logoutUser } from '../firebase/auth';
@@ -32,6 +33,7 @@ export default function AdminLayout() {
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, end: true },
     { name: 'Manage Orders', path: '/admin/orders', icon: ShoppingCart },
+    { name: 'Promo Coupons', path: '/admin/coupons', icon: Ticket },
     { name: 'All Products', path: '/admin/products', icon: ShoppingBag, end: true },
     { name: 'Add Product', path: '/admin/products/add', icon: PlusCircle },
     { name: 'Categories', path: '/admin/categories', icon: FolderTree },
@@ -101,7 +103,7 @@ export default function AdminLayout() {
           <aside className="relative w-64 bg-navy text-white h-full flex flex-col z-10 shadow-2xl">
             <div className="h-16 flex items-center justify-between px-6 border-b border-navy-light">
               <BrandLogo adminMode={true} to="/admin" />
-              <button onClick={() => setIsMobileSidebarOpen(false)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setIsMobileSidebarOpen(false)} className="text-gray-400 hover:text-white cursor-pointer">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -139,7 +141,7 @@ export default function AdminLayout() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden p-2 text-navy hover:text-primary transition-colors"
+              className="lg:hidden p-2 text-navy hover:text-primary transition-colors cursor-pointer"
               aria-label="Open sidebar"
             >
               <Menu className="w-6 h-6" />
@@ -163,7 +165,7 @@ export default function AdminLayout() {
 
             <button
               onClick={handleLogout}
-              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
               title="Logout"
             >
               <LogOut className="w-5 h-5" />

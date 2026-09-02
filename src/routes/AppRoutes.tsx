@@ -31,6 +31,7 @@ import AdminDashboard from '../pages/admin/AdminDashboard';
 import AdminProducts from '../pages/admin/AdminProducts';
 import AdminAddProduct from '../pages/admin/AdminAddProduct';
 import AdminOrders from '../pages/admin/AdminOrders';
+import AdminCoupons from '../pages/admin/AdminCoupons';
 import AdminCategories from '../pages/admin/AdminCategories';
 import AdminSellers from '../pages/admin/AdminSellers';
 import AdminLegalCMS from '../pages/admin/AdminLegalCMS';
@@ -89,6 +90,7 @@ export default function AppRoutes() {
           <Route path="products" element={<AdminProducts />} />
           <Route path="products/add" element={<AdminAddProduct />} />
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="coupons" element={<AdminCoupons />} />
           <Route path="categories" element={<AdminCategories />} />
           <Route path="sellers" element={<AdminSellers />} />
           <Route path="legal" element={<AdminLegalCMS />} />
