@@ -4,7 +4,6 @@ import {
   Search, 
   ShoppingCart, 
   User, 
-  Menu, 
   ChevronDown, 
   Package, 
   LogOut, 
@@ -130,7 +129,7 @@ export default function Header() {
   const { user, isAuthenticated } = useAuthStore();
   const itemCount = useCartStore((state) => state.getItemCount());
 
-  // লাইভ সার্চ ডিবাইন্সড ইফেক্ট
+  // লাইভ সার্চ ডিবাইন্সড ইফেক্ট (React 19 সেফ)
   useEffect(() => {
     if (!searchQuery.trim()) {
       Promise.resolve().then(() => {
@@ -211,20 +210,11 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-sm pt-safe-top">
+    <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-xs pt-safe-top">
       <div className="container mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-4 sm:gap-8">
         
-        {/* Left: Mobile Menu & Dynamic Brand Logo */}
-        <div className="flex items-center gap-4">
-          <button 
-            type="button"
-            className="md:hidden p-1 text-navy hover:text-primary transition-colors"
-            aria-label="Open menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          
-          {/* Dynamic Brand Logo (Image or Text based on Admin Settings) */}
+        {/* Left: Dynamic Brand Logo (3-Line Hamburger Menu removed for clean Daraz-style UI) */}
+        <div className="flex items-center">
           <BrandLogo to="/" />
         </div>
 
@@ -243,14 +233,14 @@ export default function Header() {
               <button
                 type="button"
                 onClick={() => { setSearchQuery(''); setShowSearchDropdown(false); }}
-                className="absolute right-12 top-0 h-11 w-8 flex items-center justify-center text-gray-400 hover:text-navy"
+                className="absolute right-12 top-0 h-11 w-8 flex items-center justify-center text-gray-400 hover:text-navy cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             ) : null}
             <button
               type="submit"
-              className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-gray-500 hover:text-primary rounded-r-full transition-colors"
+              className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-gray-500 hover:text-primary rounded-r-full transition-colors cursor-pointer"
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
@@ -278,7 +268,7 @@ export default function Header() {
                       key={product.id}
                       to={`/products/${product.id}`}
                       onClick={() => setShowSearchDropdown(false)}
-                      className="p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors group"
+                      className="p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors group cursor-pointer"
                     >
                       <img
                         src={product.images[0] || 'https://via.placeholder.com/60'}
@@ -300,7 +290,7 @@ export default function Header() {
                   ))}
                   <button
                     onClick={handleSearch}
-                    className="w-full p-2.5 bg-gray-50 hover:bg-primary hover:text-white text-xs font-bold text-navy text-center transition-colors block"
+                    className="w-full p-2.5 bg-gray-50 hover:bg-primary hover:text-white text-xs font-bold text-navy text-center transition-colors block cursor-pointer"
                   >
                     View All Results for "{searchQuery}"
                   </button>
@@ -318,7 +308,7 @@ export default function Header() {
             <div className="relative hidden sm:block" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2 text-sm font-medium text-navy hover:text-primary transition-colors focus:outline-none"
+                className="flex items-center gap-2 text-sm font-medium text-navy hover:text-primary transition-colors focus:outline-none cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 overflow-hidden">
                   {user.photoURL ? (
@@ -381,7 +371,7 @@ export default function Header() {
                   
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" /> Logout
                   </button>
@@ -403,7 +393,7 @@ export default function Header() {
           {/* Dynamic Cart Icon with Badge */}
           <Link 
             to="/cart" 
-            className="relative p-2 text-navy hover:text-primary transition-colors group"
+            className="relative p-2 text-navy hover:text-primary transition-colors group cursor-pointer"
             aria-label="Cart"
           >
             <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7" />
@@ -424,11 +414,11 @@ export default function Header() {
             value={searchQuery}
             onChange={handleInputChange}
             placeholder="Search products..."
-            className="w-full h-10 pl-4 pr-10 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-all text-sm text-navy placeholder:text-gray-400"
+            className="w-full h-10 pl-4 pr-10 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-all text-xs text-navy placeholder:text-gray-400"
           />
           <button
             type="submit"
-            className="absolute right-0 top-0 h-10 w-10 flex items-center justify-center text-gray-500 hover:text-primary transition-colors"
+            className="absolute right-0 top-0 h-10 w-10 flex items-center justify-center text-gray-500 hover:text-primary transition-colors cursor-pointer"
           >
             <Search className="w-4 h-4" />
           </button>

@@ -51,9 +51,9 @@ export default function Checkout() {
   const discount = getDiscount();
   const total = getTotal();
 
-  // কাস্টমার ইনফো স্টেট
-  const [fullName, setFullName] = useState<string>(() => user?.displayName || '');
-  const [phone, setPhone] = useState<string>(() => user?.phoneNumber || '');
+  // কাস্টমার ইনফো স্টেট (ডিফল্টভাবে একদম খালি রাখা হয়েছে যাতে কাস্টমারকে নাম কাটতে না হয়)
+  const [fullName, setFullName] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
   const [alternatePhone, setAlternatePhone] = useState<string>('');
   
   // ৩-টিয়ার বাংলাদেশ এড্রেস স্টেট
@@ -257,7 +257,7 @@ export default function Checkout() {
         
         {/* Breadcrumb */}
         <div className="mb-6">
-          <Link to="/cart" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary-dark transition-colors">
+          <Link to="/cart" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary-dark transition-colors cursor-pointer">
             <ArrowLeft className="w-4 h-4" /> Back to Cart
           </Link>
           <h1 className="text-2xl md:text-3xl font-extrabold text-navy mt-2">Checkout</h1>
@@ -269,9 +269,9 @@ export default function Checkout() {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Delivery Address Card (3-Tier Cascading Selectors) */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
+            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
@@ -282,18 +282,18 @@ export default function Checkout() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* Full Name */}
+                {/* Full Name (Clean Input with Placeholder) */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Full Name *</label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Rahim Chowdhury"
-                      className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                      placeholder="Rahim Chowdhury"
+                      className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
                     />
                   </div>
                 </div>
@@ -302,14 +302,14 @@ export default function Checkout() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Mobile Number (11 Digits) *</label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="tel"
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="01712345678"
-                      className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                      className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
                     />
                   </div>
                 </div>
@@ -318,13 +318,13 @@ export default function Checkout() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Alternative Phone (Optional)</label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="tel"
                       value={alternatePhone}
                       onChange={(e) => setAlternatePhone(e.target.value)}
                       placeholder="01812345678"
-                      className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                      className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
                     />
                   </div>
                 </div>
@@ -335,7 +335,7 @@ export default function Checkout() {
                   <select
                     value={division}
                     onChange={(e) => handleDivisionChange(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
                   >
                     {BANGLADESH_DIVISIONS.map((d) => (
                       <option key={d.name} value={d.name}>{d.name}</option>
@@ -343,13 +343,13 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* Tier 2: District Dropdown (Filtered based on Division) */}
+                {/* Tier 2: District Dropdown */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">জেলা (District) *</label>
                   <select
                     value={district}
                     onChange={(e) => handleDistrictChange(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
                   >
                     {availableDistricts.map((dist) => (
                       <option key={dist.name} value={dist.name}>{dist.name}</option>
@@ -357,13 +357,13 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* Tier 3: Upazila / Thana Dropdown (Filtered based on District) */}
+                {/* Tier 3: Upazila / Thana Dropdown */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">থানা / উপজেলা (Upazila / Thana) *</label>
                   <select
                     value={upazila}
                     onChange={(e) => setUpazila(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
                   >
                     {availableUpazilas.map((upa) => (
                       <option key={upa} value={upa}>{upa}</option>
@@ -380,7 +380,7 @@ export default function Checkout() {
                     value={fullAddress}
                     onChange={(e) => setFullAddress(e.target.value)}
                     placeholder="যেমন: হাউজ #১২, রোড #৪, ব্লক #বি, শান্তিনগর"
-                    className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors resize-none"
+                    className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors resize-none"
                   />
                 </div>
 
@@ -392,7 +392,7 @@ export default function Checkout() {
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
                     placeholder="যেমন: ডেলিভারির আগে ফোন দিন"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
 
@@ -400,9 +400,9 @@ export default function Checkout() {
             </div>
 
             {/* Payment Method Card */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
+            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-                <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green font-bold">
+                <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green font-bold">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
@@ -414,9 +414,9 @@ export default function Checkout() {
               <div className="space-y-3">
                 {/* Cash on Delivery */}
                 <label 
-                  className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'cod' 
-                      ? 'border-primary bg-primary/5 shadow-sm' 
+                      ? 'border-primary bg-primary/5 shadow-xs' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -427,23 +427,23 @@ export default function Checkout() {
                       value="cod"
                       checked={paymentMethod === 'cod'}
                       onChange={() => setPaymentMethod('cod')}
-                      className="w-4 h-4 text-primary focus:ring-primary"
+                      className="w-4 h-4 text-primary focus:ring-primary cursor-pointer"
                     />
                     <div>
-                      <span className="font-bold text-sm text-navy block">Cash on Delivery (COD)</span>
-                      <span className="text-xs text-gray-500">Pay cash to delivery rider when product arrives at your doorstep.</span>
+                      <span className="font-black text-xs sm:text-sm text-navy block">Cash on Delivery (COD)</span>
+                      <span className="text-[11px] text-gray-500">Pay cash to delivery rider when product arrives at your doorstep.</span>
                     </div>
                   </div>
-                  <span className="px-3 py-1 bg-brand-green/10 text-brand-green font-bold text-xs rounded-full hidden sm:block">
+                  <span className="px-3 py-1 bg-brand-green/10 text-brand-green font-black text-xs rounded-full hidden sm:block">
                     Recommended
                   </span>
                 </label>
 
                 {/* Automated bKash Gateway */}
                 <label 
-                  className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'bkash' 
-                      ? 'border-[#E2136E] bg-[#E2136E]/5 shadow-sm' 
+                      ? 'border-[#E2136E] bg-[#E2136E]/5 shadow-xs' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -454,14 +454,14 @@ export default function Checkout() {
                       value="bkash"
                       checked={paymentMethod === 'bkash'}
                       onChange={() => setPaymentMethod('bkash')}
-                      className="w-4 h-4 text-[#E2136E] focus:ring-[#E2136E]"
+                      className="w-4 h-4 text-[#E2136E] focus:ring-[#E2136E] cursor-pointer"
                     />
                     <div>
-                      <span className="font-bold text-sm text-navy block">bKash Online Payment</span>
-                      <span className="text-xs text-gray-500">Instant payment with bKash OTP & PIN gateway.</span>
+                      <span className="font-black text-xs sm:text-sm text-navy block">bKash Online Payment</span>
+                      <span className="text-[11px] text-gray-500">Instant payment with bKash OTP & PIN gateway.</span>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 bg-[#E2136E] text-white font-bold text-xs rounded-md">
+                  <span className="px-2.5 py-1 bg-[#E2136E] text-white font-black text-xs rounded-lg">
                     bKash
                   </span>
                 </label>
@@ -473,8 +473,8 @@ export default function Checkout() {
           {/* Right Column: Order Items & Summary */}
           <div className="space-y-6">
             
-            <div className="bg-white rounded-2xl p-6 shadow-modern border border-gray-100 space-y-6 sticky top-24">
-              <h2 className="text-lg font-bold text-navy pb-4 border-b border-gray-100">Order Items ({items.length})</h2>
+            <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-6 sticky top-24">
+              <h2 className="text-lg font-black text-navy pb-4 border-b border-gray-100">Order Items ({items.length})</h2>
 
               <div className="max-h-60 overflow-y-auto space-y-3 pr-1">
                 {items.map((item, idx) => (
@@ -482,45 +482,45 @@ export default function Checkout() {
                     <img
                       src={item.product.images[0] || 'https://via.placeholder.com/80'}
                       alt={item.product.name}
-                      className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100 shrink-0"
+                      className="w-12 h-12 rounded-xl object-cover bg-gray-50 border border-gray-100 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-navy truncate">{item.product.name}</p>
-                      <p className="text-[11px] text-gray-500">Qty: {item.quantity} × ৳{item.product.price.toLocaleString()}</p>
+                      <p className="text-xs font-bold text-navy truncate">{item.product.name}</p>
+                      <p className="text-[11px] text-gray-500 font-medium">Qty: {item.quantity} × ৳{item.product.price.toLocaleString()}</p>
                     </div>
-                    <span className="text-xs font-bold text-navy">৳{(item.product.price * item.quantity).toLocaleString()}</span>
+                    <span className="text-xs font-black text-navy font-mono">৳{(item.product.price * item.quantity).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
 
-              <div className="space-y-3 pt-4 border-t border-gray-100 text-xs md:text-sm">
-                <div className="flex justify-between text-gray-600">
+              <div className="space-y-3 pt-4 border-t border-gray-100 text-xs sm:text-sm">
+                <div className="flex justify-between text-gray-600 font-medium">
                   <span>Subtotal</span>
-                  <span className="font-bold text-navy">৳{subtotal.toLocaleString()}</span>
+                  <span className="font-bold text-navy font-mono">৳{subtotal.toLocaleString()}</span>
                 </div>
 
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-gray-600 font-medium">
                   <span>Delivery Charge ({division === 'Dhaka' && district === 'Dhaka' ? 'Inside Dhaka' : 'Outside Dhaka'})</span>
-                  <span className="font-bold text-navy">৳{deliveryFee.toLocaleString()}</span>
+                  <span className="font-bold text-navy font-mono">৳{deliveryFee.toLocaleString()}</span>
                 </div>
 
                 {discount > 0 && (
-                  <div className="flex justify-between text-brand-green font-semibold">
+                  <div className="flex justify-between text-brand-green font-bold">
                     <span>Discount</span>
-                    <span>-৳{discount.toLocaleString()}</span>
+                    <span className="font-mono">-৳{discount.toLocaleString()}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between text-base font-extrabold text-navy pt-3 border-t border-gray-100">
+                <div className="flex justify-between text-base font-black text-navy pt-3 border-t border-gray-100">
                   <span>Total Payable</span>
-                  <span className="text-primary text-lg">৳{total.toLocaleString()}</span>
+                  <span className="text-primary font-mono text-lg font-black">৳{total.toLocaleString()}</span>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-sm transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-black py-4 px-6 rounded-2xl text-sm transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:scale-102"
               >
                 {isSubmitting ? (
                   <>
@@ -533,7 +533,7 @@ export default function Checkout() {
                 )}
               </button>
 
-              <div className="flex items-center justify-center gap-2 text-[11px] text-gray-400">
+              <div className="flex items-center justify-center gap-2 text-[11px] text-gray-400 font-medium">
                 <ShieldCheck className="w-4 h-4 text-brand-green" />
                 <span>Encrypted & Safe Bangladeshi Checkout</span>
               </div>
