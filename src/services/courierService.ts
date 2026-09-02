@@ -14,6 +14,7 @@ export interface CourierBookingResult {
 interface SteadfastBackendResponse {
   success: boolean;
   message?: string;
+  errors?: Record<string, string[]> | null;
   consignment?: {
     consignment_id: number | string;
     tracking_code: string;
@@ -24,57 +25,46 @@ interface SteadfastBackendResponse {
 
 /**
  * স্টেডফাস্ট কুরিয়ারে ১-ক্লিকে রিয়েল-টাইম পার্সেল বুক করার সিকিউর সার্ভিস
- * (Calls secure Serverless Backend without exposing API/Secret Keys to browser)
+ * (১০০% আসল এপিআই কল - কোনো ফেক বা ডামি কোড ছাড়া)
  */
 export const sendOrderToCourier = async (
   order: Order,
   courierName: 'Steadfast' | 'Pathao' | 'RedX' = 'Steadfast'
 ): Promise<CourierBookingResult> => {
   try {
-    // ১. কাস্টমারের সম্পূর্ণ ঠিকানা ও COD অ্যামাউন্ট প্রস্তুত করা
+    // ১. কাস্টমারের সম্পূর্ণ ৩-টিয়ার ঠিকানা ও সঠিক COD হিসাব
     const fullAddress = `${order.shippingAddress.fullAddress}, ${order.shippingAddress.upazila}, ${order.shippingAddress.district}, ${order.shippingAddress.division}`;
-    
-    // বিকাশ পেমেন্ট করা থাকলে COD হবে 0 টাকা, আর Cash on Delivery হলে মোট অর্ডার মূল্য
     const codAmount = order.paymentMethod === 'cod' ? order.totalAmount : 0;
 
-    let consignmentId = '';
-    let trackingCode = '';
-
     // ২. আমাদের সিকিউর সার্ভারলেস ব্যাকএন্ডে (/api/steadfast) রিকোয়েস্ট পাঠানো
-    try {
-      const response = await fetch('/api/steadfast', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          invoice: order.orderNumber,
-          recipient_name: order.shippingAddress.fullName,
-          recipient_phone: order.shippingAddress.phone,
-          recipient_address: fullAddress,
-          cod_amount: codAmount,
-          note: order.shippingAddress.deliveryNotes || `Order #${order.orderNumber} - ISAR Marketplace`,
-        }),
-      });
+    const response = await fetch('/api/steadfast', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        invoice: order.orderNumber,
+        recipient_name: order.shippingAddress.fullName,
+        recipient_phone: order.shippingAddress.phone,
+        recipient_address: fullAddress,
+        cod_amount: codAmount,
+        note: order.shippingAddress.deliveryNotes || `Order #${order.orderNumber} - ISAR Marketplace`,
+      }),
+    });
 
-      const data = (await response.json()) as SteadfastBackendResponse;
+    const data = (await response.json()) as SteadfastBackendResponse;
 
-      if (response.ok && data.success && data.consignment) {
-        consignmentId = String(data.consignment.consignment_id);
-        trackingCode = String(data.consignment.tracking_code);
-      } else {
-        // যদি লাইভ কি সেট না থাকে, ফলব্যাক ট্র্যাকিং জেনারেট করে নোটিফাই করা
-        console.warn('Steadfast API note:', data.message);
-        consignmentId = `CID-${Math.floor(1000000 + Math.random() * 9000000)}`;
-        trackingCode = `STDFST-${order.orderNumber.replace(/[^0-9]/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
-      }
-    } catch (apiError) {
-      console.warn('Steadfast serverless connection note, using fallback tracking:', apiError);
-      consignmentId = `CID-${Math.floor(1000000 + Math.random() * 9000000)}`;
-      trackingCode = `STDFST-${order.orderNumber.replace(/[^0-9]/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+    // ৩. স্টেডফাস্ট থেকে সফল রেসপন্স না আসলে সরাসরি রিয়েল এরর থ্রো করবে (কোনো ফেক আইডি বানাবে না)
+    if (!response.ok || !data.success || !data.consignment) {
+      const errorDetail = data.errors ? Object.values(data.errors).flat().join(', ') : '';
+      const errorMsg = data.message || errorDetail || 'Failed to book parcel on Steadfast. Check API Keys.';
+      throw new Error(`Steadfast Error: ${errorMsg}`);
     }
 
-    // ৩. ফায়ারস্টোরে অর্ডারের স্ট্যাটাস 'shipped', কুরিয়ারের নাম ও ট্র্যাকিং তথ্য স্বয়ংক্রিয় আপডেট করা
+    const consignmentId = String(data.consignment.consignment_id);
+    const trackingCode = String(data.consignment.tracking_code);
+
+    // ৪. ফায়ারস্টোর অর্ডারে স্টেডফাস্ট থেকে আসা আসল ট্র্যাকিং কোড ও স্ট্যাটাস সেভ করা
     const orderRef = doc(db, 'orders', order.id);
     await updateDoc(orderRef, {
       status: 'shipped',
@@ -86,7 +76,7 @@ export const sendOrderToCourier = async (
       updatedAt: serverTimestamp(),
     });
 
-    // ৪. কাস্টমারের মোবাইলে স্বয়ংক্রিয়ভাবে ট্র্যাকিং কোড সহ SMS পাঠানো
+    // ৫. কাস্টমারের মোবাইলে স্বয়ংক্রিয়ভাবে আসল ট্র্যাকিং কোড সহ SMS পাঠানো
     try {
       await sendCourierTrackingSMS(
         order.shippingAddress.phone,
@@ -103,10 +93,11 @@ export const sendOrderToCourier = async (
       trackingCode,
       consignmentId,
       courierName,
-      message: `Order successfully booked with ${courierName}! Tracking Code: ${trackingCode}`,
+      message: `Order successfully booked with ${courierName}! Tracking: ${trackingCode}`,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error dispatching order to courier:', error);
-    throw error;
+    const err = error instanceof Error ? error : new Error('Failed to dispatch order to courier');
+    throw err;
   }
 };
