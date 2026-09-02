@@ -8,7 +8,9 @@ import {
   Loader2, 
   MessageSquare, 
   User, 
-  Sparkles 
+  Sparkles,
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
@@ -43,7 +45,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [helpfulVotes, setHelpfulVotes] = useState<Record<string, boolean>>({});
 
-  // ১. ফায়ারস্টোর থেকে প্রোডাক্টের সব রিভিউ লোড করা (React 19 ও ESLint কমপ্লায়েন্ট)
+  // ১. ফায়ারস্টোর থেকে প্রোডাক্টের সব রিভিউ লোড করা (React 19 সেফ)
   useEffect(() => {
     let isMounted = true;
 
@@ -77,6 +79,23 @@ export default function ProductReviews({ productId, productName }: ProductReview
 
   // সব কাস্টমারদের আপলোড করা ছবিগুলো সংগ্রহ করা
   const allCustomerPhotos = reviews.flatMap((r) => r.images || []);
+
+  // তারিখ ফরম্যাট হেল্পার ফাংশন
+  const formatReviewDate = (timestamp: unknown): string => {
+    if (!timestamp) return 'Recently';
+    try {
+      if (typeof timestamp === 'object' && timestamp !== null && 'toDate' in timestamp) {
+        const dateObj = (timestamp as { toDate: () => Date }).toDate();
+        return dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
+      if (typeof timestamp === 'string') {
+        return new Date(timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
+    } catch {
+      return 'Recently';
+    }
+    return 'Recently';
+  };
 
   // ফটো কম্প্রেশন ও বেস৬৪ কনভার্টার (Canvas API)
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -202,8 +221,8 @@ export default function ProductReviews({ productId, productName }: ProductReview
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl sm:text-2xl font-extrabold text-navy">Customer Reviews</h2>
-            <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-extrabold">
-              {reviews.length} Verified
+            <span className="px-3 py-1 rounded-full bg-brand-green/10 text-brand-green text-xs font-black flex items-center gap-1 border border-brand-green/20">
+              <ShieldCheck className="w-3.5 h-3.5" /> {reviews.length} Verified Reviews
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-1">Real ratings and actual photos from genuine buyers of {productName}</p>
@@ -217,24 +236,24 @@ export default function ProductReviews({ productId, productName }: ProductReview
               setIsModalOpen(true);
             }
           }}
-          className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white font-extrabold text-xs sm:text-sm rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+          className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-extrabold text-xs sm:text-sm rounded-2xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
         >
           <Sparkles className="w-4 h-4" /> Write a Review
         </button>
       </div>
 
       {/* Ratings Breakdown Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-5 sm:p-6 bg-gray-50/70 rounded-2xl border border-gray-100">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 sm:p-8 bg-gray-50/80 rounded-3xl border border-gray-100">
         
         {/* Overall Rating Box */}
-        <div className="flex flex-col items-center justify-center text-center p-4 border-b md:border-b-0 md:border-r border-gray-200">
-          <span className="text-4xl sm:text-5xl font-black text-navy">{summary.averageRating.toFixed(1)}</span>
+        <div className="lg:col-span-4 flex flex-col items-center justify-center text-center p-4 border-b lg:border-b-0 lg:border-r border-gray-200">
+          <span className="text-5xl sm:text-6xl font-black text-navy tracking-tight">{summary.averageRating.toFixed(1)}</span>
           
-          <div className="flex items-center gap-1 my-2">
+          <div className="flex items-center gap-1.5 my-3">
             {[1, 2, 3, 4, 5].map((star) => (
               <Star
                 key={star}
-                className={`w-5 h-5 ${
+                className={`w-6 h-6 ${
                   star <= Math.round(summary.averageRating)
                     ? 'fill-brand-gold text-brand-gold'
                     : 'fill-gray-200 text-gray-200'
@@ -243,11 +262,11 @@ export default function ProductReviews({ productId, productName }: ProductReview
             ))}
           </div>
 
-          <span className="text-xs text-gray-500 font-medium">Based on {reviews.length} verified ratings</span>
+          <span className="text-xs text-gray-500 font-bold">Based on {reviews.length} genuine customer rating(s)</span>
         </div>
 
         {/* Star Progress Bars */}
-        <div className="md:col-span-2 flex flex-col justify-center space-y-2">
+        <div className="lg:col-span-8 flex flex-col justify-center space-y-2.5">
           {[5, 4, 3, 2, 1].map((starNum) => {
             const count = summary.ratingCounts[starNum as keyof typeof summary.ratingCounts] || 0;
             const percentage = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
@@ -256,23 +275,23 @@ export default function ProductReviews({ productId, productName }: ProductReview
               <button
                 key={starNum}
                 onClick={() => setSelectedStarFilter(selectedStarFilter === starNum ? null : starNum)}
-                className={`flex items-center gap-3 text-xs w-full group text-left transition-colors p-1 rounded-lg cursor-pointer ${
-                  selectedStarFilter === starNum ? 'bg-white shadow-sm ring-1 ring-primary' : 'hover:bg-gray-100/60'
+                className={`flex items-center gap-3 text-xs w-full group text-left transition-all p-2 rounded-xl cursor-pointer ${
+                  selectedStarFilter === starNum ? 'bg-white shadow-sm ring-2 ring-primary' : 'hover:bg-gray-100/80'
                 }`}
               >
-                <div className="flex items-center gap-1 w-12 shrink-0 font-bold text-navy">
-                  <span>{starNum}</span>
+                <div className="flex items-center gap-1 w-14 shrink-0 font-bold text-navy">
+                  <span>{starNum} Star</span>
                   <Star className="w-3.5 h-3.5 fill-brand-gold text-brand-gold" />
                 </div>
 
-                <div className="grow h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                <div className="grow h-3 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     style={{ width: `${percentage}%` }}
-                    className="h-full bg-brand-gold rounded-full transition-all duration-500"
+                    className="h-full bg-linear-to-r from-brand-gold to-amber-500 rounded-full transition-all duration-500"
                   />
                 </div>
 
-                <span className="w-10 text-right text-gray-400 font-semibold shrink-0">{count}</span>
+                <span className="w-12 text-right text-gray-500 font-bold shrink-0">{count} ({percentage}%)</span>
               </button>
             );
           })}
@@ -282,9 +301,9 @@ export default function ProductReviews({ productId, productName }: ProductReview
 
       {/* Customer Uploaded Photos Gallery Strip */}
       {allCustomerPhotos.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-3 p-5 bg-primary/5 rounded-2xl border border-primary/10">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-navy flex items-center gap-2">
+            <h3 className="text-sm font-extrabold text-navy flex items-center gap-2">
               <Camera className="w-4 h-4 text-primary" /> Photos From Real Customers ({allCustomerPhotos.length})
             </h3>
             <button
@@ -297,14 +316,14 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </button>
           </div>
 
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin">
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin pt-1">
             {allCustomerPhotos.map((photoUrl, idx) => (
               <button
                 key={idx}
                 onClick={() => setPreviewImage(photoUrl)}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0 hover:opacity-90 hover:scale-105 transition-all cursor-pointer"
+                className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl overflow-hidden bg-white p-1 border-2 border-gray-200 shrink-0 hover:border-primary hover:scale-105 transition-all cursor-pointer shadow-xs"
               >
-                <img src={photoUrl} alt="Customer product" className="w-full h-full object-cover" />
+                <img src={photoUrl} alt="Customer product" className="w-full h-full object-cover rounded-xl" />
               </button>
             ))}
           </div>
@@ -312,19 +331,19 @@ export default function ProductReviews({ productId, productName }: ProductReview
       )}
 
       {/* Reviews List Area */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {loading ? (
           <div className="py-12 flex flex-col items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
             <span className="text-xs text-gray-500 font-medium">Loading genuine reviews...</span>
           </div>
         ) : filteredReviews.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-2xl space-y-3">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mx-auto">
-              <MessageSquare className="w-6 h-6" />
+          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl space-y-3">
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-primary mx-auto">
+              <MessageSquare className="w-7 h-7" />
             </div>
-            <h4 className="text-sm font-bold text-navy">No Reviews Found</h4>
-            <p className="text-xs text-gray-400 max-w-xs mx-auto">
+            <h4 className="text-base font-bold text-navy">No Reviews Found</h4>
+            <p className="text-xs text-gray-400 max-w-sm mx-auto">
               {filterWithPhotosOnly || selectedStarFilter
                 ? 'No reviews match your selected filter criteria.'
                 : 'Be the first to share your experience with this authentic product!'}
@@ -342,35 +361,39 @@ export default function ProductReviews({ productId, productName }: ProductReview
             )}
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="space-y-4">
             {filteredReviews.map((review) => {
               const hasVoted = helpfulVotes[review.id] || false;
               const displayHelpfulCount = (review.helpfulCount || 0) + (hasVoted ? 1 : 0);
 
               return (
-                <div key={review.id} className="py-6 space-y-3 first:pt-0 last:pb-0">
+                <div 
+                  key={review.id} 
+                  className="bg-gray-50/50 hover:bg-white rounded-2xl p-5 sm:p-6 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all space-y-3.5"
+                >
                   
                   {/* Reviewer Header */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs overflow-hidden shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-black flex items-center justify-center text-xs overflow-hidden shrink-0 border border-primary/20">
                         {review.userAvatar ? (
                           <img src={review.userAvatar} alt={review.userName} className="w-full h-full object-cover" />
                         ) : (
-                          <User className="w-4 h-4" />
+                          <User className="w-5 h-5" />
                         )}
                       </div>
 
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs sm:text-sm font-extrabold text-navy">{review.userName}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black text-navy">{review.userName}</span>
                           {review.isVerifiedPurchase && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand-green/10 text-brand-green text-[10px] font-extrabold">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green text-[10px] font-black border border-brand-green/20">
                               <CheckCircle2 className="w-3 h-3" /> Verified Buyer
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
+
+                        <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400">
                           <div className="flex items-center gap-0.5">
                             {[1, 2, 3, 4, 5].map((star) => (
                               <Star
@@ -383,38 +406,42 @@ export default function ProductReviews({ productId, productName }: ProductReview
                               />
                             ))}
                           </div>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> {formatReviewDate(review.createdAt)}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     <button
                       onClick={() => toggleHelpful(review.id)}
-                      className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
                         hasVoted
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          ? 'border-primary bg-primary text-white shadow-xs'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                     >
-                      <ThumbsUp className={`w-3 h-3 ${hasVoted ? 'fill-current' : ''}`} />
+                      <ThumbsUp className={`w-3.5 h-3.5 ${hasVoted ? 'fill-current' : ''}`} />
                       <span>Helpful ({displayHelpfulCount})</span>
                     </button>
                   </div>
 
                   {/* Comment */}
-                  <p className="text-xs sm:text-sm text-gray-700 leading-relaxed wrap-break-word">
+                  <p className="text-xs sm:text-sm text-gray-700 leading-relaxed wrap-break-word font-normal pl-0 sm:pl-13">
                     {review.comment}
                   </p>
 
                   {/* Review Images */}
                   {review.images && review.images.length > 0 && (
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center gap-3 pt-1 pl-0 sm:pl-13 flex-wrap">
                       {review.images.map((imgUrl, i) => (
                         <button
                           key={i}
                           onClick={() => setPreviewImage(imgUrl)}
-                          className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-200 shrink-0 hover:opacity-90 transition-opacity cursor-pointer"
+                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-white p-1 border-2 border-gray-200 shrink-0 hover:border-primary hover:scale-105 transition-all cursor-pointer shadow-xs"
                         >
-                          <img src={imgUrl} alt="Review attachment" className="w-full h-full object-cover" />
+                          <img src={imgUrl} alt="Review attachment" className="w-full h-full object-cover rounded-xl" />
                         </button>
                       ))}
                     </div>
@@ -522,7 +549,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 bg-primary hover:bg-primary-dark text-white font-extrabold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full py-3.5 bg-primary hover:bg-primary-dark text-white font-extrabold text-sm rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
@@ -544,7 +571,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
           onClick={() => setPreviewImage(null)}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/90 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="relative max-w-2xl max-h-[85vh] p-2 bg-white rounded-2xl shadow-2xl">
+          <div className="relative max-w-2xl max-h-[85vh] p-2 bg-white rounded-3xl shadow-2xl">
             <button
               onClick={() => setPreviewImage(null)}
               className="absolute -top-3 -right-3 p-1.5 bg-white rounded-full text-navy shadow-lg hover:bg-gray-100 cursor-pointer"
@@ -554,7 +581,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
             <img 
               src={previewImage} 
               alt="Customer full view" 
-              className="max-h-[80vh] w-auto max-w-full rounded-xl object-contain"
+              className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain"
             />
           </div>
         </div>
