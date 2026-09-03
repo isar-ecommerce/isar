@@ -7,13 +7,15 @@ import {
   Loader2, 
   Phone, 
   User, 
-  MapPin, 
   Lock, 
   Plus, 
-  Minus,
-  Sparkles,
-  Zap,
-  Check
+  Minus, 
+  Sparkles, 
+  Zap, 
+  Check,
+  ChevronDown,
+  Building2,
+  Compass
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -44,12 +46,12 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const { user } = useAuthStore();
   const { feeInsideDhaka, feeOutsideDhaka } = useSettingsStore();
 
-  // কাস্টমার ইনফো স্টেট (ডিফল্ট ফ্রেশ খালি স্টেট)
+  // কাস্টমার তথ্য
   const [fullName, setFullName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
 
-  // ৩-টিয়ার বাংলাদেশ এড্রেস স্টেট
+  // ৩-টিয়ার স্মার্ট বাংলাদেশ অ্যাড্রেস স্টেট
   const [division, setDivision] = useState<string>('Dhaka');
   const [district, setDistrict] = useState<string>('Dhaka');
   const [upazila, setUpazila] = useState<string>('Dhanmondi');
@@ -87,8 +89,9 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
   const subtotal = product.price * quantity;
   const totalAmount = subtotal + deliveryFee;
+  const isDhakaCity = division === 'Dhaka' && district === 'Dhaka';
 
-  // বিভাগ পরিবর্তন হ্যান্ডলার
+  // বিভাগ পরিবর্তন
   const handleDivisionChange = (newDivision: string) => {
     setDivision(newDivision);
     const districts = getDistrictsByDivision(newDivision);
@@ -108,7 +111,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     }
   };
 
-  // জেলা পরিবর্তন হ্যান্ডলার
+  // জেলা পরিবর্তন
   const handleDistrictChange = (newDistrict: string) => {
     setDistrict(newDistrict);
     const upazilas = getUpazilasByDistrict(division, newDistrict);
@@ -122,9 +125,9 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     }
   };
 
-  // ডেলিভারি জোন দ্রুত নির্বাচন পিল
-  const handleQuickZoneSelect = (isInside: boolean) => {
-    if (isInside) {
+  // ডেলিভারি জোন কুইক টগল
+  const handleQuickZoneToggle = (inside: boolean) => {
+    if (inside) {
       handleDivisionChange('Dhaka');
       handleDistrictChange('Dhaka');
     } else {
@@ -134,19 +137,19 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     }
   };
 
-  // ১-ক্লিক এক্সপ্রেস অর্ডার সাবমিশন
+  // অর্ডার সাবমিশন
   const handleExpressOrder = async (e: FormEvent) => {
     e.preventDefault();
 
     const cleanPhone = phone.replace(/[^0-9]/g, '');
 
     if (!fullName.trim() || !cleanPhone || !fullAddress.trim()) {
-      toast.error('অনুগ্রহ করে নাম, ফোন নম্বর ও সম্পূর্ণ ঠিকানা লিখুন');
+      toast.error('অনুগ্রহ করে আপনার নাম, মোবাইল নম্বর ও ঠিকানা দিন');
       return;
     }
 
     if (cleanPhone.length < 11) {
-      toast.error('অনুগ্রহ করে সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 01712345678)');
+      toast.error('সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 01712345678)');
       return;
     }
 
@@ -181,7 +184,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         paymentMethod: 'cod',
       });
 
-      // স্বয়ংক্রিয় নোটিফিকেশন ইঞ্জিন
+      // স্বয়ংক্রিয় নোটিফিকেশন
       sendOrderConfirmationSMS(cleanPhone, order.orderNumber, totalAmount);
       sendOrderConfirmationEmail(order);
       sendAdminOrderAlert(order);
@@ -189,7 +192,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       toast.success(`অর্ডার সফল হয়েছে! ট্র্যাকিং আইডি: ${order.orderNumber}`);
       onClose();
 
-      // সরাসরি মানি রিসিট ও ক্যাশ মেমো পেজে রিডাইরেক্ট
       navigate('/order-success', {
         state: {
           order: {
@@ -201,30 +203,28 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         },
       });
     } catch (error) {
-      console.error('Express order submission error:', error);
-      toast.error('অর্ডার সম্পন্ন করা যায়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+      console.error('Express order error:', error);
+      toast.error('অর্ডার সম্পন্ন করা যায়নি। পুনরায় চেষ্টা করুন।');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isDhakaCity = division === 'Dhaka' && district === 'Dhaka';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-navy/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 my-auto relative max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-navy/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 my-auto relative max-h-[94vh] flex flex-col">
         
-        {/* Modal Top Header */}
-        <div className="bg-navy text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-brand-green flex items-center justify-center text-white shadow-xs">
+        {/* Header Bar */}
+        <div className="bg-navy text-white px-5 py-4 flex items-center justify-between shrink-0 border-b border-navy-light/40">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-brand-green flex items-center justify-center text-white shadow-md shadow-brand-green/20">
               <Zap className="w-4 h-4 fill-current" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-black tracking-wide flex items-center gap-1.5">
+              <h3 className="text-sm sm:text-base font-black tracking-tight flex items-center gap-1.5">
                 ১-ক্লিক দ্রুত অর্ডার <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
               </h3>
-              <p className="text-[11px] text-gray-300">ক্যাশ অন ডেলিভারিতে দ্রুত অর্ডার সম্পন্ন করুন</p>
+              <p className="text-[11px] text-gray-300">ক্যাশ অন ডেলিভারিতে সরাসরি অর্ডার করুন</p>
             </div>
           </div>
           
@@ -232,7 +232,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             type="button"
             onClick={onClose} 
             className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-            aria-label="Close modal"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -241,9 +241,9 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
           
-          {/* Product Preview Card */}
-          <div className="p-3 sm:p-3.5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-center gap-3">
-            <div className="w-14 h-14 rounded-xl overflow-hidden bg-white border border-gray-200 shrink-0 p-1 flex items-center justify-center shadow-xs">
+          {/* Modern Product Preview Card */}
+          <div className="p-3.5 bg-linear-to-r from-gray-50 to-white rounded-2xl border border-gray-200/80 flex items-center gap-3.5 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white border border-gray-200 shrink-0 p-1 flex items-center justify-center shadow-xs">
               <img 
                 src={product.images[0] || 'https://via.placeholder.com/100'} 
                 alt={product.name} 
@@ -253,17 +253,24 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             
             <div className="flex-1 min-w-0">
               <h4 className="text-xs font-black text-navy truncate">{product.name}</h4>
-              <span className="text-sm font-black text-primary font-mono block mt-0.5">
-                ৳{product.price.toLocaleString()}
-              </span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-sm font-black text-primary font-mono">
+                  ৳{product.price.toLocaleString()}
+                </span>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <span className="text-[10px] text-gray-400 line-through font-mono">
+                    ৳{product.originalPrice.toLocaleString()}
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Quantity Controls */}
-            <div className="flex items-center border border-gray-200 rounded-xl bg-white shadow-xs shrink-0">
+            {/* Quantity Counter */}
+            <div className="flex items-center border border-gray-200 rounded-xl bg-white shadow-xs shrink-0 p-0.5">
               <button 
                 type="button"
                 onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                className="p-2 text-navy hover:text-primary transition-colors cursor-pointer"
+                className="w-7 h-7 flex items-center justify-center text-navy hover:text-primary transition-colors cursor-pointer rounded-lg hover:bg-gray-100"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
@@ -271,166 +278,181 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               <button 
                 type="button"
                 onClick={() => setQuantity(prev => Math.min(product.stock, prev + 1))}
-                className="p-2 text-navy hover:text-primary transition-colors cursor-pointer"
+                className="w-7 h-7 flex items-center justify-center text-navy hover:text-primary transition-colors cursor-pointer rounded-lg hover:bg-gray-100"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Express Form */}
-          <form onSubmit={handleExpressOrder} className="space-y-4">
+          {/* Form Fields */}
+          <form onSubmit={handleExpressOrder} className="space-y-3.5">
             
-            {/* Full Name Input */}
+            {/* Name */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-navy block">আপনার নাম (Full Name) *</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Rahim Chowdhury"
-                  className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
+              <label className="text-xs font-bold text-navy flex items-center gap-1">
+                <User className="w-3.5 h-3.5 text-primary" /> আপনার নাম *
+              </label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="যেমন: Rahim Chowdhury"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50/70 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+              />
             </div>
 
-            {/* Phone Number Input */}
+            {/* Phone */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-navy block">মোবাইল নম্বর (১১ ডিজিট) *</label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="01712345678"
-                  className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
+              <label className="text-xs font-bold text-navy flex items-center gap-1">
+                <Phone className="w-3.5 h-3.5 text-brand-green" /> মোবাইল নম্বর (১১ ডিজিট) *
+              </label>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="01712345678"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50/70 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+              />
             </div>
 
-            {/* 3-Tier Cascading Bangladesh Address Selectors */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              
-              {/* Tier 1: Division */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-navy block">বিভাগ (Division) *</label>
-                <select
-                  value={division}
-                  onChange={(e) => handleDivisionChange(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary cursor-pointer"
-                >
-                  {BANGLADESH_DIVISIONS.map((d) => (
-                    <option key={d.name} value={d.name}>{d.name}</option>
-                  ))}
-                </select>
+            {/* 3-Tier Cascading Location Selectors */}
+            <div className="p-3.5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-gray-200/60">
+                <span className="text-[11px] font-black text-navy uppercase tracking-wider flex items-center gap-1">
+                  <Compass className="w-3.5 h-3.5 text-primary" /> ডেলিভারি লোকেশন নির্বাচন করুন
+                </span>
+                <span className="text-[10px] font-bold text-brand-green">৬৪ জেলা কভারেজ</span>
               </div>
 
-              {/* Tier 2: District */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-navy block">জেলা (District) *</label>
-                <select
-                  value={district}
-                  onChange={(e) => handleDistrictChange(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary cursor-pointer"
-                >
-                  {availableDistricts.map((dist) => (
-                    <option key={dist.name} value={dist.name}>{dist.name}</option>
-                  ))}
-                </select>
-              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                
+                {/* Division */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-gray-600 block">বিভাগ (Division) *</label>
+                  <div className="relative">
+                    <select
+                      value={division}
+                      onChange={(e) => handleDivisionChange(e.target.value)}
+                      className="w-full appearance-none pl-3 pr-7 py-2 border border-gray-200 rounded-xl bg-white text-xs font-bold text-navy focus:outline-none focus:border-primary cursor-pointer shadow-xs"
+                    >
+                      {BANGLADESH_DIVISIONS.map((d) => (
+                        <option key={d.name} value={d.name}>{d.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
 
-              {/* Tier 3: Upazila / Thana */}
-              <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-bold text-navy block">থানা / উপজেলা (Upazila / Thana) *</label>
-                <select
-                  value={upazila}
-                  onChange={(e) => setUpazila(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary cursor-pointer"
-                >
-                  {availableUpazilas.map((upa) => (
-                    <option key={upa} value={upa}>{upa}</option>
-                  ))}
-                </select>
-              </div>
+                {/* District */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-gray-600 block">জেলা (District) *</label>
+                  <div className="relative">
+                    <select
+                      value={district}
+                      onChange={(e) => handleDistrictChange(e.target.value)}
+                      className="w-full appearance-none pl-3 pr-7 py-2 border border-gray-200 rounded-xl bg-white text-xs font-bold text-navy focus:outline-none focus:border-primary cursor-pointer shadow-xs"
+                    >
+                      {availableDistricts.map((dist) => (
+                        <option key={dist.name} value={dist.name}>{dist.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
 
+                {/* Thana / Upazila */}
+                <div className="col-span-2 space-y-1">
+                  <label className="text-[11px] font-bold text-gray-600 block">থানা / উপজেলা (Thana) *</label>
+                  <div className="relative">
+                    <select
+                      value={upazila}
+                      onChange={(e) => setUpazila(e.target.value)}
+                      className="w-full appearance-none pl-3 pr-7 py-2 border border-gray-200 rounded-xl bg-white text-xs font-bold text-navy focus:outline-none focus:border-primary cursor-pointer shadow-xs"
+                    >
+                      {availableUpazilas.map((upa) => (
+                        <option key={upa} value={upa}>{upa}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+              </div>
             </div>
 
             {/* Street Address */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-navy block">বিস্তারিত ডেলিভারি ঠিকানা (বাড়ি, রোড, এলাকা) *</label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                <textarea
-                  required
-                  rows={2}
-                  value={fullAddress}
-                  onChange={(e) => setFullAddress(e.target.value)}
-                  placeholder="যেমন: হাউজ #১২, রোড #৪, ব্লক #বি, শান্তিনগর"
-                  className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors resize-none"
-                />
-              </div>
+              <label className="text-xs font-bold text-navy flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-purple-600" /> বাড়ি/রোড/এলাকার বিস্তারিত ঠিকানা *
+              </label>
+              <textarea
+                required
+                rows={2}
+                value={fullAddress}
+                onChange={(e) => setFullAddress(e.target.value)}
+                placeholder="যেমন: হাউজ #১২, রোড #৪, ব্লক #বি, শান্তিনগর"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50/70 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all resize-none"
+              />
             </div>
 
-            {/* Quick Delivery Zone Indicator Pills */}
-            <div className="space-y-1.5 pt-1">
+            {/* Delivery Rate Indicator */}
+            <div className="space-y-1.5 pt-0.5">
               <label className="text-xs font-bold text-navy flex items-center gap-1.5">
-                <Truck className="w-4 h-4 text-primary" /> ডেলিভারি চার্জ নির্ধারণ:
+                <Truck className="w-3.5 h-3.5 text-primary" /> ডেলিভারি চার্জ:
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => handleQuickZoneSelect(true)}
+                  onClick={() => handleQuickZoneToggle(true)}
                   className={`py-2 px-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     isDhakaCity 
                       ? 'border-primary bg-primary/10 text-primary shadow-xs' 
                       : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  {isDhakaCity && <Check className="w-3.5 h-3.5" />}
+                  {isDhakaCity && <Check className="w-3.5 h-3.5 text-primary" />}
                   ঢাকা সিটি (৳{feeInsideDhaka || 60})
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleQuickZoneSelect(false)}
+                  onClick={() => handleQuickZoneToggle(false)}
                   className={`py-2 px-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     !isDhakaCity 
                       ? 'border-primary bg-primary/10 text-primary shadow-xs' 
                       : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  {!isDhakaCity && <Check className="w-3.5 h-3.5" />}
+                  {!isDhakaCity && <Check className="w-3.5 h-3.5 text-primary" />}
                   ঢাকার বাইরে (৳{feeOutsideDhaka || 150})
                 </button>
               </div>
             </div>
 
-            {/* Total Order Summary Card */}
-            <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-1.5 text-xs">
+            {/* Price Summary */}
+            <div className="p-3.5 bg-navy/5 rounded-2xl border border-navy/10 space-y-1.5 text-xs">
               <div className="flex justify-between text-gray-600 font-medium">
-                <span>প্রোডাক্টের দাম ({quantity}টি):</span>
+                <span>পণ্যের মূল্য ({quantity} টি):</span>
                 <span className="font-bold text-navy font-mono">৳{subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-gray-600 font-medium">
-                <span>ডেলিভারি চার্জ:</span>
+                <span>ডেলিভারি ফি ({isDhakaCity ? 'ঢাকার ভেতর' : 'ঢাকার বাইরে'}):</span>
                 <span className="font-bold text-navy font-mono">৳{deliveryFee.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm sm:text-base font-black text-navy pt-2 border-t border-gray-200">
-                <span>সর্বমোট প্রদেয় টাকা:</span>
-                <span className="text-primary font-mono font-black">৳{totalAmount.toLocaleString()}</span>
+                <span>সর্বমোট প্রদেয় টাকা:</span>
+                <span className="text-primary font-mono font-black text-lg">৳{totalAmount.toLocaleString()}</span>
               </div>
             </div>
 
-            {/* High-Converting Confirm Order Button */}
+            {/* CTA Button */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-emerald-600 text-white font-black py-4 px-6 rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01] active:scale-95"
+              className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-emerald-600 text-white font-black py-3.5 sm:py-4 px-6 rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01] active:scale-95"
             >
               {isSubmitting ? (
                 <>
@@ -438,14 +460,14 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </>
               ) : (
                 <>
-                  <Lock className="w-4 h-4" /> অর্ডার কনফার্ম করুন (৳{totalAmount.toLocaleString()})
+                  <Lock className="w-4 h-4" /> অর্ডার কনফার্ম করুন — ৳{totalAmount.toLocaleString()}
                 </>
               )}
             </button>
 
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 font-medium">
-              <ShieldCheck className="w-4 h-4 text-brand-green" />
-              <span>ক্যাশ অন ডেলিভারি — পণ্য হাতে পেয়ে টাকা পরিশোধ করুন</span>
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 font-medium text-center">
+              <ShieldCheck className="w-4 h-4 text-brand-green shrink-0" />
+              <span>১০০% ক্যাশ অন ডেলিভারি • পণ্য হাতে পেয়ে টাকা পরিশোধ করুন</span>
             </div>
 
           </form>
