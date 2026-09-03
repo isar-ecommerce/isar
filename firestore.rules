@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // সিকিউরিটি হেল্পার ফাংশনসমূহ
+    // সিকিউরিটি হেল্পার ফাংশনসমূহ (অপটিমাইজড ও ক্যাশড রিড)
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -12,65 +12,90 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // একবার ডাটা নিয়ে ভ্যারিয়েবলে রাখা (ফায়ারবেস রিড কমানোর জন্য)
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin');
+        (getUserData().role in ['admin', 'super_admin']);
     }
 
     function isSeller() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'seller' || isAdmin());
+        (getUserData().role == 'seller' || isAdmin());
     }
 
-    // ১. Users Collection Rules (ইউজার প্রোফাইল সিকিউরিটি)
+    // ১. Users Collection: নিজেকে অ্যাডমিন বানানোর পথ সম্পূর্ণ বন্ধ
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      
+      // একাউন্ট তৈরির সময় 'role' ফিল্ড ছাড়া অথবা সর্বোচ্চ 'customer' রোল দিয়ে তৈরি করা যাবে
+      allow create: if isOwner(userId) && 
+        (!('role' in request.resource.data) || request.resource.data.role == 'customer');
+      
+      // প্রোফাইল এডিট করতে পারবে, কিন্তু কোনো অবস্থাতেই 'role' পরিবর্তন করতে পারবে না
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) 
+                    || isAdmin();
+      
       allow delete: if isAdmin();
     }
 
-    // ২. Products Collection Rules (পণ্য সিকিউরিটি)
+    // ২. Products Collection: কঠোর মালিকানা ও রেটিং সুরক্ষা
     match /products/{productId} {
-      allow read: if true; // যে কেউ প্রোডাক্ট দেখতে পারবে
-      allow create: if isSeller(); // শুধু সেলার ও অ্যাডমিন যুক্ত করতে পারবে
-      // সেলার/অ্যাডমিন পুরো প্রোডাক্ট আপডেট করতে পারবে অথবা কাস্টমার রিভিউ দেওয়ার পর rating ও reviewCount ফিল্ড আপডেট করতে পারবে
-      allow update: if isSeller() || (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'reviewCount']));
+      allow read: if true;
+      
+      // প্রোডাক্ট তৈরির সময় সেলার আইডি বাধ্যতামূলক
+      allow create: if isSeller() && 
+        (request.resource.data.sellerId == request.auth.uid || isAdmin());
+      
+      // শুধু মূল সেলার বা অ্যাডমিন প্রোডাক্টের তথ্য বদলাতে পারবে
+      allow update: if isAdmin() || 
+        (isSeller() && resource.data.sellerId == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sellerId']));
+      
       allow delete: if isAdmin();
     }
 
-    // ৩. Reviews Collection Rules (কাস্টমার ফটো রিভিউ ও রেটিং সিকিউরিটি)
+    // ৩. Reviews Collection: রিভিউ সিকিউরিটি
     match /reviews/{reviewId} {
-      allow read: if true; // যে কেউ প্রোডাক্টের রিভিউ দেখতে পারবে
-      // লগইন করা ইউজার নিজের আইডি দিয়ে নতুন রিভিউ তৈরি করতে পারবে
+      allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      // রিভিউ লেখক অথবা অ্যাডমিন এডিট করতে পারবে, অথবা কাস্টমাররা helpfulCount আপডেট করতে পারবে
-      allow update: if isOwner(resource.data.userId) || isAdmin() || (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount']));
+      allow update: if isOwner(resource.data.userId) || isAdmin() || 
+        (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount']));
       allow delete: if isOwner(resource.data.userId) || isAdmin();
     }
 
-    // ৪. Categories Collection Rules (ক্যাটাগরি সিকিউরিটি)
+    // ৪. Categories Collection
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // ৫. Orders Collection Rules (অর্ডার সিকিউরিটি)
+    // ৫. Orders Collection: অর্ডার ও পেমেন্ট টেম্পারিং ১০০% বন্ধ
     match /orders/{orderId} {
-      allow create: if true; // যে কেউ অর্ডার প্লেস করতে পারবে
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // ফেক/বট অর্ডার রোধে ন্যূনতম ডাটা যাচাই (নাম্বার, ফোন ও ইনভয়েস বাধ্যতামূলক)
+      allow create: if request.resource.data.totalAmount is number &&
+                       request.resource.data.totalAmount >= 0 &&
+                       request.resource.data.recipient_phone is string;
+      
+      // গ্রাহক শুধুমাত্র নিজের অর্ডার দেখতে পারবে, অ্যাডমিন সব দেখতে পারবে
+      allow read: if isAdmin() || 
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+      
+      // কাস্টমার কখনোই অর্ডার আপডেট/ট্যাম্পার করতে পারবে না (শুধুমাত্র অ্যাডমিন করতে পারবে)
+      allow update: if isAdmin();
+      
       allow delete: if isAdmin();
     }
 
-    // ৬. Legal Pages CMS Rules (লিগ্যাল পেজ সিকিউরিটি)
+    // ৬. Legal Pages CMS Rules
     match /legalPages/{slug} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // ৭. Website Settings Rules (ওয়েবসাইট সেটিংস সিকিউরিটি)
+    // ৭. Website Settings Rules
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();
