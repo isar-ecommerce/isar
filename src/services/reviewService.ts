@@ -4,7 +4,6 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy, 
   serverTimestamp, 
   doc, 
   updateDoc 
@@ -15,25 +14,50 @@ import type { Review, CreateReviewParams, ProductReviewSummary } from '../types/
 const reviewsRef = collection(db, 'reviews');
 
 /**
+ * টাইমস্ট্যাম্প কনভার্টার হেল্পার ফাংশন
+ */
+const getTimestampMs = (val: unknown): number => {
+  if (!val) return 0;
+  if (val instanceof Date) return val.getTime();
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    const ms = new Date(val).getTime();
+    return isNaN(ms) ? 0 : ms;
+  }
+  if (typeof val === 'object' && val !== null) {
+    if ('toDate' in val && typeof (val as { toDate: () => Date }).toDate === 'function') {
+      return (val as { toDate: () => Date }).toDate().getTime();
+    }
+    if ('seconds' in val && typeof (val as { seconds: number }).seconds === 'number') {
+      return (val as { seconds: number }).seconds * 1000;
+    }
+  }
+  return 0;
+};
+
+/**
  * কোনো নির্দিষ্ট প্রোডাক্টের সব অনুমোদিত রিভিউ ফায়ারস্টোর থেকে নিয়ে আসার ফাংশন
+ * (ইনডেক্স ঝামেলা ছাড়া ১০০% ডিভাইস ও আইডিতে লাইভ দেখাবে)
  */
 export const getProductReviews = async (productId: string): Promise<Review[]> => {
   try {
     const q = query(
       reviewsRef, 
-      where('productId', '==', productId), 
-      where('status', '==', 'approved'),
-      orderBy('createdAt', 'desc')
+      where('productId', '==', productId)
     );
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((d) => ({
+    const list = snapshot.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as Review[];
+
+    // ইন-মেমোরি ফিল্টারিং ও রিয়েল-টাইম সর্টিং (নতুন রিভিউ সবার উপরে থাকবে)
+    return list
+      .filter((r) => r.status === 'approved' || !r.status)
+      .sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt));
   } catch (error) {
     console.error('Error fetching product reviews:', error);
-    // ফলব্যাক হিসেবে খালি অ্যারে রিটার্ন
     return [];
   }
 };
@@ -61,9 +85,11 @@ export const submitProductReview = async (params: CreateReviewParams): Promise<R
 
     // প্রোডাক্টের গড় রেটিং ও রিভিউ সংখ্যা রিয়েল-টাইমে আপডেট করা
     try {
-      const q = query(reviewsRef, where('productId', '==', params.productId), where('status', '==', 'approved'));
+      const q = query(reviewsRef, where('productId', '==', params.productId));
       const snapshot = await getDocs(q);
-      const allReviews = snapshot.docs.map((d) => d.data());
+      const allReviews = snapshot.docs
+        .map((d) => d.data() as Review)
+        .filter((r) => r.status === 'approved' || !r.status);
       
       const totalRating = allReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
       const avgRating = allReviews.length > 0 ? Number((totalRating / allReviews.length).toFixed(1)) : 5.0;
