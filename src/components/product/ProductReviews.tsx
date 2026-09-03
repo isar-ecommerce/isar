@@ -10,7 +10,9 @@ import {
   User, 
   Sparkles,
   Calendar,
-  ShieldCheck
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
@@ -34,6 +36,9 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [filterWithPhotosOnly, setFilterWithPhotosOnly] = useState<boolean>(false);
   const [selectedStarFilter, setSelectedStarFilter] = useState<number | null>(null);
+
+  // See All Reviews টগল স্টেট (শুরুতে ৩টি দেখাবে)
+  const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
 
   // লাইটবক্স ফটো প্রিভিউ স্টেট
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -213,6 +218,9 @@ export default function ProductReviews({ productId, productName }: ProductReview
     return true;
   });
 
+  // প্রদর্শিত রিভিউ সংখ্যা (See All টগল লজিক)
+  const displayedReviews = showAllReviews ? filteredReviews : filteredReviews.slice(0, 3);
+
   return (
     <section className="bg-white rounded-3xl p-5 sm:p-8 shadow-modern border border-gray-100 space-y-8 mt-10">
       
@@ -362,7 +370,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredReviews.map((review) => {
+            {displayedReviews.map((review) => {
               const hasVoted = helpfulVotes[review.id] || false;
               const displayHelpfulCount = (review.helpfulCount || 0) + (hasVoted ? 1 : 0);
 
@@ -450,6 +458,29 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 </div>
               );
             })}
+
+            {/* Smart "See All Reviews" Expand/Collapse Button */}
+            {filteredReviews.length > 3 && (
+              <div className="text-center pt-2">
+                <button
+                  onClick={() => setShowAllReviews(!showAllReviews)}
+                  className="px-6 py-3 bg-white border-2 border-primary/20 hover:border-primary text-primary hover:bg-primary/5 rounded-2xl text-xs sm:text-sm font-black transition-all shadow-xs inline-flex items-center gap-2 cursor-pointer hover:scale-102"
+                >
+                  {showAllReviews ? (
+                    <>
+                      <span>Show Less Reviews</span>
+                      <ChevronUp className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <>
+                      <span>See All Reviews ({filteredReviews.length} Total)</span>
+                      <ChevronDown className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
           </div>
         )}
       </div>
