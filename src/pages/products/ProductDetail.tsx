@@ -426,23 +426,23 @@ export default function ProductDetail() {
                 {/* Primary High-Converting Buttons */}
                 <div className="space-y-3 pt-2">
                   
-                  {/* 1-Click Express Buy Now Button */}
+                  {/* Luxury Royal Blue & Deep Navy Gradient "Order Now" Button */}
                   <button
                     onClick={() => setIsExpressModalOpen(true)}
                     disabled={product.stock === 0}
-                    className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-emerald-600 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2.5 bg-linear-to-r from-primary via-primary-dark to-navy hover:from-blue-700 hover:to-slate-900 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95 cursor-pointer"
                   >
-                    <Zap className="w-5 h-5 fill-current" />
-                    সরাসরি অর্ডার করুন (1-Click Order)
+                    <Zap className="w-5 h-5 fill-brand-gold text-brand-gold" />
+                    <span>Order Now</span>
                   </button>
 
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleAddToCart}
                       disabled={product.stock === 0}
-                      className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white py-3.5 px-6 rounded-2xl font-extrabold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-navy border-2 border-gray-200 hover:border-primary/50 py-3.5 px-6 rounded-2xl font-extrabold text-xs sm:text-sm shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <ShoppingBag className="w-5 h-5" />
+                      <ShoppingBag className="w-4 h-4 text-primary" />
                       Add to Cart
                     </button>
 
@@ -450,7 +450,7 @@ export default function ProductDetail() {
                       onClick={handleToggleWishlist}
                       className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
                         isWishlisted 
-                          ? 'border-red-200 bg-red-50 text-red-500' 
+                          ? 'border-red-200 bg-red-50 text-red-500 shadow-xs' 
                           : 'border-gray-200 bg-white text-gray-600 hover:text-red-500 hover:bg-gray-50'
                       }`}
                       aria-label="Wishlist"
