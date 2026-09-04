@@ -4,6 +4,8 @@ import {
   signOut, 
   onAuthStateChanged,
   updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider,
   type User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -68,6 +70,31 @@ export const initAuthListener = () => {
   });
 
   return unsubscribe;
+};
+
+// গুগল দিয়ে সরাসরি ১-ক্লিকে লগইন বা সাইন-আপ করার ফাংশন
+export const loginWithGoogle = async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    
+    // ফায়ারস্টোরে প্রোফাইল নিশ্চিত করা
+    await syncUserToFirestore(user, 'customer', user.displayName || undefined);
+    
+    toast.success('Signed in with Google successfully!');
+    return user;
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    if (err.code === 'auth/popup-closed-by-user') {
+      return null; // ইউজার পপ-আপ নিজে কেটে দিলে এরর দেখানোর দরকার নেই
+    }
+    console.error("Google sign-in error:", error);
+    toast.error(err.message || 'Failed to sign in with Google');
+    throw error;
+  }
 };
 
 // ইমেইল এবং পাসওয়ার্ড দিয়ে নতুন একাউন্ট খোলার ফাংশন
