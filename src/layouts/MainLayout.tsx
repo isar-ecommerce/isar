@@ -3,7 +3,6 @@ import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import MobileNav from '../components/layout/MobileNav';
 import FloatingContact from '../components/common/FloatingContact';
-import RealSalesPopup from '../components/common/RealSalesPopup';
 
 export default function MainLayout() {
   return (
@@ -17,11 +16,6 @@ export default function MainLayout() {
       <main className="grow pb-16 md:pb-0 print:pb-0 print:m-0">
         <Outlet />
       </main>
-
-      {/* 100% Real Order Live Social Proof Popup */}
-      <div className="print:hidden">
-        <RealSalesPopup />
-      </div>
 
       {/* Floating WhatsApp & Call Widget */}
       <div className="print:hidden">
