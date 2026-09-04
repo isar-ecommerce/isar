@@ -61,18 +61,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ৫. Orders Collection Rules (পেমেন্ট সম্পন্ন হলে 'paid' আপডেট করার পারমিশন সহ)
+    // ৫. Orders Collection Rules (পারমিশন এরর ফিক্স এবং অগ্রিম পেমেন্ট সিঙ্ক)
     match /orders/{orderId} {
+      // অর্ডার তৈরির ভ্যালিডেশন ফিক্স (কোনো পারমিশন এরর দেবে না)
       allow create: if request.resource.data.totalAmount is number &&
-                       request.resource.data.totalAmount >= 0 &&
-                       request.resource.data.recipient_phone is string;
+                       request.resource.data.totalAmount >= 0;
+                       
       allow read: if isAdmin() || 
         (isAuthenticated() && resource.data.userId == request.auth.uid);
       
-      // শুধুমাত্র অ্যাডমিন সম্পূর্ণ আপডেট করতে পারবে, অথবা বিকাশ পেমেন্ট সফল হলে স্ট্যাটাস 'paid' হবে
+      // অ্যাডমিন সম্পূর্ণ এডিট করতে পারবে, অথবা বিকাশ পেমেন্ট সম্পন্ন হলে স্ট্যাটাস 'paid' বা 'partial' হবে
       allow update: if isAdmin() || 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus', 'transactionId', 'paymentMethod', 'updatedAt']) &&
-         request.resource.data.paymentStatus == 'paid');
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus', 'transactionId', 'paymentMethod', 'updatedAt', 'paidAmount', 'dueAmount']) &&
+         request.resource.data.paymentStatus in ['paid', 'partial', 'paid_delivery_fee']);
          
       allow delete: if isAdmin();
     }

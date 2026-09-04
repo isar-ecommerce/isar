@@ -51,8 +51,11 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const [phone, setPhone] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   
-  // পেমেন্ট টাইপ: 'partial_cod' (অগ্রিম ডেলিভারি চার্জ) অথবা 'full_online' (সম্পূর্ণ পেমেন্ট)
-  const [paymentType, setPaymentType] = useState<'partial_cod' | 'full_online'>('partial_cod');
+  // পেমেন্ট মোড: 'partial_cod' (অগ্রিম ডেলিভারি চার্জ) অথবা 'full_online' (সম্পূর্ণ পেমেন্ট)
+  const [paymentMode, setPaymentMode] = useState<'partial_cod' | 'full_online'>('partial_cod');
+  
+  // সিলেক্টেড গেটওয়ে: 'bkash' অথবা 'nagad'
+  const [selectedGateway, setSelectedGateway] = useState<'bkash' | 'nagad'>('bkash');
 
   const [division, setDivision] = useState<string>('Dhaka');
   const [district, setDistrict] = useState<string>('Dhaka');
@@ -65,7 +68,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
   if (!isOpen || !product) return null;
 
-  // Steadfast ডেলিভারি চার্জ অটো-সিঙ্ক
+  // Steadfast রেট অটো-লক
   const isDhakaCity = division.trim().toLowerCase() === 'dhaka' && district.trim().toLowerCase() === 'dhaka';
   const deliveryFee = isDhakaCity 
     ? (typeof feeInsideDhaka === 'number' ? feeInsideDhaka : 60)
@@ -74,34 +77,35 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const subtotal = product.price * quantity;
   const totalAmount = subtotal + deliveryFee;
 
-  // হিসাব: এখন কত পে করতে হবে এবং ডেলিভারির সময় কত ক্যাশ দিতে হবে
-  const payNowAmount = paymentType === 'partial_cod' ? deliveryFee : totalAmount;
-  const payOnDeliveryAmount = paymentType === 'partial_cod' ? subtotal : 0;
+  // হিসাব: কত টাকা এখন দিতে হবে এবং ডেলিভারির সময় কত দিতে হবে
+  const payNowAmount = paymentMode === 'partial_cod' ? deliveryFee : totalAmount;
+  const dueOnDelivery = paymentMode === 'partial_cod' ? subtotal : 0;
 
   const t = {
     en: {
       name: 'Full Name',
       namePlaceholder: 'Enter your full name',
       phone: 'Mobile Number',
-      phonePlaceholder: '01XXXXXXXXX',
+      phonePlaceholder: '01XXXXXXXXX (11 digits)',
       division: 'Division',
       district: 'District',
       upazila: 'Thana / Upazila',
       address: 'Delivery Address',
       addressPlaceholder: 'House, Road, Area details',
-      deliveryArea: isDhakaCity ? 'Delivery (Inside Dhaka):' : 'Delivery (Outside Dhaka):',
-      paymentSectionTitle: 'Choose Payment Option:',
-      codOptTitle: 'Cash on Delivery (COD)',
-      codOptSub: `Pay ৳${deliveryFee} delivery fee now via bKash, pay ৳${subtotal.toLocaleString()} on delivery`,
-      fullOptTitle: 'Full Payment (bKash)',
-      fullOptSub: `Pay full amount (৳${totalAmount.toLocaleString()}) via bKash now`,
+      deliveryFeeText: isDhakaCity ? 'Delivery (Inside Dhaka):' : 'Delivery (Outside Dhaka):',
+      choosePayment: 'Select Payment Option:',
+      codTitle: 'Cash on Delivery (Advance Delivery Fee)',
+      codSub: `Pay ৳${deliveryFee} delivery fee now to confirm order. Pay product price (৳${subtotal.toLocaleString()}) on delivery.`,
+      fullTitle: 'Full Online Payment',
+      fullSub: `Pay full amount (৳${totalAmount.toLocaleString()}) now. Zero cash due on delivery.`,
+      selectGateway: 'Choose Payment Gateway:',
       itemPrice: 'Product Price',
       shippingFee: 'Delivery Fee',
-      payNowLabel: 'To Pay Now (via bKash):',
-      payOnDeliveryLabel: 'Cash on Delivery Due:',
-      btnPayNow: `Pay ৳${payNowAmount.toLocaleString()} via bKash to Confirm`,
-      processing: 'Connecting to bKash...',
-      trustNotice: 'Secure online payment • 100% Genuine product guarantee',
+      payNowLabel: `To Pay Now (${selectedGateway === 'bkash' ? 'bKash' : 'Nagad'}):`,
+      dueLabel: 'Cash on Delivery Due:',
+      btnText: `Pay ৳${payNowAmount.toLocaleString()} via ${selectedGateway === 'bkash' ? 'bKash' : 'Nagad'} to Confirm`,
+      processing: 'Connecting to Gateway...',
+      trustNotice: 'Secure Payment Gateway • Fast Home Delivery Across Bangladesh',
       errInfo: 'Please provide your name, phone number, and address.',
       errPhone: 'Please enter a valid 11-digit mobile number.',
       success: 'Order placed successfully! ID:'
@@ -110,24 +114,25 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       name: 'আপনার নাম',
       namePlaceholder: 'পূর্ণ নাম লিখুন',
       phone: 'মোবাইল নম্বর',
-      phonePlaceholder: '০১XXXXXXXXX',
+      phonePlaceholder: '০১XXXXXXXXX (১১ ডিজিট)',
       division: 'বিভাগ',
       district: 'জেলা',
       upazila: 'থানা / উপজেলা',
       address: 'সম্পূর্ণ ঠিকানা',
       addressPlaceholder: 'বাসা নম্বর, রোড নম্বর বা এলাকা',
-      deliveryArea: isDhakaCity ? 'ডেলিভারি চার্জ (ঢাকা সিটি):' : 'ডেলিভারি চার্জ (ঢাকার বাইরে):',
-      paymentSectionTitle: 'পেমেন্ট অপশন নির্বাচন করুন:',
-      codOptTitle: 'ক্যাশ অন ডেলিভারি (COD)',
-      codOptSub: `অগ্রিম ডেলিভারি ফি ৳${deliveryFee} দিয়ে কনফার্ম করুন, বাকি ৳${subtotal.toLocaleString()} ডেলিভারির সময় দিন`,
-      fullOptTitle: 'সম্পূর্ণ পেমেন্ট (bKash)',
-      fullOptSub: `সম্পূর্ণ মূল্য (৳${totalAmount.toLocaleString()}) বিকাশে একবারে পরিশোধ করুন`,
+      deliveryFeeText: isDhakaCity ? 'ডেলিভারি চার্জ (ঢাকা সিটি):' : 'ডেলিভারি চার্জ (ঢাকার বাইরে):',
+      choosePayment: 'পেমেন্ট অপশন নির্বাচন করুন:',
+      codTitle: 'ক্যাশ অন ডেলিভারি (অগ্রিম ডেলিভারি ফি)',
+      codSub: `অর্ডার কনফার্ম করতে ডেলিভারি ফি ৳${deliveryFee} দিন। পণ্যের মূল্য (৳${subtotal.toLocaleString()}) ডেলিভারির সময় ক্যাশ পরিশোধ করবেন।`,
+      fullTitle: 'সম্পূর্ণ অনলাইন পেমেন্ট',
+      fullSub: `সম্পূর্ণ মূল্য (৳${totalAmount.toLocaleString()}) একবারে পরিশোধ করুন। ডেলিভারির সময় কোনো টাকা দিতে হবে না।`,
+      selectGateway: 'পেমেন্ট মেথড বেছে নিন:',
       itemPrice: 'পণ্যের মূল্য',
       shippingFee: 'ডেলিভারি ফি',
-      payNowLabel: 'এখন প্রদেয় (বিকাশ):',
-      payOnDeliveryLabel: 'পণ্য হাতে পেয়ে প্রদেয় (ক্যাশ):',
-      btnPayNow: `অর্ডার কনফার্ম করতে ৳${payNowAmount.toLocaleString()} বিকাশ করুন`,
-      processing: 'বিকাশ গেটওয়েতে সংযোগ হচ্ছে...',
+      payNowLabel: `এখন প্রদেয় (${selectedGateway === 'bkash' ? 'বিকাশ' : 'নগদ'}):`,
+      dueLabel: 'পণ্য হাতে পেয়ে প্রদেয় (ক্যাশ):',
+      btnText: `অর্ডার কনফার্ম করতে ৳${payNowAmount.toLocaleString()} ${selectedGateway === 'bkash' ? 'বিকাশ' : 'নগদ'} করুন`,
+      processing: 'পেমেন্ট গেটওয়েতে সংযোগ হচ্ছে...',
       trustNotice: 'নিরাপদ অনলাইন পেমেন্ট • ১০০% আসল পণ্যের নিশ্চয়তা',
       errInfo: 'আপনার নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা দিন।',
       errPhone: 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।',
@@ -188,7 +193,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
       const cartItems = [{ product, quantity }];
 
-      // ১. অর্ডার ডাটা প্রস্তুত (Steadfast এবং অ্যাডমিনের জন্য পারফেক্ট ক্যাশ অন ডেলিভারি অ্যামাউন্ট)
+      // টাইপস্ক্রিপ্ট ১০০% নিখুঁত: শুধুমাত্র CreateOrderInput-এর সঠিক ফিল্ডগুলোই পাঠানো হচ্ছে
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -200,38 +205,40 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         deliveryFee,
         discount: 0,
         totalAmount,
-        paymentMethod: paymentType === 'partial_cod' ? 'cod' : 'bkash',
+        paymentMethod: paymentMode === 'partial_cod' ? 'cod' : selectedGateway,
       });
 
-      // ২. সরাসরি বিকাশ পেমেন্ট ইনিশিয়েট (অগ্রিম ডেলিভারি ফি অথবা সম্পূর্ণ টাকা)
-      toast.loading(t.processing);
-      const bkashRes = await initiateBkashPayment(order.orderNumber, payNowAmount);
-      
-      if (bkashRes.success && bkashRes.bkashURL) {
-        // সরাসরি অফিসিয়াল বিকাশ পোর্টালে রিডাইরেক্ট
-        window.location.href = bkashRes.bkashURL;
-        return;
-      } else {
-        // ক্রেডেনশিয়াল না থাকলে ফলব্যাক নোটিফিকেশন
-        toast.dismiss();
-        toast.success(`অর্ডার রিসিভ হয়েছে! ইনভয়েস: ${order.orderNumber}`);
+      // গেটওয়ে হ্যান্ডলিং
+      if (selectedGateway === 'bkash') {
+        toast.loading(t.processing);
+        const bkashRes = await initiateBkashPayment(order.orderNumber, payNowAmount);
         
-        sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount);
-        sendOrderConfirmationEmail(order);
-        sendAdminOrderAlert(order);
-
-        onClose();
-        navigate('/order-success', {
-          state: {
-            order: {
-              ...order,
-              totalAmount,
-              paymentMethod: paymentType === 'partial_cod' ? 'cod' : 'bkash',
-              paymentStatus: 'pending',
-            },
-          },
-        });
+        if (bkashRes.success && bkashRes.bkashURL) {
+          window.location.href = bkashRes.bkashURL;
+          return;
+        }
       }
+
+      toast.dismiss();
+      sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount);
+      sendOrderConfirmationEmail(order);
+      sendAdminOrderAlert(order);
+
+      toast.success(`${t.success} ${order.orderNumber}`);
+      onClose();
+
+      navigate('/order-success', {
+        state: {
+          order: {
+            ...order,
+            totalAmount,
+            paidAmount: payNowAmount,
+            dueAmount: dueOnDelivery,
+            paymentMethod: paymentMode === 'partial_cod' ? 'cod' : selectedGateway,
+            paymentStatus: 'pending',
+          },
+        },
+      });
     } catch (error) {
       console.error('Order submission error:', error);
       toast.error(lang === 'bn' ? 'অর্ডার সম্পন্ন করা যায়নি।' : 'Failed to complete order.');
@@ -244,7 +251,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative my-auto">
         
-        {/* Sleek Brand Header */}
+        {/* Header Bar */}
         <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
           <span className="text-sm font-black tracking-widest text-white">ISAR</span>
 
@@ -281,10 +288,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
           </div>
         </div>
 
-        {/* Compact Form Body */}
+        {/* Form Body */}
         <div className="p-3.5 sm:p-4 space-y-2.5">
           
-          {/* Micro Product Strip */}
+          {/* Mini Product Strip */}
           <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/70 flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-lg overflow-hidden bg-white border border-slate-200 shrink-0 p-0.5 flex items-center justify-center">
               <img 
@@ -309,7 +316,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               >
                 <Minus className="w-2.5 h-2.5" />
               </button>
-              <span className="w-5 text-center text-xs font-bold text-slate-900 font-mono">{quantity}</span>
+              <span className="w-5 text-center text-xs font-black text-slate-900 font-mono">{quantity}</span>
               <button 
                 type="button"
                 onClick={() => setQuantity(prev => Math.min(product.stock, prev + 1))}
@@ -322,7 +329,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
           <form onSubmit={handleOrderSubmit} className="space-y-2.5">
             
-            {/* Name & Phone in 2-Column Grid */}
+            {/* Name & Phone */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="space-y-0.5">
                 <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
@@ -340,7 +347,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
               <div className="space-y-0.5">
                 <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                  <Phone className="w-3 h-3 text-emerald-600" /> {t.phone} *
+                  <Phone className="w-3.5 h-3.5 text-emerald-600" /> {t.phone} *
                 </label>
                 <input
                   type="tel"
@@ -354,7 +361,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </div>
             </div>
 
-            {/* 3 Cascading Location Selectors */}
+            {/* Location */}
             <div className="p-2 bg-slate-50/80 rounded-xl border border-slate-200/60 grid grid-cols-3 gap-1.5">
               <div className="space-y-0.5">
                 <label className="text-[9px] font-semibold text-slate-500">{t.division} *</label>
@@ -424,85 +431,136 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             <div className="px-2.5 py-1.5 bg-blue-50/70 rounded-lg border border-blue-200/80 flex items-center justify-between text-[11px]">
               <div className="flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span className="font-semibold text-slate-800">{t.deliveryArea}</span>
+                <span className="font-semibold text-slate-800">{t.deliveryFeeText}</span>
               </div>
               <span className="font-black text-blue-700 font-mono">
                 ৳{deliveryFee}
               </span>
             </div>
 
-            {/* Business Model: Advance Delivery Charge vs Full Online Payment */}
+            {/* Payment Mode (COD vs Full Online) */}
             <div className="space-y-1 pt-0.5">
               <span className="text-[10px] font-bold text-slate-700 block">
-                {t.paymentSectionTitle}
+                {t.choosePayment}
               </span>
-              <div className="space-y-1.5">
-                
-                {/* Option 1: Cash on Delivery with Mandatory Advance Delivery Fee */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentType('partial_cod')}
-                  className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
-                    paymentType === 'partial_cod'
-                      ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-600/30'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                    <Banknote className="w-3 h-3" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-900">
-                        {t.codOptTitle}
-                      </span>
-                      <span className="text-[9px] font-extrabold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                        জনপ্রিয়
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                      {t.codOptSub}
+              
+              {/* Option 1: COD with Advance Fee */}
+              <button
+                type="button"
+                onClick={() => setPaymentMode('partial_cod')}
+                className={`w-full p-2 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                  paymentMode === 'partial_cod'
+                    ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-600/30'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                  <Banknote className="w-3 h-3" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-900">
+                      {t.codTitle}
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      জনপ্রিয়
                     </span>
                   </div>
-                  {paymentType === 'partial_cod' && (
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  )}
-                </button>
+                  <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
+                    {t.codSub}
+                  </span>
+                </div>
+                {paymentMode === 'partial_cod' && (
+                  <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                )}
+              </button>
 
-                {/* Option 2: 100% Full Payment via bKash */}
+              {/* Option 2: Full Online Payment */}
+              <button
+                type="button"
+                onClick={() => setPaymentMode('full_online')}
+                className={`w-full p-2 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                  paymentMode === 'full_online'
+                    ? 'border-purple-600 bg-purple-50/70 shadow-xs ring-1 ring-purple-600/30'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-md bg-purple-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                  <Zap className="w-3 h-3" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-900">
+                      {t.fullTitle}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
+                    {t.fullSub}
+                  </span>
+                </div>
+                {paymentMode === 'full_online' && (
+                  <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                )}
+              </button>
+            </div>
+
+            {/* Official bKash and Nagad Gateways */}
+            <div className="space-y-1 pt-0.5">
+              <span className="text-[10px] font-bold text-slate-700 block">
+                {t.selectGateway}
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                
+                {/* Official bKash Gateway */}
                 <button
                   type="button"
-                  onClick={() => setPaymentType('full_online')}
-                  className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
-                    paymentType === 'full_online'
-                      ? 'border-[#E2136E] bg-pink-50/70 shadow-xs ring-1 ring-[#E2136E]/30'
+                  onClick={() => setSelectedGateway('bkash')}
+                  className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
+                    selectedGateway === 'bkash'
+                      ? 'border-[#E2136E] bg-pink-50/80 shadow-xs ring-1 ring-[#E2136E]/30'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
-                  <div className="w-5 h-5 rounded-md bg-[#E2136E] p-0.5 flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-6 h-6 rounded-lg bg-[#E2136E] p-1 flex items-center justify-center shrink-0">
                     <svg className="w-full h-full" viewBox="0 0 32 32" fill="none">
                       <path d="M19.5 3L8 16.5L14.5 18L12 29L26 14.5L18.5 13.5L19.5 3Z" fill="white" />
                     </svg>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-[#E2136E]">
-                        {t.fullOptTitle}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                      {t.fullOptSub}
-                    </span>
+                  <div className="flex-1 text-left min-w-0">
+                    <span className="text-xs font-black text-[#E2136E] block leading-tight">bKash</span>
+                    <span className="text-[9px] text-slate-500 block truncate">বিকাশ অনলাইন</span>
                   </div>
-                  {paymentType === 'full_online' && (
-                    <CheckCircle2 className="w-4 h-4 text-[#E2136E] shrink-0 mt-0.5" />
+                  {selectedGateway === 'bkash' && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#E2136E] shrink-0" />
+                  )}
+                </button>
+
+                {/* Official Nagad Gateway */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedGateway('nagad')}
+                  className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
+                    selectedGateway === 'nagad'
+                      ? 'border-[#F7941D] bg-orange-50/80 shadow-xs ring-1 ring-[#F7941D]/30'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-lg bg-[#F7941D] text-white font-black text-[11px] flex items-center justify-center shrink-0">
+                    নগদ
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <span className="text-xs font-black text-[#F7941D] block leading-tight">Nagad</span>
+                    <span className="text-[9px] text-slate-500 block truncate">নগদ অনলাইন</span>
+                  </div>
+                  {selectedGateway === 'nagad' && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#F7941D] shrink-0" />
                   )}
                 </button>
 
               </div>
             </div>
 
-            {/* Clear Transparent Bill Summary */}
+            {/* Bill Summary */}
             <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1 text-[11px]">
               <div className="flex justify-between text-slate-600">
                 <span>{t.itemPrice} ({quantity}):</span>
@@ -518,23 +576,23 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   <span>{t.payNowLabel}</span>
                   <span className="font-black font-mono">৳{payNowAmount.toLocaleString()}</span>
                 </div>
-                {paymentType === 'partial_cod' && (
+                {paymentMode === 'partial_cod' && (
                   <div className="flex justify-between text-slate-500 font-medium text-[10px]">
-                    <span>{t.payOnDeliveryLabel}</span>
-                    <span className="font-bold font-mono">৳{payOnDeliveryAmount.toLocaleString()}</span>
+                    <span>{t.dueLabel}</span>
+                    <span className="font-bold font-mono">৳{dueOnDelivery.toLocaleString()}</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* High-Converting Action Button */}
+            {/* Action Button */}
             <button
               type="submit"
               disabled={isSubmitting}
               className={`w-full flex items-center justify-center gap-2 text-white font-black py-2.5 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md cursor-pointer hover:scale-[1.01] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed ${
-                paymentType === 'full_online'
-                  ? 'bg-linear-to-r from-[#E2136E] to-[#b30e56] hover:from-[#c20f5d] hover:to-[#8a0941] shadow-pink-500/20'
-                  : 'bg-linear-to-r from-blue-600 via-indigo-600 to-slate-900 hover:from-blue-700 hover:to-black shadow-blue-500/25'
+                selectedGateway === 'bkash'
+                  ? 'bg-linear-to-r from-[#E2136E] to-[#990a48] hover:from-[#c20f5d] hover:to-[#770636] shadow-pink-500/20'
+                  : 'bg-linear-to-r from-[#F7941D] to-[#d4780b] hover:from-[#e58310] hover:to-[#b86606] shadow-orange-500/20'
               }`}
             >
               {isSubmitting ? (
@@ -544,7 +602,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               ) : (
                 <>
                   <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> 
-                  <span>{t.btnPayNow}</span>
+                  <span>{t.btnText}</span>
                 </>
               )}
             </button>
