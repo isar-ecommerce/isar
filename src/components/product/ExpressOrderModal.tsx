@@ -45,6 +45,9 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const { user } = useAuthStore();
   const { feeInsideDhaka, feeOutsideDhaka } = useSettingsStore();
 
+  // ভাষা স্টেট (ডিফল্ট: ইংরেজি 'en')
+  const [lang, setLang] = useState<'en' | 'bn'>('en');
+
   const [fullName, setFullName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
@@ -61,7 +64,69 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
   if (!isOpen || !product) return null;
 
-  // Steadfast কুরিয়ার অনুযায়ী স্বয়ংক্রিয় ডেলিভারি ফি অটো-লক (গ্রাহক পরিবর্তন করতে পারবে না)
+  // ভাষা ডিকশনারি
+  const t = {
+    en: {
+      name: 'Full Name *',
+      namePlaceholder: 'Enter your full name',
+      phone: 'Mobile Number *',
+      phonePlaceholder: '01XXXXXXXXX (11 digits)',
+      locationTitle: 'Delivery Location',
+      division: 'Division *',
+      district: 'District *',
+      upazila: 'Thana / Upazila *',
+      address: 'Full Address (House, Road, Area) *',
+      addressPlaceholder: 'e.g. House #12, Road #4, Dhanmondi',
+      deliveryFeeInside: 'Delivery Fee (Inside Dhaka):',
+      deliveryFeeOutside: 'Delivery Fee (Outside Dhaka):',
+      paymentTitle: 'Select Payment Method:',
+      codTitle: 'COD',
+      codSub: 'Cash on Delivery',
+      bkashTitle: 'bKash',
+      bkashSub: 'Online Payment',
+      itemPrice: 'Product Price',
+      deliveryCharge: 'Delivery Charge',
+      total: 'Total Payable:',
+      orderNow: 'Order Now',
+      payWithBkash: 'Pay with bKash',
+      processing: 'Processing Order...',
+      trustNotice: '100% Cash on Delivery available • Fast Home Delivery',
+      errInfo: 'Please provide your name, phone number, and full address.',
+      errPhone: 'Please enter a valid 11-digit mobile number.',
+      success: 'Order placed successfully! ID:'
+    },
+    bn: {
+      name: 'আপনার নাম *',
+      namePlaceholder: 'পূর্ণ নাম লিখুন',
+      phone: 'মোবাইল নম্বর *',
+      phonePlaceholder: '০১XXXXXXXXX (১১ ডিজিট)',
+      locationTitle: 'ডেলিভারি এলাকা নির্বাচন',
+      division: 'বিভাগ *',
+      district: 'জেলা *',
+      upazila: 'থানা / উপজেলা *',
+      address: 'সম্পূর্ণ ঠিকানা (বাসা/রোড/এলাকা) *',
+      addressPlaceholder: 'যেমন: হাউজ #১২, রোড #৪, ধানমন্ডি',
+      deliveryFeeInside: 'ডেলিভারি ফি (ঢাকা সিটি):',
+      deliveryFeeOutside: 'ডেলিভারি ফি (ঢাকার বাইরে):',
+      paymentTitle: 'পেমেন্ট মেথড নির্বাচন করুন:',
+      codTitle: 'COD',
+      codSub: 'ক্যাশ অন ডেলিভারি',
+      bkashTitle: 'bKash',
+      bkashSub: 'বিকাশ অনলাইন পেমেন্ট',
+      itemPrice: 'পণ্যের মূল্য',
+      deliveryCharge: 'ডেলিভারি চার্জ',
+      total: 'সর্বমোট প্রদেয়:',
+      orderNow: 'Order Now',
+      payWithBkash: 'Pay with bKash',
+      processing: 'অর্ডার প্রসেসিং হচ্ছে...',
+      trustNotice: 'নিরাপদ ও দ্রুততম হোম ডেলিভারি সার্ভিস',
+      errInfo: 'আপনার নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা দিন।',
+      errPhone: 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।',
+      success: 'অর্ডার সম্পন্ন হয়েছে! আইডি:'
+    }
+  }[lang];
+
+  // Steadfast কুরিয়ার রেট অটো-সিঙ্ক (গ্রাহক চেঞ্জ করতে পারবে না)
   const isDhakaCity = division.trim().toLowerCase() === 'dhaka' && district.trim().toLowerCase() === 'dhaka';
   const deliveryFee = isDhakaCity 
     ? (typeof feeInsideDhaka === 'number' ? feeInsideDhaka : 60)
@@ -90,7 +155,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     setUpazila(upazilas[0] || '');
   };
 
-  // ফোন নম্বরে শুধুমাত্র ১১ ডিজিট নেওয়ার ফিল্টার
+  // ফোন নম্বর শুধুমাত্র ১১ ডিজিট নেওয়ার ফিল্টার
   const handlePhoneChange = (val: string) => {
     const numeric = val.replace(/\D/g, '').slice(0, 11);
     setPhone(numeric);
@@ -100,13 +165,13 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     e.preventDefault();
 
     if (!fullName.trim() || !phone || !fullAddress.trim()) {
-      toast.error('আপনার নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা দিন');
+      toast.error(t.errInfo);
       return;
     }
 
     const bdPhoneRegex = /^(?:\+88|88)?(01[3-9]\d{8})$/;
     if (!bdPhoneRegex.test(phone) || phone.length !== 11) {
-      toast.error('সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
+      toast.error(t.errPhone);
       return;
     }
 
@@ -124,7 +189,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
       const cartItems = [{ product, quantity }];
 
-      // ১. মূল অর্ডার ডাটাবেসে তৈরি
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -139,25 +203,23 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         paymentMethod,
       });
 
-      // ২. বিকাশ পেমেন্ট হ্যান্ডলিং
       if (paymentMethod === 'bkash') {
-        toast.loading('বিকাশ সুরক্ষিত গেটওয়েতে সংযোগ হচ্ছে...');
+        toast.loading(lang === 'bn' ? 'বিকাশ গেটওয়েতে যাচ্ছি...' : 'Connecting to bKash Gateway...');
         const bkashRes = await initiateBkashPayment(order.orderNumber, totalAmount);
         
         if (bkashRes.success && bkashRes.bkashURL) {
           window.location.href = bkashRes.bkashURL;
           return;
         } else {
-          toast.error(bkashRes.message || 'বিকাশ গেটওয়ে সংযোগে ত্রুটি। COD হিসেবে অর্ডার সেভ করা হলো।');
+          toast.error(bkashRes.message || 'bKash Gateway connection failed.');
         }
       }
 
-      // ৩. নোটিফিকেশন প্রেরণ
       sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount);
       sendOrderConfirmationEmail(order);
       sendAdminOrderAlert(order);
 
-      toast.success(`অর্ডার সম্পন্ন হয়েছে! আইডি: ${order.orderNumber}`);
+      toast.success(`${t.success} ${order.orderNumber}`);
       onClose();
 
       navigate('/order-success', {
@@ -172,7 +234,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       });
     } catch (error) {
       console.error('Order submission error:', error);
-      toast.error('অর্ডার সম্পন্ন করা যায়নি। পুনরায় চেষ্টা করুন।');
+      toast.error(lang === 'bn' ? 'অর্ডার সম্পন্ন করা যায়নি।' : 'Failed to complete order.');
     } finally {
       setIsSubmitting(false);
     }
@@ -182,20 +244,45 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative max-h-[92vh] flex flex-col">
         
-        {/* Minimal Clean Header */}
+        {/* Minimalist Branded Header: Only "ISAR" & Language Switcher */}
         <div className="bg-slate-900 text-white px-5 py-3 flex items-center justify-between shrink-0">
-          <span className="text-xs font-black tracking-wider uppercase text-slate-200 flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> এক্সপ্রেস চেকআউট
+          <span className="text-base font-black tracking-widest text-white">
+            ISAR
           </span>
-          
-          <button 
-            type="button"
-            onClick={onClose} 
-            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Language Switcher Toggle */}
+            <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setLang('en')}
+                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                  lang === 'en' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('bn')}
+                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                  lang === 'bn' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                বাং
+              </button>
+            </div>
+
+            {/* Close Button */}
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Form Body */}
@@ -242,14 +329,14 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             {/* Name */}
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-blue-600" /> আপনার নাম *
+                <User className="w-3.5 h-3.5 text-blue-600" /> {t.name}
               </label>
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="পূর্ণ নাম লিখুন"
+                placeholder={t.namePlaceholder}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/15 transition-all shadow-xs"
               />
             </div>
@@ -257,7 +344,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             {/* Phone (১১ ডিজিটের কঠোর ভ্যালিডেশন) */}
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                <Phone className="w-3.5 h-3.5 text-emerald-600" /> মোবাইল নম্বর *
+                <Phone className="w-3.5 h-3.5 text-emerald-600" /> {t.phone}
               </label>
               <input
                 type="tel"
@@ -265,20 +352,20 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 maxLength={11}
                 value={phone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
-                placeholder="01XXXXXXXXX (১১ ডিজিট)"
+                placeholder={t.phonePlaceholder}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/15 transition-all shadow-xs font-mono"
               />
             </div>
 
-            {/* Cascading Location Selectors */}
+            {/* Location Selectors */}
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
               <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
-                ডেলিভারি এলাকা নির্বাচন
+                {t.locationTitle}
               </span>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-0.5">
-                  <label className="text-[10px] font-semibold text-slate-500">বিভাগ *</label>
+                  <label className="text-[10px] font-semibold text-slate-500">{t.division}</label>
                   <div className="relative">
                     <select
                       value={division}
@@ -294,7 +381,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </div>
 
                 <div className="space-y-0.5">
-                  <label className="text-[10px] font-semibold text-slate-500">জেলা *</label>
+                  <label className="text-[10px] font-semibold text-slate-500">{t.district}</label>
                   <div className="relative">
                     <select
                       value={district}
@@ -310,7 +397,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </div>
 
                 <div className="col-span-2 space-y-0.5">
-                  <label className="text-[10px] font-semibold text-slate-500">থানা / উপজেলা *</label>
+                  <label className="text-[10px] font-semibold text-slate-500">{t.upazila}</label>
                   <div className="relative">
                     <select
                       value={upazila}
@@ -330,35 +417,35 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             {/* Address */}
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                <Building className="w-3.5 h-3.5 text-indigo-600" /> সম্পূর্ণ ঠিকানা (বাসা/রোড/এলাকা) *
+                <Building className="w-3.5 h-3.5 text-indigo-600" /> {t.address}
               </label>
               <textarea
                 required
                 rows={2}
                 value={fullAddress}
                 onChange={(e) => setFullAddress(e.target.value)}
-                placeholder="বাসা নম্বর, রোড নম্বর বা এলাকার নাম লিখুন"
+                placeholder={t.addressPlaceholder}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/15 transition-all resize-none shadow-xs"
               />
             </div>
 
-            {/* Steadfast অটো-লক ডেলিভারি চার্জ ব্যাজ (কোনো ম্যানুয়াল বাটনের ঝামেলা নেই) */}
+            {/* Delivery Fee: Clean ৳60 or ৳150 without any "(অটো-লক)" text */}
             <div className="p-2.5 bg-blue-50/70 rounded-xl border border-blue-200 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <Truck className="w-4 h-4 text-blue-600" />
+                <Truck className="w-4 h-4 text-blue-600 shrink-0" />
                 <span className="font-bold text-slate-800">
-                  {isDhakaCity ? 'ঢাকা সিটি ডেলিভারি চার্জ:' : 'ঢাকার বাইরে ডেলিভারি চার্জ:'}
+                  {isDhakaCity ? t.deliveryFeeInside : t.deliveryFeeOutside}
                 </span>
               </div>
               <span className="font-black text-blue-700 bg-white px-2.5 py-0.5 rounded-lg border border-blue-200 font-mono shadow-xs">
-                ৳{deliveryFee} (অটো-লক)
+                ৳{deliveryFee}
               </span>
             </div>
 
-            {/* Payment Method Selector: COD vs bKash (অফিশিয়াল বিকাশ ব্র্যান্ডিং) */}
+            {/* Payment Method Selector: COD vs bKash */}
             <div className="space-y-1 pt-0.5">
               <label className="text-[11px] font-bold text-slate-700 block">
-                পেমেন্ট মেথড নির্বাচন করুন:
+                {t.paymentTitle}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 
@@ -374,14 +461,14 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <Banknote className="w-4 h-4 text-emerald-600" /> COD
+                      <Banknote className="w-4 h-4 text-emerald-600" /> {t.codTitle}
                     </span>
                     {paymentMethod === 'cod' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
                   </div>
-                  <span className="text-[10px] text-slate-500 block mt-1">ক্যাশ অন ডেলিভারি</span>
+                  <span className="text-[10px] text-slate-500 block mt-1">{t.codSub}</span>
                 </button>
 
-                {/* bKash Option with Official Pink Branding & Symbol */}
+                {/* bKash Option with Official Bird Logo */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('bkash')}
@@ -393,36 +480,35 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      {/* Official bKash Bird Emblem */}
                       <svg className="w-4 h-4 shrink-0" viewBox="0 0 32 32" fill="none">
                         <path d="M19.5 3L8 16.5L14.5 18L12 29L26 14.5L18.5 13.5L19.5 3Z" fill="#E2136E" />
                       </svg>
-                      <span className="text-xs font-black text-[#E2136E]">bKash</span>
+                      <span className="text-xs font-black text-[#E2136E]">{t.bkashTitle}</span>
                     </div>
                     {paymentMethod === 'bkash' && <CheckCircle2 className="w-3.5 h-3.5 text-[#E2136E] shrink-0" />}
                   </div>
-                  <span className="text-[10px] text-slate-500 block mt-1">বিকাশ পেমেন্ট</span>
+                  <span className="text-[10px] text-slate-500 block mt-1">{t.bkashSub}</span>
                 </button>
               </div>
             </div>
 
-            {/* Bill Summary - Clean Taka Symbol */}
+            {/* Bill Summary */}
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>পণ্যের মূল্য ({quantity} টি):</span>
+                <span>{t.itemPrice} ({quantity}):</span>
                 <span className="font-bold text-slate-900 font-mono">৳{subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>ডেলিভারি ফি ({isDhakaCity ? 'ঢাকা সিটি' : 'ঢাকার বাইরে'}):</span>
+                <span>{t.deliveryCharge}:</span>
                 <span className="font-bold text-slate-900 font-mono">৳{deliveryFee.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm font-black text-slate-900 pt-1.5 border-t border-slate-200">
-                <span>সর্বমোট প্রদেয়:</span>
+                <span>{t.total}</span>
                 <span className="text-blue-600 font-mono font-black text-base">৳{totalAmount.toLocaleString()}</span>
               </div>
             </div>
 
-            {/* CTA Button: Adapts dynamically based on Payment Method */}
+            {/* Action CTA Button */}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -434,13 +520,13 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Processing Order...
+                  <Loader2 className="w-4 h-4 animate-spin" /> {t.processing}
                 </>
               ) : (
                 <>
                   <Zap className="w-4 h-4 fill-amber-400 text-amber-400" /> 
                   <span>
-                    {paymentMethod === 'bkash' ? 'Pay with bKash' : 'Order Now'} — ৳{totalAmount.toLocaleString()}
+                    {paymentMethod === 'bkash' ? t.payWithBkash : t.orderNow} — ৳{totalAmount.toLocaleString()}
                   </span>
                 </>
               )}
@@ -448,7 +534,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
             <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 text-center pt-0.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>নিরাপদ ও দ্রুততম হোম ডেলিভারি সার্ভিস</span>
+              <span>{t.trustNotice}</span>
             </div>
 
           </form>
