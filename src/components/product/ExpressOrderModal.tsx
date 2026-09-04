@@ -105,13 +105,13 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     const cleanPhone = phone.replace(/[^0-9]/g, '');
 
     if (!fullName.trim() || !cleanPhone || !fullAddress.trim()) {
-      toast.error('অনুগ্রহ করে আপনার নাম, মোবাইল নম্বর ও ঠিকানা দিন');
+      toast.error('Please provide your name, phone number, and address');
       return;
     }
 
     const bdPhoneRegex = /^(?:\+88|88)?(01[3-9]\d{8})$/;
     if (!bdPhoneRegex.test(cleanPhone)) {
-      toast.error('সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)');
+      toast.error('Please enter a valid 11-digit mobile number (e.g. 017XXXXXXXX)');
       return;
     }
 
@@ -165,7 +165,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       });
     } catch (error) {
       console.error('Express order error:', error);
-      toast.error('অর্ডার সম্পন্ন করা যায়নি। পুনরায় চেষ্টা করুন।');
+      toast.error('Failed to complete order. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -279,7 +279,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               />
             </div>
 
-            {/* 3-Tier Cascading Location Selectors */}
+            {/* Delivery Location */}
             <div className="p-3.5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-3">
               <div className="flex items-center justify-between pb-1 border-b border-gray-200/60">
                 <span className="text-[11px] font-black text-navy uppercase tracking-wider flex items-center gap-1">
@@ -290,7 +290,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
               <div className="grid grid-cols-2 gap-2.5">
                 
-                {/* Division */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-gray-600 block">বিভাগ (Division) *</label>
                   <div className="relative">
@@ -307,7 +306,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   </div>
                 </div>
 
-                {/* District */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-gray-600 block">জেলা (District) *</label>
                   <div className="relative">
@@ -324,7 +322,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   </div>
                 </div>
 
-                {/* Thana / Upazila */}
                 <div className="col-span-2 space-y-1">
                   <label className="text-[11px] font-bold text-gray-600 block">থানা / উপজেলা (Thana) *</label>
                   <div className="relative">
@@ -359,7 +356,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               />
             </div>
 
-            {/* Delivery Rate Indicator - Clean (৳৬০) / (৳১৫০) */}
+            {/* Delivery Rate Badges (কোলন ছাড়া স্পষ্ট ৳৬০ ও ৳১৫০) */}
             <div className="space-y-1.5 pt-0.5">
               <label className="text-xs font-bold text-navy flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5 text-primary" /> ডেলিভারি চার্জ:
@@ -409,7 +406,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </div>
             </div>
 
-            {/* CTA Button - Exact Royal Blue / Deep Navy Gradient & English "Order Now" Text */}
+            {/* আসল সমাধান: সবুজ বাটন বদলে প্রোডাক্ট পেজের মতো Royal Blue / Navy Gradient এবং ইংরেজিতে "Order Now" */}
             <button
               type="submit"
               disabled={isSubmitting}

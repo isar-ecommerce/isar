@@ -128,7 +128,6 @@ export default function ProductDetail() {
     );
   }
 
-  // ফায়ারবেসের কুৎসিত হ্যাশ আইডি ফিল্টার করে প্রিমিয়াম লেবেল তৈরি
   const categoryTag = (() => {
     const cat = (product as { categoryName?: string }).categoryName || product.categoryId || '';
     if (!cat || cat.length > 15) {
@@ -199,7 +198,6 @@ export default function ProductDetail() {
             {/* Right Column: Product Information */}
             <div className="flex flex-col space-y-5">
               
-              {/* Category Tag & Stock Pill (কুৎসিত আইডি দূর করা হয়েছে) */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20">
                   <Tag className="w-3.5 h-3.5" /> {categoryTag}
@@ -216,12 +214,10 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {/* Product Title */}
               <h1 className="text-2xl md:text-3xl font-black text-navy leading-snug">
                 {product.name}
               </h1>
 
-              {/* Rating & Reviews Bar */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center text-amber-500">
                   <Star className="w-4 h-4 fill-current" />
@@ -231,7 +227,6 @@ export default function ProductDetail() {
                 <span className="text-xs text-gray-500 font-medium">{product.reviewCount || 1} Verified Customer Review(s)</span>
               </div>
 
-              {/* Pricing Box */}
               <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-baseline gap-3 flex-wrap shadow-inner">
                 <span className="text-3xl sm:text-4xl font-black text-primary font-mono">
                   ৳{product.price.toLocaleString()}
@@ -254,7 +249,6 @@ export default function ProductDetail() {
                 </p>
               )}
 
-              {/* Quantity Selector & Order Buttons */}
               <div className="space-y-4 pt-2">
                 <div className="flex items-center gap-4">
                   <span className="text-xs font-bold text-navy uppercase tracking-wider">পরিমাণ (Quantity):</span>
@@ -280,7 +274,7 @@ export default function ProductDetail() {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  {/* Order Now Button in English with Gold Lightning */}
+                  {/* খাঁটি ইংরেজিতে Order Now বাটন */}
                   <button
                     onClick={() => setIsExpressModalOpen(true)}
                     disabled={product.stock === 0}
@@ -315,7 +309,6 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* Trust Badges */}
               <div className="grid grid-cols-4 gap-2 pt-6 border-t border-gray-100 text-center">
                 <div className="flex flex-col items-center gap-1">
                   <Truck className="w-5 h-5 text-primary" />
