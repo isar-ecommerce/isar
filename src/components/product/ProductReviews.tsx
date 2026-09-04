@@ -17,7 +17,6 @@ import {
 import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../../store/authStore';
-import { useSettingsStore } from '../../store/settingsStore';
 import { uploadImageToCloudinary } from '../../cloudinary/upload';
 import { 
   getProductReviews, 
@@ -33,7 +32,6 @@ interface ProductReviewsProps {
 
 export default function ProductReviews({ productId, productName }: ProductReviewsProps) {
   const { user } = useAuthStore();
-  const { language } = useSettingsStore();
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -41,13 +39,13 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [filterWithPhotosOnly, setFilterWithPhotosOnly] = useState<boolean>(false);
   const [selectedStarFilter, setSelectedStarFilter] = useState<number | null>(null);
 
-  // পেজ লম্বা না করার জন্য শুরুতে ৪টি রিভিউ দেখাবে (২x২ গ্রিড)
+  // Compact 2x2 Grid: Shows 4 reviews initially
   const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
 
-  // লাইটবক্স ফটো প্রিভিউ স্টেট
+  // Lightbox Image Preview
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // রিভিউ ফরম স্টেট
+  // Form State
   const [rating, setRating] = useState<number>(5);
   const [comment, setComment] = useState<string>('');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
@@ -55,75 +53,6 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [helpfulVotes, setHelpfulVotes] = useState<Record<string, boolean>>({});
 
-  // বাই-লিঙ্গুয়াল টেক্সট ডিকশনারি (English by default)
-  const t = {
-    en: {
-      title: 'Customer Reviews & Ratings',
-      verifiedCount: (count: number) => `${count} Verified Reviews`,
-      subtitle: `Genuine feedback and real photos from verified buyers of ${productName}`,
-      writeBtn: 'Write a Review',
-      avgRatingLabel: 'Average Customer Rating',
-      starText: 'Star',
-      customerPhotos: 'Photos From Real Customers',
-      allPhotos: 'Show All',
-      filterPhotos: 'Filter with photos only',
-      noReviews: 'No Reviews Found Yet',
-      noReviewsSub: 'Be the first genuine buyer to share your experience with this product!',
-      verifiedBuyer: 'Verified Buyer',
-      helpful: 'Helpful',
-      showLess: 'Show Less Reviews',
-      showAll: (count: number) => `See All Reviews (${count})`,
-      modalTitle: 'Write a Product Review',
-      ratePrompt: 'Select Your Rating *',
-      starsCount: 'out of 5 Stars',
-      experiencePrompt: 'Your Review & Feedback *',
-      commentPlaceholder: 'How was the product quality, packaging, and delivery speed?',
-      photosPrompt: 'Upload Real Photos (Max 4)',
-      addPhotoText: 'Add Photo',
-      submitBtn: 'Submit Review',
-      submittingText: 'Submitting Review...',
-      loginError: 'Please login to write a review',
-      commentError: 'Please write your feedback about the product',
-      maxPhotosError: 'You can upload a maximum of 4 photos',
-      uploadSuccess: 'Photo uploaded successfully to cloud!',
-      uploadError: 'Photo upload failed. Please try again.',
-      successMsg: 'Thank you! Your verified review has been submitted.',
-    },
-    bn: {
-      title: 'কাস্টমার রিভিউ ও রেটিং',
-      verifiedCount: (count: number) => `${count} ভেরিফায়েড রিভিউ`,
-      subtitle: `${productName}-এর প্রকৃত ক্রেতাদের আসল অভিজ্ঞতা ও ছবি`,
-      writeBtn: 'মতামত দিন',
-      avgRatingLabel: 'ক্রেতাদের গড় রেটিং',
-      starText: 'স্টার',
-      customerPhotos: 'ক্রেতাদের পাঠানো ছবি',
-      allPhotos: 'সবগুলো দেখুন',
-      filterPhotos: 'শুধুমাত্র ছবিসহ ফিল্টার',
-      noReviews: 'কোনো রিভিউ পাওয়া যায়নি',
-      noReviewsSub: 'এই পণ্যটি কেনার পর প্রথম রিভিউটি আপনিই দিন!',
-      verifiedBuyer: 'ভেরিফায়েড ক্রেতা',
-      helpful: 'দরকারী',
-      showLess: 'কম রিভিউ দেখুন',
-      showAll: (count: number) => `সব রিভিউ দেখুন (${count}টি)`,
-      modalTitle: 'আপনার মতামত দিন',
-      ratePrompt: 'রেটিং নির্বাচন করুন *',
-      starsCount: 'স্টার',
-      experiencePrompt: 'পণ্যের অভিজ্ঞতা *',
-      commentPlaceholder: 'পণ্যের মান, ডেলিভারি ও প্যাকেজিং কেমন লেগেছে তা লিখুন...',
-      photosPrompt: 'পণ্যের ছবি যুক্ত করুন (সর্বোচ্চ ৪টি)',
-      addPhotoText: 'ছবি দিন',
-      submitBtn: 'রিভিউ জমা দিন',
-      submittingText: 'জমা দেওয়া হচ্ছে...',
-      loginError: 'রিভিউ দিতে অনুগ্রহ করে লগইন করুন',
-      commentError: 'অনুগ্রহ করে পণ্যের ব্যাপারে আপনার মতামত লিখুন',
-      maxPhotosError: 'সর্বোচ্চ ৪টি ছবি আপলোড করা যাবে',
-      uploadSuccess: 'ছবি সফলভাবে ক্লাউডে আপলোড হয়েছে!',
-      uploadError: 'ছবি আপলোড ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।',
-      successMsg: 'ধন্যবাদ! আপনার রিভিউ সফলভাবে যুক্ত হয়েছে।',
-    }
-  }[language];
-
-  // ফায়ারস্টোর থেকে প্রোডাক্টের সব রিভিউ লোড করা
   useEffect(() => {
     let isMounted = true;
 
@@ -150,40 +79,37 @@ export default function ProductReviews({ productId, productName }: ProductReview
     };
   }, [productId]);
 
-  // রেটিং সামারি হিসাব
   const summary: ProductReviewSummary = useMemo(() => {
     return calculateReviewSummary(reviews);
   }, [reviews]);
 
-  // কাস্টমারদের আপলোড করা সব আসল ছবির তালিকা
   const allCustomerPhotos = useMemo(() => {
     return reviews.flatMap((r) => r.images || []);
   }, [reviews]);
 
-  // তারিখ ফরম্যাট হেল্পার
+  // Pure English Date Formatter
   const formatReviewDate = (timestamp: unknown): string => {
-    if (!timestamp) return language === 'en' ? 'Recently' : 'সম্প্রতি';
+    if (!timestamp) return 'Recently';
     try {
       if (typeof timestamp === 'object' && timestamp !== null && 'toDate' in timestamp) {
         const dateObj = (timestamp as { toDate: () => Date }).toDate();
-        return dateObj.toLocaleDateString(language === 'en' ? 'en-GB' : 'bn-BD', { day: '2-digit', month: 'short', year: 'numeric' });
+        return dateObj.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
       }
       if (typeof timestamp === 'string') {
-        return new Date(timestamp).toLocaleDateString(language === 'en' ? 'en-GB' : 'bn-BD', { day: '2-digit', month: 'short', year: 'numeric' });
+        return new Date(timestamp).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
       }
     } catch {
-      return language === 'en' ? 'Recently' : 'সম্প্রতি';
+      return 'Recently';
     }
-    return language === 'en' ? 'Recently' : 'সম্প্রতি';
+    return 'Recently';
   };
 
-  // ক্লাউডিনারি রিয়েল-টাইম ১:১ স্কয়ার ইমেজ আপলোড হ্যান্ডলার
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     if (uploadedImages.length + files.length > 4) {
-      toast.error(t.maxPhotosError);
+      toast.error('You can upload a maximum of 4 photos');
       return;
     }
 
@@ -191,7 +117,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
       setIsUploadingToCloud(true);
       const uploadPromises = Array.from(files).map(async (file) => {
         if (!file.type.startsWith('image/')) {
-          toast.error(`${file.name} is not an image`);
+          toast.error(`${file.name} is not a valid image file`);
           return null;
         }
         return await uploadImageToCloudinary(file);
@@ -201,32 +127,30 @@ export default function ProductReviews({ productId, productName }: ProductReview
       const validUrls = uploadedUrls.filter((url): url is string => Boolean(url));
       
       setUploadedImages((prev) => [...prev, ...validUrls]);
-      toast.success(t.uploadSuccess);
+      toast.success('Photos uploaded successfully!');
     } catch (err) {
       console.error('Cloudinary upload error:', err);
-      toast.error(t.uploadError);
+      toast.error('Photo upload failed. Please try again.');
     } finally {
       setIsUploadingToCloud(false);
       e.target.value = '';
     }
   };
 
-  // ছবি রিমুভ করা
   const removeImage = (indexToRemove: number) => {
     setUploadedImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  // রিভিউ সাবমিট হ্যান্ডলার
   const handleSubmitReview = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!user) {
-      toast.error(t.loginError);
+      toast.error('Please login to write a review');
       return;
     }
 
     if (!comment.trim()) {
-      toast.error(t.commentError);
+      toast.error('Please write your feedback about the product');
       return;
     }
 
@@ -235,7 +159,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
       const newReview = await submitProductReview({
         productId,
         userId: user.uid,
-        userName: user.displayName || (language === 'en' ? 'Verified Buyer' : 'ভেরিফায়েড ক্রেতা'),
+        userName: user.displayName || 'Verified Buyer',
         userAvatar: user.photoURL || undefined,
         rating,
         comment,
@@ -244,7 +168,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
       });
 
       setReviews((prev) => [newReview, ...prev]);
-      toast.success(t.successMsg);
+      toast.success('Thank you! Your verified review has been published.');
       
       setComment('');
       setRating(5);
@@ -252,26 +176,24 @@ export default function ProductReviews({ productId, productName }: ProductReview
       setIsModalOpen(false);
     } catch (error) {
       console.error('Submit review error:', error);
-      toast.error('Failed to submit review');
+      toast.error('Failed to submit review. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // হেল্পফুল আপভোট
   const toggleHelpful = (reviewId: string) => {
     setHelpfulVotes((prev) => {
       const isAlreadyVoted = prev[reviewId];
       if (isAlreadyVoted) {
         return { ...prev, [reviewId]: false };
       } else {
-        toast.success(language === 'en' ? 'Marked as helpful!' : 'দরকারী হিসেবে চিহ্নিত!');
+        toast.success('Marked as helpful!');
         return { ...prev, [reviewId]: true };
       }
     });
   };
 
-  // ফিল্টার করা রিভিউ তালিকা
   const filteredReviews = useMemo(() => {
     return reviews.filter((r) => {
       if (filterWithPhotosOnly && (!r.images || r.images.length === 0)) return false;
@@ -280,7 +202,6 @@ export default function ProductReviews({ productId, productName }: ProductReview
     });
   }, [reviews, filterWithPhotosOnly, selectedStarFilter]);
 
-  // শুরুতে মাত্র ৪টি রিভিউ দেখাবে (২x২ গ্রিড) যাতে পেজ লম্বা না হয়
   const displayedReviews = useMemo(() => {
     return showAllReviews ? filteredReviews : filteredReviews.slice(0, 4);
   }, [showAllReviews, filteredReviews]);
@@ -288,29 +209,29 @@ export default function ProductReviews({ productId, productName }: ProductReview
   return (
     <section className="bg-white rounded-3xl p-5 sm:p-7 shadow-modern border border-gray-100 space-y-6 mt-10">
       
-      {/* Top Header & Overview Bar */}
+      {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-xl sm:text-2xl font-black text-navy">{t.title}</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-navy">Customer Reviews & Ratings</h2>
             <span className="px-2.5 py-0.5 rounded-full bg-brand-green/10 text-brand-green text-xs font-black flex items-center gap-1 border border-brand-green/20">
-              <ShieldCheck className="w-3.5 h-3.5" /> {t.verifiedCount(reviews.length)}
+              <ShieldCheck className="w-3.5 h-3.5" /> {reviews.length} Verified Reviews
             </span>
           </div>
-          <p className="text-xs text-gray-500 mt-1">{t.subtitle}</p>
+          <p className="text-xs text-gray-500 mt-1">Real ratings and actual photos from verified buyers of {productName}</p>
         </div>
 
         <button
           onClick={() => {
             if (!user) {
-              toast.error(t.loginError);
+              toast.error('Please login to write a review');
             } else {
               setIsModalOpen(true);
             }
           }}
           className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white font-extrabold text-xs sm:text-sm rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
         >
-          <Sparkles className="w-4 h-4" /> {t.writeBtn}
+          <Sparkles className="w-4 h-4" /> Write a Review
         </button>
       </div>
 
@@ -332,10 +253,10 @@ export default function ProductReviews({ productId, productName }: ProductReview
               />
             ))}
           </div>
-          <span className="text-[11px] text-gray-500 font-bold">{reviews.length} {t.avgRatingLabel}</span>
+          <span className="text-[11px] text-gray-500 font-bold">Based on {reviews.length} customer ratings</span>
         </div>
 
-        {/* Compact Star Progress Bars */}
+        {/* Star Progress Bars */}
         <div className="md:col-span-8 space-y-1.5">
           {[5, 4, 3, 2, 1].map((starNum) => {
             const count = summary.ratingCounts[starNum as keyof typeof summary.ratingCounts] || 0;
@@ -349,7 +270,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                   selectedStarFilter === starNum ? 'bg-white shadow-xs ring-1 ring-primary' : 'hover:bg-gray-100/70'
                 }`}
               >
-                <span className="w-14 font-bold text-navy text-left">{starNum} {t.starText}</span>
+                <span className="w-14 font-bold text-navy text-left">{starNum} Star</span>
                 <div className="grow h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     style={{ width: `${percentage}%` }}
@@ -369,13 +290,13 @@ export default function ProductReviews({ productId, productName }: ProductReview
         <div className="p-3.5 bg-primary/5 rounded-2xl border border-primary/10 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-black text-navy">
             <span className="flex items-center gap-1.5">
-              <Camera className="w-4 h-4 text-primary" /> {t.customerPhotos} ({allCustomerPhotos.length})
+              <Camera className="w-4 h-4 text-primary" /> Photos From Real Customers ({allCustomerPhotos.length})
             </span>
             <button
               onClick={() => setFilterWithPhotosOnly(!filterWithPhotosOnly)}
               className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
             >
-              {filterWithPhotosOnly ? t.allPhotos : t.filterPhotos}
+              {filterWithPhotosOnly ? 'Show All' : 'Filter with photos only'}
             </button>
           </div>
 
@@ -393,18 +314,18 @@ export default function ProductReviews({ productId, productName }: ProductReview
         </div>
       )}
 
-      {/* Reviews Cards: ২-কলামের কমপ্যাক্ট গ্রিড */}
+      {/* Reviews Cards: 2-Column Clean Responsive Grid */}
       <div>
         {loading ? (
           <div className="py-10 flex flex-col items-center justify-center">
             <Loader2 className="w-6 h-6 text-primary animate-spin mb-2" />
-            <span className="text-xs text-gray-500 font-medium">{language === 'en' ? 'Loading reviews...' : 'রিভিউ লোড হচ্ছে...'}</span>
+            <span className="text-xs text-gray-500 font-medium">Loading genuine reviews...</span>
           </div>
         ) : filteredReviews.length === 0 ? (
           <div className="text-center py-10 border border-dashed border-gray-200 rounded-2xl space-y-2">
             <MessageSquare className="w-8 h-8 text-gray-400 mx-auto" />
-            <h4 className="text-sm font-bold text-navy">{t.noReviews}</h4>
-            <p className="text-xs text-gray-400">{t.noReviewsSub}</p>
+            <h4 className="text-sm font-bold text-navy">No Reviews Found</h4>
+            <p className="text-xs text-gray-400">Be the first to share your experience with this authentic product!</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -486,7 +407,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                         }`}
                       >
                         <ThumbsUp className={`w-3 h-3 ${hasVoted ? 'fill-current' : ''}`} />
-                        <span>{t.helpful} ({displayHelpfulCount})</span>
+                        <span>Helpful ({displayHelpfulCount})</span>
                       </button>
                     </div>
 
@@ -503,12 +424,12 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 >
                   {showAllReviews ? (
                     <>
-                      <span>{t.showLess}</span>
+                      <span>Show Less Reviews</span>
                       <ChevronUp className="w-3.5 h-3.5" />
                     </>
                   ) : (
                     <>
-                      <span>{t.showAll(filteredReviews.length)}</span>
+                      <span>See All Reviews ({filteredReviews.length})</span>
                       <ChevronDown className="w-3.5 h-3.5" />
                     </>
                   )}
@@ -533,14 +454,14 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </button>
 
             <div className="mb-4">
-              <h3 className="text-lg font-black text-navy">{t.modalTitle}</h3>
+              <h3 className="text-lg font-black text-navy">Write a Product Review</h3>
               <p className="text-xs text-gray-500 truncate">{productName}</p>
             </div>
 
             <form onSubmit={handleSubmitReview} className="space-y-4">
               
               <div>
-                <label className="text-xs font-bold text-navy block mb-1">{t.ratePrompt}</label>
+                <label className="text-xs font-bold text-navy block mb-1">Select Rating *</label>
                 <div className="flex items-center gap-1.5">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -558,24 +479,24 @@ export default function ProductReviews({ productId, productName }: ProductReview
                       />
                     </button>
                   ))}
-                  <span className="text-xs font-bold text-navy ml-2">{rating} {t.starsCount}</span>
+                  <span className="text-xs font-bold text-navy ml-2">{rating} out of 5 Stars</span>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-navy block mb-1">{t.experiencePrompt}</label>
+                <label className="text-xs font-bold text-navy block mb-1">Your Review & Experience *</label>
                 <textarea
                   required
                   rows={3}
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder={t.commentPlaceholder}
+                  placeholder="How was the product quality, packaging, and delivery speed?"
                   className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary resize-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-navy block mb-1">{t.photosPrompt}</label>
+                <label className="text-xs font-bold text-navy block mb-1">Upload Real Photos (Max 4)</label>
                 
                 <div className="flex flex-wrap items-center gap-2">
                   {uploadedImages.map((img, idx) => (
@@ -598,7 +519,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                       ) : (
                         <>
                           <Camera className="w-4 h-4" />
-                          <span className="text-[9px] font-bold">{t.addPhotoText}</span>
+                          <span className="text-[9px] font-bold">Add Photo</span>
                         </>
                       )}
                       <input
@@ -621,10 +542,10 @@ export default function ProductReviews({ productId, productName }: ProductReview
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> {t.submittingText}
+                    <Loader2 className="w-4 h-4 animate-spin" /> Submitting Review...
                   </>
                 ) : (
-                  t.submitBtn
+                  'Submit Review'
                 )}
               </button>
 
