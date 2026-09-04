@@ -38,14 +38,13 @@ const syncUserToFirestore = async (user: FirebaseUser, role: UserRole = 'custome
   return userSnap.data().role as UserRole;
 };
 
-// গ্লোবাল Auth Listener (যেকোনো সময় ইউজার লগইন/লগআউট করলে এটি ট্রিগার হবে)
+// গ্লোবাল Auth Listener
 export const initAuthListener = () => {
   const { setUser, setLoading, logout } = useAuthStore.getState();
 
   const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
     try {
       if (firebaseUser) {
-        // ফায়ারস্টোর থেকে ইউজারের রোল (role) বের করে আনা
         const role = await syncUserToFirestore(firebaseUser);
         
         const userData: AuthUser = {
@@ -89,7 +88,7 @@ export const loginWithGoogle = async () => {
   } catch (error: unknown) {
     const err = error as { code?: string; message?: string };
     if (err.code === 'auth/popup-closed-by-user') {
-      return null; // ইউজার পপ-আপ নিজে কেটে দিলে এরর দেখানোর দরকার নেই
+      return null;
     }
     console.error("Google sign-in error:", error);
     toast.error(err.message || 'Failed to sign in with Google');
@@ -103,10 +102,7 @@ export const registerUser = async (email: string, password: string, fullName: st
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
-    // Firebase Auth-এ নাম আপডেট করা
     await updateProfile(user, { displayName: fullName });
-    
-    // Firestore-এ ডাটা সেভ করা
     await syncUserToFirestore(user, 'customer', fullName);
     
     toast.success('Account created successfully!');
