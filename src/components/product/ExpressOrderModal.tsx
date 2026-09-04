@@ -55,7 +55,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const [paymentMode, setPaymentMode] = useState<'partial_cod' | 'full_online'>('partial_cod');
   
   // সিলেক্টেড গেটওয়ে: 'bkash' অথবা 'nagad'
-  const [selectedGateway, setSelectedGateway] = useState<'bkash' | 'nagad'>('bkash');
+  const [gateway, setGateway] = useState<'bkash' | 'nagad'>('bkash');
 
   const [division, setDivision] = useState<string>('Dhaka');
   const [district, setDistrict] = useState<string>('Dhaka');
@@ -77,7 +77,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const subtotal = product.price * quantity;
   const totalAmount = subtotal + deliveryFee;
 
-  // হিসাব: কত টাকা এখন দিতে হবে এবং ডেলিভারির সময় কত দিতে হবে
   const payNowAmount = paymentMode === 'partial_cod' ? deliveryFee : totalAmount;
   const dueOnDelivery = paymentMode === 'partial_cod' ? subtotal : 0;
 
@@ -93,18 +92,20 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       address: 'Delivery Address',
       addressPlaceholder: 'House, Road, Area details',
       deliveryFeeText: isDhakaCity ? 'Delivery (Inside Dhaka):' : 'Delivery (Outside Dhaka):',
-      choosePayment: 'Select Payment Option:',
-      codTitle: 'Cash on Delivery (Advance Delivery Fee)',
+      paymentSectionTitle: 'Select Payment Option:',
+      codTitle: 'Cash on Delivery (COD)',
       codSub: `Pay ৳${deliveryFee} delivery fee now to confirm order. Pay product price (৳${subtotal.toLocaleString()}) on delivery.`,
       fullTitle: 'Full Online Payment',
       fullSub: `Pay full amount (৳${totalAmount.toLocaleString()}) now. Zero cash due on delivery.`,
-      selectGateway: 'Choose Payment Gateway:',
+      gatewayTitle: 'Choose Payment Gateway:',
       itemPrice: 'Product Price',
       shippingFee: 'Delivery Fee',
-      payNowLabel: `To Pay Now (${selectedGateway === 'bkash' ? 'bKash' : 'Nagad'}):`,
+      payNowLabel: `To Pay Now (${gateway === 'bkash' ? 'bKash' : 'Nagad'}):`,
       dueLabel: 'Cash on Delivery Due:',
-      btnText: `Pay ৳${payNowAmount.toLocaleString()} via ${selectedGateway === 'bkash' ? 'bKash' : 'Nagad'} to Confirm`,
-      processing: 'Connecting to Gateway...',
+      btnOrderNow: 'Order Now',
+      btnPayBkash: 'Pay with bKash',
+      btnPayNagad: 'Pay with Nagad',
+      processing: 'Processing Order...',
       trustNotice: 'Secure Payment Gateway • Fast Home Delivery Across Bangladesh',
       errInfo: 'Please provide your name, phone number, and address.',
       errPhone: 'Please enter a valid 11-digit mobile number.',
@@ -121,18 +122,20 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       address: 'সম্পূর্ণ ঠিকানা',
       addressPlaceholder: 'বাসা নম্বর, রোড নম্বর বা এলাকা',
       deliveryFeeText: isDhakaCity ? 'ডেলিভারি চার্জ (ঢাকা সিটি):' : 'ডেলিভারি চার্জ (ঢাকার বাইরে):',
-      choosePayment: 'পেমেন্ট অপশন নির্বাচন করুন:',
-      codTitle: 'ক্যাশ অন ডেলিভারি (অগ্রিম ডেলিভারি ফি)',
-      codSub: `অর্ডার কনফার্ম করতে ডেলিভারি ফি ৳${deliveryFee} দিন। পণ্যের মূল্য (৳${subtotal.toLocaleString()}) ডেলিভারির সময় ক্যাশ পরিশোধ করবেন।`,
+      paymentSectionTitle: 'পেমেন্ট অপশন নির্বাচন করুন:',
+      codTitle: 'ক্যাশ অন ডেলিভারি (COD)',
+      codSub: `অর্ডার কনফার্ম করতে শুধু ডেলিভারি ফি ৳${deliveryFee} দিন। পণ্যের মূল্য (৳${subtotal.toLocaleString()}) ডেলিভারির সময় ক্যাশ পরিশোধ করবেন।`,
       fullTitle: 'সম্পূর্ণ অনলাইন পেমেন্ট',
       fullSub: `সম্পূর্ণ মূল্য (৳${totalAmount.toLocaleString()}) একবারে পরিশোধ করুন। ডেলিভারির সময় কোনো টাকা দিতে হবে না।`,
-      selectGateway: 'পেমেন্ট মেথড বেছে নিন:',
+      gatewayTitle: 'পেমেন্ট গেটওয়ে বেছে নিন:',
       itemPrice: 'পণ্যের মূল্য',
       shippingFee: 'ডেলিভারি ফি',
-      payNowLabel: `এখন প্রদেয় (${selectedGateway === 'bkash' ? 'বিকাশ' : 'নগদ'}):`,
+      payNowLabel: `এখন প্রদেয় (${gateway === 'bkash' ? 'বিকাশ' : 'নগদ'}):`,
       dueLabel: 'পণ্য হাতে পেয়ে প্রদেয় (ক্যাশ):',
-      btnText: `অর্ডার কনফার্ম করতে ৳${payNowAmount.toLocaleString()} ${selectedGateway === 'bkash' ? 'বিকাশ' : 'নগদ'} করুন`,
-      processing: 'পেমেন্ট গেটওয়েতে সংযোগ হচ্ছে...',
+      btnOrderNow: 'Order Now',
+      btnPayBkash: 'Pay with bKash',
+      btnPayNagad: 'Pay with Nagad',
+      processing: 'অর্ডার প্রসেসিং হচ্ছে...',
       trustNotice: 'নিরাপদ অনলাইন পেমেন্ট • ১০০% আসল পণ্যের নিশ্চয়তা',
       errInfo: 'আপনার নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা দিন।',
       errPhone: 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।',
@@ -193,7 +196,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
       const cartItems = [{ product, quantity }];
 
-      // টাইপস্ক্রিপ্ট ১০০% নিখুঁত: শুধুমাত্র CreateOrderInput-এর সঠিক ফিল্ডগুলোই পাঠানো হচ্ছে
+      // CreateOrderInput এর সাথে ১০০% সামঞ্জস্যপূর্ণ
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -205,16 +208,17 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         deliveryFee,
         discount: 0,
         totalAmount,
-        paymentMethod: paymentMode === 'partial_cod' ? 'cod' : selectedGateway,
+        paymentMethod: paymentMode === 'partial_cod' ? 'cod' : gateway,
       });
 
       // গেটওয়ে হ্যান্ডলিং
-      if (selectedGateway === 'bkash') {
+      if (gateway === 'bkash') {
         toast.loading(t.processing);
         const bkashRes = await initiateBkashPayment(order.orderNumber, payNowAmount);
         
         if (bkashRes.success && bkashRes.bkashURL) {
-          window.location.href = bkashRes.bkashURL;
+          // ESLint react-hooks/immutability ফিক্স: window.location.assign ব্যবহার করা হয়েছে
+          window.location.assign(bkashRes.bkashURL);
           return;
         }
       }
@@ -234,7 +238,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             totalAmount,
             paidAmount: payNowAmount,
             dueAmount: dueOnDelivery,
-            paymentMethod: paymentMode === 'partial_cod' ? 'cod' : selectedGateway,
+            paymentMethod: paymentMode === 'partial_cod' ? 'cod' : gateway,
             paymentStatus: 'pending',
           },
         },
@@ -247,11 +251,18 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     }
   };
 
+  const getButtonText = () => {
+    if (paymentMode === 'partial_cod') {
+      return t.btnOrderNow;
+    }
+    return gateway === 'bkash' ? t.btnPayBkash : t.btnPayNagad;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative my-auto">
         
-        {/* Header Bar */}
+        {/* Brand Header */}
         <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
           <span className="text-sm font-black tracking-widest text-white">ISAR</span>
 
@@ -288,10 +299,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
           </div>
         </div>
 
-        {/* Form Body */}
+        {/* Modal Body */}
         <div className="p-3.5 sm:p-4 space-y-2.5">
           
-          {/* Mini Product Strip */}
+          {/* Product Mini Strip */}
           <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/70 flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-lg overflow-hidden bg-white border border-slate-200 shrink-0 p-0.5 flex items-center justify-center">
               <img 
@@ -316,7 +327,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               >
                 <Minus className="w-2.5 h-2.5" />
               </button>
-              <span className="w-5 text-center text-xs font-black text-slate-900 font-mono">{quantity}</span>
+              <span className="w-5 text-center text-xs font-bold text-slate-900 font-mono">{quantity}</span>
               <button 
                 type="button"
                 onClick={() => setQuantity(prev => Math.min(product.stock, prev + 1))}
@@ -329,7 +340,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
           <form onSubmit={handleOrderSubmit} className="space-y-2.5">
             
-            {/* Name & Phone */}
+            {/* Name & Phone in 2 Columns */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="space-y-0.5">
                 <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
@@ -347,7 +358,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
               <div className="space-y-0.5">
                 <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5 text-emerald-600" /> {t.phone} *
+                  <Phone className="w-3 h-3 text-emerald-600" /> {t.phone} *
                 </label>
                 <input
                   type="tel"
@@ -361,7 +372,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </div>
             </div>
 
-            {/* Location */}
+            {/* 3 Cascading Location Dropdowns */}
             <div className="p-2 bg-slate-50/80 rounded-xl border border-slate-200/60 grid grid-cols-3 gap-1.5">
               <div className="space-y-0.5">
                 <label className="text-[9px] font-semibold text-slate-500">{t.division} *</label>
@@ -415,7 +426,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             {/* Address */}
             <div className="space-y-0.5">
               <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                <Building className="w-3 h-3 text-indigo-600" /> {t.address} *
+                <Building className="w-3.5 h-3.5 text-indigo-600" /> {t.address} *
               </label>
               <input
                 type="text"
@@ -438,17 +449,17 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </span>
             </div>
 
-            {/* Payment Mode (COD vs Full Online) */}
+            {/* Payment Mode Selection: COD vs Full Online */}
             <div className="space-y-1 pt-0.5">
               <span className="text-[10px] font-bold text-slate-700 block">
-                {t.choosePayment}
+                {t.paymentSectionTitle}
               </span>
               
-              {/* Option 1: COD with Advance Fee */}
+              {/* Option 1: Cash on Delivery with Advance Fee */}
               <button
                 type="button"
                 onClick={() => setPaymentMode('partial_cod')}
-                className={`w-full p-2 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
                   paymentMode === 'partial_cod'
                     ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-600/30'
                     : 'border-slate-200 bg-white hover:bg-slate-50'
@@ -479,7 +490,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               <button
                 type="button"
                 onClick={() => setPaymentMode('full_online')}
-                className={`w-full p-2 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
                   paymentMode === 'full_online'
                     ? 'border-purple-600 bg-purple-50/70 shadow-xs ring-1 ring-purple-600/30'
                     : 'border-slate-200 bg-white hover:bg-slate-50'
@@ -504,19 +515,19 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </button>
             </div>
 
-            {/* Official bKash and Nagad Gateways */}
+            {/* Official bKash and Nagad Gateways with Real Logos */}
             <div className="space-y-1 pt-0.5">
               <span className="text-[10px] font-bold text-slate-700 block">
-                {t.selectGateway}
+                {t.gatewayTitle}
               </span>
               <div className="grid grid-cols-2 gap-2">
                 
-                {/* Official bKash Gateway */}
+                {/* Official bKash Gateway Button */}
                 <button
                   type="button"
-                  onClick={() => setSelectedGateway('bkash')}
+                  onClick={() => setGateway('bkash')}
                   className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
-                    selectedGateway === 'bkash'
+                    gateway === 'bkash'
                       ? 'border-[#E2136E] bg-pink-50/80 shadow-xs ring-1 ring-[#E2136E]/30'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
@@ -530,17 +541,17 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                     <span className="text-xs font-black text-[#E2136E] block leading-tight">bKash</span>
                     <span className="text-[9px] text-slate-500 block truncate">বিকাশ অনলাইন</span>
                   </div>
-                  {selectedGateway === 'bkash' && (
+                  {gateway === 'bkash' && (
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#E2136E] shrink-0" />
                   )}
                 </button>
 
-                {/* Official Nagad Gateway */}
+                {/* Official Nagad Gateway Button */}
                 <button
                   type="button"
-                  onClick={() => setSelectedGateway('nagad')}
+                  onClick={() => setGateway('nagad')}
                   className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
-                    selectedGateway === 'nagad'
+                    gateway === 'nagad'
                       ? 'border-[#F7941D] bg-orange-50/80 shadow-xs ring-1 ring-[#F7941D]/30'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
@@ -552,7 +563,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                     <span className="text-xs font-black text-[#F7941D] block leading-tight">Nagad</span>
                     <span className="text-[9px] text-slate-500 block truncate">নগদ অনলাইন</span>
                   </div>
-                  {selectedGateway === 'nagad' && (
+                  {gateway === 'nagad' && (
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#F7941D] shrink-0" />
                   )}
                 </button>
@@ -585,14 +596,16 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </div>
             </div>
 
-            {/* Action Button */}
+            {/* Clean CTA Button - Strictly NO Price numbers inside */}
             <button
               type="submit"
               disabled={isSubmitting}
               className={`w-full flex items-center justify-center gap-2 text-white font-black py-2.5 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md cursor-pointer hover:scale-[1.01] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed ${
-                selectedGateway === 'bkash'
+                gateway === 'bkash' && paymentMode === 'full_online'
                   ? 'bg-linear-to-r from-[#E2136E] to-[#990a48] hover:from-[#c20f5d] hover:to-[#770636] shadow-pink-500/20'
-                  : 'bg-linear-to-r from-[#F7941D] to-[#d4780b] hover:from-[#e58310] hover:to-[#b86606] shadow-orange-500/20'
+                  : gateway === 'nagad' && paymentMode === 'full_online'
+                    ? 'bg-linear-to-r from-[#F7941D] to-[#d4780b] hover:from-[#e58310] hover:to-[#b86606] shadow-orange-500/20'
+                    : 'bg-linear-to-r from-blue-600 via-indigo-600 to-slate-900 hover:from-blue-700 hover:to-black shadow-blue-500/25'
               }`}
             >
               {isSubmitting ? (
@@ -602,13 +615,13 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               ) : (
                 <>
                   <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> 
-                  <span>{t.btnText}</span>
+                  <span>{getButtonText()}</span>
                 </>
               )}
             </button>
 
             <div className="flex items-center justify-center gap-1 text-[9px] text-slate-400 text-center">
-              <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>{t.trustNotice}</span>
             </div>
 
