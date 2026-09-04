@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, 
@@ -59,37 +59,18 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
-
-  // ডেলিভারি চার্জ স্টেট
-  const [deliveryFee, setDeliveryFee] = useState<number>(60);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  // লাইভ ডেলিভারি চার্জ সিঙ্ক
-  useEffect(() => {
-    let isMounted = true;
-
-    Promise.resolve().then(() => {
-      if (isMounted) {
-        const inside = feeInsideDhaka || 60;
-        const outside = feeOutsideDhaka || 150;
-        if (division === 'Dhaka' && district === 'Dhaka') {
-          setDeliveryFee(inside);
-        } else {
-          setDeliveryFee(outside);
-        }
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [division, district, feeInsideDhaka, feeOutsideDhaka]);
 
   if (!isOpen || !product) return null;
 
+  // ডাইনামিক ও শতভাগ নিরাপদ ডেলিভারি ফি ক্যালকুলেশন (জিরো-রেইস কন্ডিশন)
+  const insideFee = typeof feeInsideDhaka === 'number' ? feeInsideDhaka : 60;
+  const outsideFee = typeof feeOutsideDhaka === 'number' ? feeOutsideDhaka : 150;
+  const isDhakaCity = division.trim().toLowerCase() === 'dhaka' && district.trim().toLowerCase() === 'dhaka';
+  const deliveryFee = isDhakaCity ? insideFee : outsideFee;
+
   const subtotal = product.price * quantity;
   const totalAmount = subtotal + deliveryFee;
-  const isDhakaCity = division === 'Dhaka' && district === 'Dhaka';
 
   // বিভাগ পরিবর্তন
   const handleDivisionChange = (newDivision: string) => {
@@ -103,12 +84,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     const upazilas = getUpazilasByDistrict(newDivision, firstDistrict);
     setAvailableUpazilas(upazilas);
     setUpazila(upazilas[0] || '');
-
-    if (newDivision === 'Dhaka' && firstDistrict === 'Dhaka') {
-      setDeliveryFee(feeInsideDhaka || 60);
-    } else {
-      setDeliveryFee(feeOutsideDhaka || 150);
-    }
   };
 
   // জেলা পরিবর্তন
@@ -117,12 +92,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     const upazilas = getUpazilasByDistrict(division, newDistrict);
     setAvailableUpazilas(upazilas);
     setUpazila(upazilas[0] || '');
-
-    if (division === 'Dhaka' && newDistrict === 'Dhaka') {
-      setDeliveryFee(feeInsideDhaka || 60);
-    } else {
-      setDeliveryFee(feeOutsideDhaka || 150);
-    }
   };
 
   // ডেলিভারি জোন কুইক টগল
@@ -131,7 +100,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       handleDivisionChange('Dhaka');
       handleDistrictChange('Dhaka');
     } else {
-      if (division === 'Dhaka' && district === 'Dhaka') {
+      if (isDhakaCity) {
         handleDivisionChange('Chittagong');
       }
     }
@@ -148,8 +117,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       return;
     }
 
-    if (cleanPhone.length < 11) {
-      toast.error('সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 01712345678)');
+    // বাংলাদেশি ১১ ডিজিট কঠোর ভ্যালিডেশন
+    const bdPhoneRegex = /^(?:\+88|88)?(01[3-9]\d{8})$/;
+    if (!bdPhoneRegex.test(cleanPhone)) {
+      toast.error('সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)');
       return;
     }
 
@@ -211,8 +182,8 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-navy/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 my-auto relative max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-navy/80 backdrop-blur-md overflow-hidden animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 my-auto relative max-h-[92vh] flex flex-col">
         
         {/* Header Bar */}
         <div className="bg-navy text-white px-5 py-4 flex items-center justify-between shrink-0 border-b border-navy-light/40">
@@ -313,8 +284,8 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="01712345678"
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50/70 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                placeholder="017XXXXXXXX"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50/70 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-mono"
               />
             </div>
 
@@ -414,7 +385,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   }`}
                 >
                   {isDhakaCity && <Check className="w-3.5 h-3.5 text-primary" />}
-                  ঢাকা সিটি (৳{feeInsideDhaka || 60})
+                  ঢাকা সিটি (৳{insideFee})
                 </button>
 
                 <button
@@ -427,7 +398,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   }`}
                 >
                   {!isDhakaCity && <Check className="w-3.5 h-3.5 text-primary" />}
-                  ঢাকার বাইরে (৳{feeOutsideDhaka || 150})
+                  ঢাকার বাইরে (৳{outsideFee})
                 </button>
               </div>
             </div>

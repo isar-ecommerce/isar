@@ -62,100 +62,6 @@ const MOCK_CATALOG: Product[] = [
     sellerId: 'admin',
     createdAt: new Date(),
     updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    name: 'Smart Watch Series 8 - Midnight Aluminum Case',
-    slug: 'smart-watch',
-    shortDescription: 'Track your health in real-time with heart rate and blood oxygen monitoring.',
-    description: '<p>The Smart Watch Series 8 features an advanced always-on Retina display, durable crack-resistant front crystal, and comprehensive fitness tracking.</p><br/><p>Water resistant up to 50 meters, perfect for daily workouts and tracking sleep in Bangladesh weather.</p>',
-    price: 3200,
-    originalPrice: 4000,
-    stock: 8,
-    lowStockAlert: 2,
-    sku: 'WATCH-01',
-    categoryId: 'gadgets',
-    images: [
-      'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=800&q=80'
-    ],
-    specifications: [
-      { key: 'Brand', value: 'ISAR Smart' },
-      { key: 'Display', value: 'OLED Always-On' },
-      { key: 'Sensors', value: 'Heart Rate, SpO2, Sleep Tracking' },
-      { key: 'Water Resistance', value: '50M' },
-    ],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: false,
-    rating: 4.5,
-    reviewCount: 89,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    name: 'Ultra HD 4K Action Camera with Waterproof Case',
-    slug: 'action-camera',
-    shortDescription: 'Waterproof 4K recording camera for extreme sports and outdoor adventures.',
-    description: '<p>Capture your adventure moments with ultra-smooth 4K stabilization. Includes waterproof housing up to 30 meters depth and dual screens for crystal clear vlogging.</p>',
-    price: 8500,
-    originalPrice: 9500,
-    stock: 5,
-    lowStockAlert: 1,
-    sku: 'CAM-01',
-    categoryId: 'cameras',
-    images: [
-      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&w=800&q=80'
-    ],
-    specifications: [
-      { key: 'Resolution', value: '4K Ultra HD @ 60fps' },
-      { key: 'Waterproof Depth', value: '30 Meters' },
-      { key: 'Battery', value: '1350mAh Dual Battery' },
-    ],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    rating: 4.9,
-    reviewCount: 210,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '4',
-    name: 'Minimalist Leather Backpack for Men & Women',
-    slug: 'leather-backpack',
-    shortDescription: 'Water-resistant premium leather backpack for daily commute and carrying 15.6 inch laptops safely.',
-    description: '<p>Designed for daily commute and carrying 15.6 inch laptops safely. Made with genuine water-resistant leather with multiple organizer pockets and comfortable shoulder straps.</p>',
-    price: 2100,
-    originalPrice: 2500,
-    stock: 20,
-    lowStockAlert: 5,
-    sku: 'BAG-01',
-    categoryId: 'fashion',
-    images: [
-      'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?auto=format&fit=crop&w=800&q=80'
-    ],
-    specifications: [
-      { key: 'Material', value: 'Waterproof Synthetic Leather' },
-      { key: 'Laptop Compartment', value: 'Up to 15.6 Inch' },
-      { key: 'Capacity', value: '25 Liters' },
-    ],
-    status: 'active',
-    isFeatured: false,
-    isTrending: false,
-    isNewArrival: true,
-    rating: 4.6,
-    reviewCount: 56,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
   }
 ];
 
@@ -274,14 +180,24 @@ export default function ProductDetail() {
     );
   }
 
+  // ফায়ারবেসের কুৎসিত আইডি ফিল্টার করে প্রিমিয়াম ক্যাটাগরি লেবেল তৈরি
+  const displayCategory = (() => {
+    const rawCategory = (product as { categoryName?: string }).categoryName || product.categoryId || '';
+    // যদি আইডিটি ফায়ারবেসের লম্বা হ্যাশ কোড হয় (১২ ক্যারেক্টারের বেশি), তবে ISAR EXCLUSIVE দেখাবে
+    if (!rawCategory || rawCategory.length > 15) {
+      return 'ISAR EXCLUSIVE';
+    }
+    return rawCategory.toUpperCase();
+  })();
+
   return (
-    <div className="bg-secondary min-h-screen py-8 md:py-12">
+    <div className="bg-secondary min-h-screen py-6 md:py-10">
       <Helmet>
         <title>{`${product.name} | ISAR Marketplace`}</title>
         <meta name="description" content={product.shortDescription || product.name} />
       </Helmet>
 
-      <div className="container mx-auto px-4 max-w-6xl">
+      <div className="container mx-auto px-4 max-w-6xl pb-12">
         
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center gap-2 text-xs md:text-sm text-gray-500 mb-6 flex-wrap">
@@ -293,7 +209,7 @@ export default function ProductDetail() {
         </nav>
 
         {/* Main Product Showcase Card */}
-        <div className="bg-white rounded-3xl shadow-modern-lg p-6 md:p-10 border border-gray-100 mb-10">
+        <div className="bg-white rounded-3xl shadow-modern-lg p-5 sm:p-8 md:p-10 border border-gray-100 mb-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
             
             {/* Left Column: Premium Framed Image Gallery */}
@@ -337,13 +253,13 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Right Column: Product Information, Pricing & High-Converting Actions */}
-            <div className="flex flex-col space-y-6">
+            {/* Right Column: Product Information & High-Converting Actions */}
+            <div className="flex flex-col space-y-5">
               
-              {/* Category Tag & Stock Pill */}
+              {/* Clean Category Tag & Stock Pill (কুৎসিত আইডি দূর করা হয়েছে) */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20">
-                  <Tag className="w-3.5 h-3.5" /> {product.categoryId?.toUpperCase() || 'GENERAL'}
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20">
+                  <Tag className="w-3.5 h-3.5" /> {displayCategory}
                 </span>
                 
                 {product.stock > 0 ? (
@@ -369,7 +285,7 @@ export default function ProductDetail() {
                   <span className="ml-1 text-sm font-bold text-navy">{product.rating || 4.8}</span>
                 </div>
                 <span className="text-gray-300">|</span>
-                <span className="text-xs text-gray-500 font-medium">{product.reviewCount || 12} Verified Customer Reviews</span>
+                <span className="text-xs text-gray-500 font-medium">{product.reviewCount || 1} Verified Customer Review(s)</span>
               </div>
 
               {/* Modern Pricing Box */}
@@ -426,14 +342,14 @@ export default function ProductDetail() {
                 {/* Primary High-Converting Buttons */}
                 <div className="space-y-3 pt-2">
                   
-                  {/* Luxury Royal Blue & Deep Navy Gradient "Order Now" Button */}
+                  {/* High-Converting 1-Click Order Button */}
                   <button
                     onClick={() => setIsExpressModalOpen(true)}
                     disabled={product.stock === 0}
                     className="w-full flex items-center justify-center gap-2.5 bg-linear-to-r from-primary via-primary-dark to-navy hover:from-blue-700 hover:to-slate-900 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95 cursor-pointer"
                   >
                     <Zap className="w-5 h-5 fill-brand-gold text-brand-gold" />
-                    <span>Order Now</span>
+                    <span>এখনই অর্ডার করুন (১-ক্লিক)</span>
                   </button>
 
                   <div className="flex items-center gap-3">
