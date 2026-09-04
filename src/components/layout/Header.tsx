@@ -13,7 +13,6 @@ import {
 
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
-import { useSettingsStore } from '../../store/settingsStore';
 import { logoutUser } from '../../firebase/auth';
 import { getProducts } from '../../services/productService';
 import BrandLogo from '../common/BrandLogo';
@@ -59,9 +58,7 @@ export default function Header() {
 
   const { user, isAuthenticated } = useAuthStore();
   const itemCount = useCartStore((state) => state.getItemCount());
-  const { language, setLanguage } = useSettingsStore();
 
-  // লাইভ সার্চ ডিবাইন্সড ইফেক্ট
   useEffect(() => {
     if (!searchQuery.trim()) {
       Promise.resolve().then(() => {
@@ -158,7 +155,7 @@ export default function Header() {
               value={searchQuery}
               onChange={handleInputChange}
               onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
-              placeholder={language === 'en' ? "Search for products, brands and more..." : "পণ্য, ব্র্যান্ড দিয়ে খুঁজুন..."}
+              placeholder="Search for products, brands and more..."
               className="w-full h-11 pl-4 pr-12 rounded-full border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm text-navy placeholder:text-gray-400"
             />
             {searchQuery ? (
@@ -179,21 +176,20 @@ export default function Header() {
             </button>
           </form>
 
-          {/* Live Search Suggestions Dropdown */}
           {showSearchDropdown && (
             <div className="absolute top-12 left-0 right-0 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
               {isSearching ? (
                 <div className="p-4 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 text-primary animate-spin" /> {language === 'en' ? "Searching products..." : "পণ্য খোঁজা হচ্ছে..."}
+                  <Loader2 className="w-4 h-4 text-primary animate-spin" /> Searching products...
                 </div>
               ) : searchResults.length === 0 ? (
                 <div className="p-4 text-center text-xs text-gray-500">
-                  {language === 'en' ? `No products found for "${searchQuery}"` : `"${searchQuery}" এর কোনো পণ্য পাওয়া যায়নি`}
+                  No products found for "{searchQuery}"
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
                   <div className="px-4 py-2 bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                    {language === 'en' ? "Instant Search Results" : "সার্চ ফলাফল"}
+                    Instant Search Results
                   </div>
                   {searchResults.map((product) => (
                     <Link
@@ -224,7 +220,7 @@ export default function Header() {
                     onClick={handleSearch}
                     className="w-full p-2.5 bg-gray-50 hover:bg-primary hover:text-white text-xs font-bold text-navy text-center transition-colors block cursor-pointer"
                   >
-                    {language === 'en' ? `View All Results for "${searchQuery}"` : `সব ফলাফল দেখুন`}
+                    View All Results for "{searchQuery}"
                   </button>
                 </div>
               )}
@@ -232,36 +228,8 @@ export default function Header() {
           )}
         </div>
 
-        {/* Right: Language Switcher, Account, Cart */}
-        <div className="flex items-center gap-2.5 sm:gap-4">
-          
-          {/* Global Language Toggle (EN | বাং) */}
-          <div className="flex items-center bg-gray-100/90 rounded-xl p-0.5 border border-gray-200 text-xs font-black shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setLanguage('en')}
-              className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
-                language === 'en' 
-                  ? 'bg-navy text-white shadow-xs' 
-                  : 'text-gray-500 hover:text-navy'
-              }`}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              onClick={() => setLanguage('bn')}
-              className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
-                language === 'bn' 
-                  ? 'bg-blue-600 text-white shadow-xs' 
-                  : 'text-gray-500 hover:text-navy'
-              }`}
-            >
-              বাং
-            </button>
-          </div>
-
-          {/* User Account Dropdown */}
+        {/* Right: Account & Cart */}
+        <div className="flex items-center gap-3 sm:gap-5">
           {isAuthenticated && user ? (
             <div className="relative hidden sm:block" ref={dropdownRef}>
               <button
@@ -312,7 +280,7 @@ export default function Header() {
                     onClick={() => setIsDropdownOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
                   >
-                    <User className="w-4 h-4" /> {language === 'en' ? 'My Profile' : 'আমার প্রোফাইল'}
+                    <User className="w-4 h-4" /> My Profile
                   </Link>
                   
                   <Link
@@ -320,7 +288,7 @@ export default function Header() {
                     onClick={() => setIsDropdownOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
                   >
-                    <Package className="w-4 h-4" /> {language === 'en' ? 'My Orders' : 'আমার অর্ডার'}
+                    <Package className="w-4 h-4" /> My Orders
                   </Link>
                   
                   <div className="h-px bg-gray-100 my-2"></div>
@@ -329,7 +297,7 @@ export default function Header() {
                     onClick={handleLogout}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                   >
-                    <LogOut className="w-4 h-4" /> {language === 'en' ? 'Logout' : 'লগআউট'}
+                    <LogOut className="w-4 h-4" /> Logout
                   </button>
                 </div>
               )}
@@ -342,7 +310,7 @@ export default function Header() {
               <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                 <User className="w-5 h-5 text-gray-600 group-hover:text-primary" />
               </div>
-              <span className="hidden lg:block font-semibold">{language === 'en' ? 'Login / Sign Up' : 'লগইন'}</span>
+              <span className="hidden lg:block font-semibold">Login / Sign Up</span>
             </Link>
           )}
 
@@ -370,7 +338,7 @@ export default function Header() {
             type="text"
             value={searchQuery}
             onChange={handleInputChange}
-            placeholder={language === 'en' ? "Search products..." : "পণ্য খুঁজুন..."}
+            placeholder="Search products..."
             className="w-full h-10 pl-4 pr-10 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-all text-xs text-navy placeholder:text-gray-400"
           />
           <button

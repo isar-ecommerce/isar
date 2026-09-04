@@ -44,16 +44,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  const [lang, setLang] = useState<'en' | 'bn'>('bn');
-
   const [fullName, setFullName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
-  
-  // পেমেন্ট মোড: 'partial_cod' (অগ্রিম ডেলিভারি চার্জ) অথবা 'full_online' (সম্পূর্ণ পেমেন্ট)
   const [paymentMode, setPaymentMode] = useState<'partial_cod' | 'full_online'>('partial_cod');
-  
-  // সিলেক্টেড গেটওয়ে: 'bkash' অথবা 'nagad'
 
   const [division, setDivision] = useState<string>('Dhaka');
   const [district, setDistrict] = useState<string>('Dhaka');
@@ -65,16 +59,13 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isBkashModalOpen, setIsBkashModalOpen] = useState<boolean>(false);
 
-  // রেন্ডারের বাইরে একবার অর্ডার ট্র্যাকিং রেফারেন্স জেনারেট
   const [tempOrderNumber] = useState<string>(() => `ISAR-${Date.now().toString().slice(-6)}`);
 
-  // মোট ওজনের হিসাব (কেজিতে)
   const totalWeight = useMemo(() => {
     const singleWeight = (product as { weightInKg?: number })?.weightInKg || 0.5;
     return Number((singleWeight * quantity).toFixed(2));
   }, [product, quantity]);
 
-  // স্টেডফাস্টের অফিশিয়াল ফর্মুলা অনুযায়ী রিয়েল-টাইম ডেলিভারি ফি ক্যালকুলেশন
   const { deliveryFee, deliveryZone } = useMemo(() => {
     const calculation = calculateDynamicDeliveryFee(district, upazila, totalWeight);
     return {
@@ -86,70 +77,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const subtotal = product.price * quantity;
   const totalAmount = subtotal + deliveryFee;
 
-  // অগ্রিম কত দেবে ও ক্যাশ কত বাকি থাকবে
   const payNowAmount = paymentMode === 'partial_cod' ? deliveryFee : totalAmount;
   const dueOnDelivery = paymentMode === 'partial_cod' ? subtotal : 0;
 
   if (!isOpen || !product) return null;
-
-  const t = {
-    en: {
-      name: 'Full Name',
-      namePlaceholder: 'Enter your full name',
-      phone: 'Mobile Number',
-      phonePlaceholder: '01XXXXXXXXX (11 digits)',
-      division: 'Division',
-      district: 'District',
-      upazila: 'Thana / Upazila',
-      address: 'Delivery Address',
-      addressPlaceholder: 'House, Road, Area details',
-      deliveryFeeText: 'Steadfast Delivery Fee:',
-      paymentSectionTitle: 'Select Payment Option:',
-      codTitle: 'Cash on Delivery (Advance Delivery Fee)',
-      codSub: `Pay only ৳${deliveryFee} delivery fee via bKash now. Pay product price (৳${subtotal.toLocaleString()}) in cash on delivery.`,
-      fullTitle: 'Full Online Payment',
-      fullSub: `Pay total ৳${totalAmount.toLocaleString()} via bKash now. Zero cash due on delivery.`,
-      gatewayTitle: 'Payment Gateway:',
-      itemPrice: 'Product Price',
-      shippingFee: 'Delivery Fee',
-      weightText: 'Parcel Weight:',
-      payNowLabel: `To Pay Now via bKash:`,
-      dueLabel: 'Cash on Delivery Due:',
-      btnOrderNow: `Pay ৳${payNowAmount} & Confirm Order`,
-      processing: 'Processing...',
-      trustNotice: '100% Authentic Product • Secure bKash Gateway',
-      errInfo: 'Please provide your full name, phone number, and address.',
-      errPhone: 'Please enter a valid 11-digit Bangladeshi mobile number.',
-    },
-    bn: {
-      name: 'আপনার নাম',
-      namePlaceholder: 'যেমন: মোঃ আরিফুল ইসলাম',
-      phone: 'মোবাইল নম্বর (১১ ডিজিট)',
-      phonePlaceholder: '01XXXXXXXXX',
-      division: 'বিভাগ',
-      district: 'জেলা',
-      upazila: 'থানা / উপজেলা',
-      address: 'সম্পূর্ণ ঠিকানা',
-      addressPlaceholder: 'বাসা নম্বর, রোড নম্বর বা এলাকা',
-      deliveryFeeText: 'স্টেডফাস্ট ডেলিভারি চার্জ:',
-      paymentSectionTitle: 'পেমেন্ট অপশন বেছে নিন:',
-      codTitle: 'ক্যাশ অন ডেলিভারি (অগ্রিম ডেলিভারি চার্জ)',
-      codSub: `ফেক অর্ডার রোধে শুধু ডেলিভারি চার্জ ৳${deliveryFee} বিকাশে অগ্রিম দিন। পণ্যের দাম ৳${subtotal.toLocaleString()} ডেলিভারির সময় ক্যাশ দেবেন।`,
-      fullTitle: 'সম্পূর্ণ অনলাইন পেমেন্ট',
-      fullSub: `সম্পূর্ণ মূল্য ৳${totalAmount.toLocaleString()} বিকাশে পরিশোধ করুন। ডেলিভারির সময় ০ টাকা ক্যাশ।`,
-      gatewayTitle: 'পেমেন্ট গেটওয়ে:',
-      itemPrice: 'পণ্যের মূল্য',
-      shippingFee: 'ডেলিভারি ফি',
-      weightText: 'পার্সেল ওজন:',
-      payNowLabel: `বিকাশে এখনই প্রদেয়:`,
-      dueLabel: 'ডেলিভারির সময় ক্যাশ দেবেন:',
-      btnOrderNow: `৳${payNowAmount} দিয়ে অর্ডার কনফার্ম করুন`,
-      processing: 'প্রসেসিং হচ্ছে...',
-      trustNotice: 'নিরাপদ বিকাশ গেটওয়ে • ১০০% আসল পণ্যের নিশ্চয়তা',
-      errInfo: 'আপনার নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা দিন।',
-      errPhone: 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।',
-    }
-  }[lang];
 
   const handleDivisionChange = (newDivision: string) => {
     setDivision(newDivision);
@@ -176,26 +107,23 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     setPhone(numeric);
   };
 
-  // ফর্ম সাবমিট: কোনো অর্ডার তৈরি না করে আগে বিকাশ পেমেন্ট পপ-আপ খোলা হবে
   const handleOrderSubmit = (e: FormEvent) => {
     e.preventDefault();
 
     if (!fullName.trim() || !phone || !fullAddress.trim()) {
-      toast.error(t.errInfo);
+      toast.error('Please enter your full name, phone number, and address.');
       return;
     }
 
     const bdPhoneRegex = /^(?:\+88|88)?(01[3-9]\d{8})$/;
     if (!bdPhoneRegex.test(phone) || phone.length !== 11) {
-      toast.error(t.errPhone);
+      toast.error('Please enter a valid 11-digit mobile number (01XXXXXXXXX).');
       return;
     }
 
-    // সরাসরি বিকাশ পেমেন্ট মডাল ওপেন
     setIsBkashModalOpen(true);
   };
 
-  // বিকাশ পেমেন্ট সফল হওয়ার পর অর্ডার ফায়ারস্টোরে সেভ হবে
   const handleBkashSuccess = async (trxId: string) => {
     try {
       setIsSubmitting(true);
@@ -212,7 +140,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       const cartItems = [{ product, quantity }];
       const isPartial = paymentMode === 'partial_cod';
 
-      // ফায়ারস্টোরে অর্ডার তৈরি (সঠিক ব্যালেন্স সহ)
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -233,15 +160,14 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         transactionId: trxId,
       });
 
-      // নোটিফিকেশন পাঠানো
       sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount);
       sendOrderConfirmationEmail(order);
       sendAdminOrderAlert(order);
 
       toast.success(
         isPartial 
-          ? `৳${payNowAmount} অগ্রিম সফল! বাকি ৳${dueOnDelivery} ডেলিভারির সময় দেবেন।`
-          : `৳${totalAmount} সম্পূর্ণ পরিশোধ সফল! অর্ডার কনফার্ম হয়েছে।`
+          ? `Advance payment of ৳${payNowAmount} verified! Remaining ৳${dueOnDelivery} due on delivery.`
+          : `Full payment of ৳${totalAmount} verified! Order confirmed.`
       );
 
       setIsBkashModalOpen(false);
@@ -260,8 +186,8 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         },
       });
     } catch (error) {
-      console.error('Order creation post-payment error:', error);
-      toast.error('পেমেন্ট সফল হলেও অর্ডার সেভ করতে সমস্যা হয়েছে। দয়া করে সাপোর্ট হেল্পলাইনে যোগাযোগ করুন।');
+      console.error('Order creation error:', error);
+      toast.error('Payment verified, but order creation failed. Contact support.');
     } finally {
       setIsSubmitting(false);
     }
@@ -273,46 +199,23 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative my-auto">
           
           {/* Brand Header */}
-          <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
-            <span className="text-sm font-black tracking-widest text-white">ISAR EXPRESS</span>
+          <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+            <span className="text-sm font-black tracking-widest text-white">ISAR EXPRESS CHECKOUT</span>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-[10px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setLang('en')}
-                  className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-                    lang === 'en' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLang('bn')}
-                  className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-                    lang === 'bn' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  বাং
-                </button>
-              </div>
-
-              <button 
-                type="button"
-                onClick={onClose} 
-                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Modal Body */}
           <div className="p-3.5 sm:p-4 space-y-2.5">
             
-            {/* Product Mini Strip */}
+            {/* Product Strip */}
             <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/70 flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-lg overflow-hidden bg-white border border-slate-200 shrink-0 p-0.5 flex items-center justify-center">
                 <img 
@@ -357,21 +260,21 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-0.5">
                   <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                    <User className="w-3 h-3 text-blue-600" /> {t.name} *
+                    <User className="w-3 h-3 text-blue-600" /> Full Name *
                   </label>
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder={t.namePlaceholder}
+                    placeholder="e.g. John Doe"
                     className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all shadow-xs"
                   />
                 </div>
 
                 <div className="space-y-0.5">
                   <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                    <Phone className="w-3 h-3 text-emerald-600" /> {t.phone} *
+                    <Phone className="w-3 h-3 text-emerald-600" /> Mobile Number *
                   </label>
                   <input
                     type="tel"
@@ -379,16 +282,16 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                     maxLength={11}
                     value={phone}
                     onChange={(e) => handlePhoneChange(e.target.value)}
-                    placeholder={t.phonePlaceholder}
+                    placeholder="01XXXXXXXXX"
                     className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all shadow-xs font-mono"
                   />
                 </div>
               </div>
 
-              {/* 3 Cascading Location Dropdowns */}
+              {/* Location Selectors */}
               <div className="p-2 bg-slate-50/80 rounded-xl border border-slate-200/60 grid grid-cols-3 gap-1.5">
                 <div className="space-y-0.5">
-                  <label className="text-[9px] font-semibold text-slate-500">{t.division} *</label>
+                  <label className="text-[9px] font-semibold text-slate-500">Division *</label>
                   <div className="relative">
                     <select
                       value={division}
@@ -404,7 +307,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </div>
 
                 <div className="space-y-0.5">
-                  <label className="text-[9px] font-semibold text-slate-500">{t.district} *</label>
+                  <label className="text-[9px] font-semibold text-slate-500">District *</label>
                   <div className="relative">
                     <select
                       value={district}
@@ -420,7 +323,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </div>
 
                 <div className="space-y-0.5">
-                  <label className="text-[9px] font-semibold text-slate-500">{t.upazila} *</label>
+                  <label className="text-[9px] font-semibold text-slate-500">Thana / Upazila *</label>
                   <div className="relative">
                     <select
                       value={upazila}
@@ -436,36 +339,36 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </div>
               </div>
 
-              {/* Address */}
+              {/* Street Address */}
               <div className="space-y-0.5">
                 <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                  <Building className="w-3.5 h-3.5 text-indigo-600" /> {t.address} *
+                  <Building className="w-3.5 h-3.5 text-indigo-600" /> Street Address *
                 </label>
                 <input
                   type="text"
                   required
                   value={fullAddress}
                   onChange={(e) => setFullAddress(e.target.value)}
-                  placeholder={t.addressPlaceholder}
+                  placeholder="House, Road, Area details..."
                   className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all shadow-xs"
                 />
               </div>
 
-              {/* Dynamic Delivery Charge Auto Badge */}
+              {/* Delivery Fee Notice */}
               <div className="px-2.5 py-1.5 bg-blue-50/70 rounded-lg border border-blue-200/80 flex items-center justify-between text-[11px]">
                 <div className="flex items-center gap-1.5">
                   <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span className="font-semibold text-slate-800">{t.deliveryFeeText}</span>
+                  <span className="font-semibold text-slate-800">Steadfast Courier Delivery Fee:</span>
                 </div>
                 <span className="font-black text-blue-700 font-mono">
                   ৳{deliveryFee}
                 </span>
               </div>
 
-              {/* Payment Mode Selection: COD vs Full Online */}
+              {/* Payment Mode Options */}
               <div className="space-y-1 pt-0.5">
                 <span className="text-[10px] font-bold text-slate-700 block">
-                  {t.paymentSectionTitle}
+                  Payment Method:
                 </span>
                 
                 {/* Option 1: COD with Advance Delivery Fee */}
@@ -484,14 +387,14 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black text-slate-900">
-                        {t.codTitle}
+                        Cash on Delivery (Advance Shipping Fee)
                       </span>
                       <span className="text-[9px] font-extrabold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                        জনপ্রিয়
+                        Popular
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                      {t.codSub}
+                      Pay only ৳{deliveryFee} delivery fee via bKash now. Pay product price (৳{subtotal.toLocaleString()}) on delivery.
                     </span>
                   </div>
                   {paymentMode === 'partial_cod' && (
@@ -514,10 +417,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="text-xs font-black text-slate-900">
-                      {t.fullTitle}
+                      Full Online Payment (bKash)
                     </span>
                     <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                      {t.fullSub}
+                      Pay total ৳{totalAmount.toLocaleString()} via bKash now. Zero cash due on delivery.
                     </span>
                   </div>
                   {paymentMode === 'full_online' && (
@@ -526,32 +429,32 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </button>
               </div>
 
-              {/* Bill Summary */}
+              {/* Pricing Breakdown */}
               <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1 text-[11px]">
                 <div className="flex justify-between text-slate-600">
-                  <span>{t.itemPrice} ({quantity}):</span>
+                  <span>Product Price ({quantity}):</span>
                   <span className="font-bold text-slate-900 font-mono">৳{subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>{t.shippingFee}:</span>
+                  <span>Delivery Charge:</span>
                   <span className="font-bold text-slate-900 font-mono">৳{deliveryFee.toLocaleString()}</span>
                 </div>
                 
                 <div className="pt-1 border-t border-slate-200 space-y-0.5">
                   <div className="flex justify-between text-[#E2136E] font-black">
-                    <span>{t.payNowLabel}</span>
+                    <span>To Pay Now (bKash):</span>
                     <span className="font-mono text-xs">৳{payNowAmount.toLocaleString()}</span>
                   </div>
                   {paymentMode === 'partial_cod' && (
                     <div className="flex justify-between text-slate-600 font-bold text-[10px]">
-                      <span>{t.dueLabel}</span>
+                      <span>Due on Delivery (Cash):</span>
                       <span className="font-mono text-slate-900">৳{dueOnDelivery.toLocaleString()}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Order Button */}
+              {/* Submit CTA */}
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -559,19 +462,19 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t.processing}
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing Order...
                   </>
                 ) : (
                   <>
                     <Zap className="w-3.5 h-3.5 fill-white text-white" /> 
-                    <span>{t.btnOrderNow}</span>
+                    <span>Pay ৳{payNowAmount.toLocaleString()} & Confirm Order</span>
                   </>
                 )}
               </button>
 
               <div className="flex items-center justify-center gap-1 text-[9px] text-slate-400 text-center">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>{t.trustNotice}</span>
+                <span>100% Authentic Product • Secure bKash Gateway</span>
               </div>
 
             </form>
@@ -580,7 +483,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         </div>
       </div>
 
-      {/* Automated bKash Modal Integration (Zero Bypass) */}
+      {/* Automated bKash Modal */}
       <BkashAutomatedModal
         amount={payNowAmount}
         orderNumber={tempOrderNumber}
