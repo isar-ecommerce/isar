@@ -27,55 +27,15 @@ import type { Product } from '../../types/product';
 import ExpressOrderModal from '../../components/product/ExpressOrderModal';
 import ProductReviews from '../../components/product/ProductReviews';
 
-// টেস্ট করার জন্য ফলব্যাক ক্যাটালগ
-const MOCK_CATALOG: Product[] = [
-  {
-    id: '1',
-    name: 'Premium Wireless Headphones with Active Noise Cancelling',
-    slug: 'wireless-headphones',
-    shortDescription: 'High quality audio with crystal clear bass and active noise cancelling features.',
-    description: '<p>Experience world-class sound quality with our Premium Wireless Headphones. Engineered for ultimate comfort, these headphones feature active noise cancelling, 30-hour battery life, and Bluetooth 5.3 connectivity.</p><br/><p>Whether you are traveling across Dhaka or working from home, enjoy uninterrupted audio performance with deep bass and clear voice calls.</p>',
-    price: 4500,
-    originalPrice: 6000,
-    stock: 15,
-    lowStockAlert: 2,
-    sku: 'AUDIO-01',
-    categoryId: 'audio',
-    images: [
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80'
-    ],
-    specifications: [
-      { key: 'Brand', value: 'ISAR Audio' },
-      { key: 'Model', value: 'ANC-Pro 2026' },
-      { key: 'Connectivity', value: 'Bluetooth 5.3' },
-      { key: 'Battery Life', value: 'Up to 30 Hours' },
-      { key: 'Warranty', value: '1 Year Brand Warranty' },
-    ],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    rating: 4.8,
-    reviewCount: 124,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-];
-
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   
-  // UI স্টেট
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
   
-  // ১-ক্লিক এক্সপ্রেস অর্ডার মোডাল
   const [isExpressModalOpen, setIsExpressModalOpen] = useState<boolean>(false);
 
   const addItemToCart = useCartStore((state) => state.addItem);
@@ -87,23 +47,13 @@ export default function ProductDetail() {
     const fetchProduct = async () => {
       if (!id) return;
 
-      const mockItem = MOCK_CATALOG.find((p) => p.id === id || p.slug === id);
-
       try {
         const data = await getProductById(id);
-        if (isMounted) {
-          if (data) {
-            setProduct(data);
-          } else if (mockItem) {
-            setProduct(mockItem);
-          } else {
-            setProduct(MOCK_CATALOG[0]);
-          }
+        if (isMounted && data) {
+          setProduct(data);
         }
-      } catch {
-        if (isMounted) {
-          setProduct(mockItem || MOCK_CATALOG[0]);
-        }
+      } catch (err) {
+        console.error("Error loading product:", err);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -111,9 +61,7 @@ export default function ProductDetail() {
       }
     };
 
-    Promise.resolve().then(() => {
-      fetchProduct();
-    });
+    fetchProduct();
 
     return () => {
       isMounted = false;
@@ -180,14 +128,13 @@ export default function ProductDetail() {
     );
   }
 
-  // ফায়ারবেসের কুৎসিত আইডি ফিল্টার করে প্রিমিয়াম ক্যাটাগরি লেবেল তৈরি
-  const displayCategory = (() => {
-    const rawCategory = (product as { categoryName?: string }).categoryName || product.categoryId || '';
-    // যদি আইডিটি ফায়ারবেসের লম্বা হ্যাশ কোড হয় (১২ ক্যারেক্টারের বেশি), তবে ISAR EXCLUSIVE দেখাবে
-    if (!rawCategory || rawCategory.length > 15) {
+  // ফায়ারবেসের কুৎসিত হ্যাশ আইডি ফিল্টার করে প্রিমিয়াম লেবেল তৈরি
+  const categoryTag = (() => {
+    const cat = (product as { categoryName?: string }).categoryName || product.categoryId || '';
+    if (!cat || cat.length > 15) {
       return 'ISAR EXCLUSIVE';
     }
-    return rawCategory.toUpperCase();
+    return cat.toUpperCase();
   })();
 
   return (
@@ -212,10 +159,8 @@ export default function ProductDetail() {
         <div className="bg-white rounded-3xl shadow-modern-lg p-5 sm:p-8 md:p-10 border border-gray-100 mb-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
             
-            {/* Left Column: Premium Framed Image Gallery */}
+            {/* Left Column: Image Gallery */}
             <div className="space-y-4">
-              
-              {/* Main Product Frame */}
               <div className="relative aspect-square max-h-115 rounded-3xl overflow-hidden bg-gray-50/50 border border-gray-100 shadow-inner flex items-center justify-center p-6 group">
                 <img 
                   src={product.images[selectedImageIndex] || product.images[0] || 'https://via.placeholder.com/600'} 
@@ -223,7 +168,6 @@ export default function ProductDetail() {
                   className="max-h-full max-w-full w-auto h-auto object-contain transition-transform duration-500 group-hover:scale-105 filter drop-shadow-md"
                 />
                 
-                {/* Top Share Button */}
                 <button 
                   onClick={handleShare}
                   className="absolute top-4 right-4 p-2.5 bg-white/90 hover:bg-white rounded-full text-gray-700 shadow-md backdrop-blur-sm transition-all border border-gray-100 hover:scale-110 cursor-pointer"
@@ -233,7 +177,6 @@ export default function ProductDetail() {
                 </button>
               </div>
 
-              {/* Thumbnails Row */}
               {product.images.length > 1 && (
                 <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1">
                   {product.images.map((img, idx) => (
@@ -253,13 +196,13 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Right Column: Product Information & High-Converting Actions */}
+            {/* Right Column: Product Information */}
             <div className="flex flex-col space-y-5">
               
-              {/* Clean Category Tag & Stock Pill (কুৎসিত আইডি দূর করা হয়েছে) */}
+              {/* Category Tag & Stock Pill (কুৎসিত আইডি দূর করা হয়েছে) */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20">
-                  <Tag className="w-3.5 h-3.5" /> {displayCategory}
+                  <Tag className="w-3.5 h-3.5" /> {categoryTag}
                 </span>
                 
                 {product.stock > 0 ? (
@@ -282,13 +225,13 @@ export default function ProductDetail() {
               <div className="flex items-center gap-2">
                 <div className="flex items-center text-amber-500">
                   <Star className="w-4 h-4 fill-current" />
-                  <span className="ml-1 text-sm font-bold text-navy">{product.rating || 4.8}</span>
+                  <span className="ml-1 text-sm font-bold text-navy">{product.rating || 5}</span>
                 </div>
                 <span className="text-gray-300">|</span>
                 <span className="text-xs text-gray-500 font-medium">{product.reviewCount || 1} Verified Customer Review(s)</span>
               </div>
 
-              {/* Modern Pricing Box */}
+              {/* Pricing Box */}
               <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-baseline gap-3 flex-wrap shadow-inner">
                 <span className="text-3xl sm:text-4xl font-black text-primary font-mono">
                   ৳{product.price.toLocaleString()}
@@ -305,17 +248,14 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {/* Short Summary Description */}
               {product.shortDescription && (
                 <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
                   {product.shortDescription}
                 </p>
               )}
 
-              {/* Quantity Selector & High-Converting Order Buttons */}
+              {/* Quantity Selector & Order Buttons */}
               <div className="space-y-4 pt-2">
-                
-                {/* Quantity Control */}
                 <div className="flex items-center gap-4">
                   <span className="text-xs font-bold text-navy uppercase tracking-wider">পরিমাণ (Quantity):</span>
                   <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50">
@@ -339,17 +279,15 @@ export default function ProductDetail() {
                   </div>
                 </div>
 
-                {/* Primary High-Converting Buttons */}
                 <div className="space-y-3 pt-2">
-                  
-                  {/* High-Converting 1-Click Order Button */}
+                  {/* Order Now Button in English with Gold Lightning */}
                   <button
                     onClick={() => setIsExpressModalOpen(true)}
                     disabled={product.stock === 0}
                     className="w-full flex items-center justify-center gap-2.5 bg-linear-to-r from-primary via-primary-dark to-navy hover:from-blue-700 hover:to-slate-900 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95 cursor-pointer"
                   >
                     <Zap className="w-5 h-5 fill-brand-gold text-brand-gold" />
-                    <span>এখনই অর্ডার করুন (১-ক্লিক)</span>
+                    <span>Order Now</span>
                   </button>
 
                   <div className="flex items-center gap-3">
@@ -374,12 +312,10 @@ export default function ProductDetail() {
                       <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-current' : ''}`} />
                     </button>
                   </div>
-
                 </div>
-
               </div>
 
-              {/* Luxury Trust Indicators */}
+              {/* Trust Badges */}
               <div className="grid grid-cols-4 gap-2 pt-6 border-t border-gray-100 text-center">
                 <div className="flex flex-col items-center gap-1">
                   <Truck className="w-5 h-5 text-primary" />
@@ -404,7 +340,7 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Tabs Section: Description & Specifications */}
+        {/* Tabs Section */}
         <div className="bg-white rounded-3xl shadow-modern border border-gray-100 overflow-hidden mb-10">
           <div className="flex border-b border-gray-100 bg-gray-50/50">
             <button
@@ -454,7 +390,6 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Customer Verified Photo Reviews & 5-Star Ratings Section */}
         <ProductReviews 
           productId={product.id} 
           productName={product.name} 
@@ -462,7 +397,6 @@ export default function ProductDetail() {
 
       </div>
 
-      {/* Express 1-Click Order Modal */}
       {product && (
         <ExpressOrderModal 
           product={product} 

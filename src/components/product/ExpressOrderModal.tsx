@@ -7,7 +7,6 @@ import {
   Loader2, 
   Phone, 
   User, 
-  Lock, 
   Plus, 
   Minus, 
   Sparkles, 
@@ -46,12 +45,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const { user } = useAuthStore();
   const { feeInsideDhaka, feeOutsideDhaka } = useSettingsStore();
 
-  // কাস্টমার তথ্য
   const [fullName, setFullName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
 
-  // ৩-টিয়ার স্মার্ট বাংলাদেশ অ্যাড্রেস স্টেট
   const [division, setDivision] = useState<string>('Dhaka');
   const [district, setDistrict] = useState<string>('Dhaka');
   const [upazila, setUpazila] = useState<string>('Dhanmondi');
@@ -63,7 +60,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
   if (!isOpen || !product) return null;
 
-  // ডাইনামিক ও শতভাগ নিরাপদ ডেলিভারি ফি ক্যালকুলেশন (জিরো-রেইস কন্ডিশন)
   const insideFee = typeof feeInsideDhaka === 'number' ? feeInsideDhaka : 60;
   const outsideFee = typeof feeOutsideDhaka === 'number' ? feeOutsideDhaka : 150;
   const isDhakaCity = division.trim().toLowerCase() === 'dhaka' && district.trim().toLowerCase() === 'dhaka';
@@ -72,7 +68,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const subtotal = product.price * quantity;
   const totalAmount = subtotal + deliveryFee;
 
-  // বিভাগ পরিবর্তন
   const handleDivisionChange = (newDivision: string) => {
     setDivision(newDivision);
     const districts = getDistrictsByDivision(newDivision);
@@ -86,7 +81,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     setUpazila(upazilas[0] || '');
   };
 
-  // জেলা পরিবর্তন
   const handleDistrictChange = (newDistrict: string) => {
     setDistrict(newDistrict);
     const upazilas = getUpazilasByDistrict(division, newDistrict);
@@ -94,7 +88,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     setUpazila(upazilas[0] || '');
   };
 
-  // ডেলিভারি জোন কুইক টগল
   const handleQuickZoneToggle = (inside: boolean) => {
     if (inside) {
       handleDivisionChange('Dhaka');
@@ -106,7 +99,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     }
   };
 
-  // অর্ডার সাবমিশন
   const handleExpressOrder = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -117,10 +109,9 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       return;
     }
 
-    // বাংলাদেশি ১১ ডিজিট কঠোর ভ্যালিডেশন
     const bdPhoneRegex = /^(?:\+88|88)?(01[3-9]\d{8})$/;
     if (!bdPhoneRegex.test(cleanPhone)) {
-      toast.error('সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)');
+      toast.error('সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)');
       return;
     }
 
@@ -155,12 +146,11 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         paymentMethod: 'cod',
       });
 
-      // স্বয়ংক্রিয় নোটিফিকেশন
       sendOrderConfirmationSMS(cleanPhone, order.orderNumber, totalAmount);
       sendOrderConfirmationEmail(order);
       sendAdminOrderAlert(order);
 
-      toast.success(`অর্ডার সফল হয়েছে! ট্র্যাকিং আইডি: ${order.orderNumber}`);
+      toast.success(`Order placed successfully! ID: ${order.orderNumber}`);
       onClose();
 
       navigate('/order-success', {
@@ -188,8 +178,8 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         {/* Header Bar */}
         <div className="bg-navy text-white px-5 py-4 flex items-center justify-between shrink-0 border-b border-navy-light/40">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-brand-green flex items-center justify-center text-white shadow-md shadow-brand-green/20">
-              <Zap className="w-4 h-4 fill-current" />
+            <div className="w-9 h-9 rounded-2xl bg-linear-to-r from-primary to-blue-600 flex items-center justify-center text-white shadow-md">
+              <Zap className="w-4 h-4 fill-brand-gold text-brand-gold" />
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-black tracking-tight flex items-center gap-1.5">
@@ -212,7 +202,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
           
-          {/* Modern Product Preview Card */}
+          {/* Product Preview Card */}
           <div className="p-3.5 bg-linear-to-r from-gray-50 to-white rounded-2xl border border-gray-200/80 flex items-center gap-3.5 shadow-xs">
             <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white border border-gray-200 shrink-0 p-1 flex items-center justify-center shadow-xs">
               <img 
@@ -369,7 +359,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               />
             </div>
 
-            {/* Delivery Rate Indicator */}
+            {/* Delivery Rate Indicator - Clean (৳৬০) / (৳১৫০) */}
             <div className="space-y-1.5 pt-0.5">
               <label className="text-xs font-bold text-navy flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5 text-primary" /> ডেলিভারি চার্জ:
@@ -419,19 +409,19 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </div>
             </div>
 
-            {/* CTA Button */}
+            {/* CTA Button - Exact Royal Blue / Deep Navy Gradient & English "Order Now" Text */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-emerald-600 text-white font-black py-3.5 sm:py-4 px-6 rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01] active:scale-95"
+              className="w-full flex items-center justify-center gap-2.5 bg-linear-to-r from-primary via-primary-dark to-navy hover:from-blue-700 hover:to-slate-900 text-white font-black py-3.5 sm:py-4 px-6 rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl hover:shadow-primary/25 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01] active:scale-95"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" /> অর্ডার কনফার্ম হচ্ছে...
+                  <Loader2 className="w-5 h-5 animate-spin" /> Processing Order...
                 </>
               ) : (
                 <>
-                  <Lock className="w-4 h-4" /> অর্ডার কনফার্ম করুন — ৳{totalAmount.toLocaleString()}
+                  <Zap className="w-5 h-5 fill-brand-gold text-brand-gold" /> Order Now — ৳{totalAmount.toLocaleString()}
                 </>
               )}
             </button>
