@@ -13,7 +13,8 @@ import {
   Truck,
   ExternalLink,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Printer
 } from 'lucide-react';
 import { collection, getDocs, doc, updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -22,15 +23,19 @@ import { db } from '../../firebase/config';
 import { sendOrderToCourier } from '../../services/courierService';
 import type { Order, OrderStatus } from '../../types/order';
 
-// টাইপ-সেফ পেমেন্ট ভ্যালিডেশন হেল্পার
-const isOrderFullPaid = (order: Order): boolean => {
-  return order.paymentStatus === 'paid' || order.paymentMethod === 'bkash';
-};
-
-const isOrderAdvancePaid = (order: Order): boolean => {
-  const paidAmt = (order as { paidAmount?: number }).paidAmount || 0;
-  const statusStr = String(order.paymentStatus || '');
-  return paidAmt >= (order.deliveryFee || 0) || statusStr === 'partial' || statusStr === 'paid_delivery_fee';
+// নিখুঁত কালেকশন অ্যামাউন্ট হেল্পার (১ টাকারও ভুল হবে না)
+const getCollectableCOD = (order: Order): number => {
+  if (typeof order.dueAmount === 'number') {
+    return order.dueAmount;
+  }
+  if (order.paymentStatus === 'paid') {
+    return 0;
+  }
+  if (order.paymentStatus === 'partial_paid') {
+    const paid = order.paidAmount || order.deliveryFee || 0;
+    return Math.max(0, order.totalAmount - paid);
+  }
+  return order.totalAmount || 0;
 };
 
 export default function AdminOrders() {
@@ -73,7 +78,7 @@ export default function AdminOrders() {
     };
   }, [fetchOrders]);
 
-  // অর্ডারের স্ট্যাটাস ম্যানুয়াল আপডেট
+  // অর্ডারের স্ট্যাটাস ম্যানুয়াল পরিবর্তন
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
       setUpdatingId(orderId);
@@ -92,71 +97,59 @@ export default function AdminOrders() {
         setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
 
-      toast.success(`Order status updated to ${newStatus.toUpperCase()}`);
+      toast.success(`স্ট্যাটাস পরিবর্তন হয়েছে: ${newStatus.toUpperCase()}`);
     } catch (error) {
       console.error('Error updating order status:', error);
-      toast.error('Failed to update status');
+      toast.error('স্ট্যাটাস পরিবর্তন ব্যর্থ হয়েছে');
     } finally {
       setUpdatingId(null);
     }
   };
 
-  // ১-ক্লিক কুরিয়ার ডিসপ্যাচ (ডেলিভারি ফি ডাবল চার্জিং বন্ধ)
+  // ১-ক্লিক স্টেডফাস্ট ডিসপ্যাচ (সঠিক ক্যাশ কালেকশন ভ্যালু সহ)
   const handleDispatchCourier = async (order: Order) => {
     try {
       setDispatchingId(order.id);
 
-      const isFullPaid = isOrderFullPaid(order);
-      const isAdvancePaid = isOrderAdvancePaid(order);
+      const finalCodToCollect = getCollectableCOD(order);
 
-      let finalCodToCollect = order.totalAmount;
-
-      if (isFullPaid) {
-        finalCodToCollect = 0; // কাস্টমার আগেই পুরো টাকা দিয়েছে
-      } else if (isAdvancePaid) {
-        finalCodToCollect = order.subtotal; // অগ্রিম ডেলিভারি চার্জ দেওয়া থাকলে শুধু পণ্যের দাম তুলবে
-      }
-
+      // স্টেডফাস্ট কুরিয়ারে অবিকল বাকি ক্যাশ পাঠানো
       const orderToDispatch: Order = {
         ...order,
         totalAmount: finalCodToCollect,
+        dueAmount: finalCodToCollect,
       };
 
       const result = await sendOrderToCourier(orderToDispatch, 'Steadfast');
 
+      const updatedFields = {
+        status: 'shipped' as OrderStatus,
+        courierName: 'Steadfast',
+        trackingCode: result.trackingCode,
+        consignmentId: result.consignmentId,
+        shippedAt: new Date().toISOString(),
+      };
+
+      // ফায়ারস্টোর আপডেট
+      const orderRef = doc(db, 'orders', order.id);
+      await updateDoc(orderRef, {
+        ...updatedFields,
+        updatedAt: serverTimestamp(),
+      });
+
       setOrders((prev) =>
-        prev.map((o) =>
-          o.id === order.id
-            ? {
-                ...o,
-                status: 'shipped',
-                courierName: 'Steadfast',
-                trackingCode: result.trackingCode,
-                consignmentId: result.consignmentId,
-              }
-            : o
-        )
+        prev.map((o) => (o.id === order.id ? { ...o, ...updatedFields } : o))
       );
 
       if (selectedOrder && selectedOrder.id === order.id) {
-        setSelectedOrder((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: 'shipped',
-                courierName: 'Steadfast',
-                trackingCode: result.trackingCode,
-                consignmentId: result.consignmentId,
-              }
-            : null
-        );
+        setSelectedOrder((prev) => (prev ? { ...prev, ...updatedFields } : null));
       }
 
-      toast.success(`Steadfast Booked! Collectable COD: ৳${finalCodToCollect}`);
+      toast.success(`স্টেডফাস্ট বুকিং সফল! কালেকশন ক্যাশ: ৳${finalCodToCollect}`);
     } catch (error: unknown) {
       console.error('Courier dispatch error:', error);
       const err = error as Error;
-      toast.error(err.message || 'Failed to book courier parcel');
+      toast.error(err.message || 'স্টেডফাস্ট পার্সেল বুকিং ব্যর্থ হয়েছে');
     } finally {
       setDispatchingId(null);
     }
@@ -188,7 +181,7 @@ export default function AdminOrders() {
       case 'out_for_delivery':
         return (
           <span className="px-2.5 py-1 text-[10px] font-black rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center gap-1">
-            <Truck className="w-3 h-3 shrink-0" /> With Courier
+            <Truck className="w-3 h-3 shrink-0" /> Steadfast
           </span>
         );
       default:
@@ -197,25 +190,24 @@ export default function AdminOrders() {
   };
 
   const getPaymentBadge = (order: Order) => {
-    const isFullPaid = isOrderFullPaid(order);
-    const isAdvancePaid = isOrderAdvancePaid(order);
+    const codDue = getCollectableCOD(order);
 
-    if (isFullPaid) {
+    if (order.paymentStatus === 'paid' || codDue === 0) {
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#E2136E] bg-pink-50 border border-pink-200 px-2 py-0.5 rounded-md">
+        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-brand-green bg-brand-green/10 border border-brand-green/20 px-2 py-0.5 rounded-md">
           <CheckCircle2 className="w-3 h-3 shrink-0" /> Full Paid
         </span>
       );
     }
 
-    if (isAdvancePaid) {
+    if (order.paymentStatus === 'partial_paid' || (order.paidAmount && order.paidAmount > 0)) {
       return (
         <div className="space-y-0.5">
           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
-            Adv. ৳{order.deliveryFee} Paid
+            Adv. ৳{order.paidAmount || order.deliveryFee} Paid
           </span>
-          <span className="block text-[9px] font-bold text-slate-500">
-            Due: ৳{order.subtotal}
+          <span className="block text-[10px] font-bold text-[#E2136E]">
+            COD Due: ৳{codDue}
           </span>
         </div>
       );
@@ -223,7 +215,7 @@ export default function AdminOrders() {
 
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
-        <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" /> Unpaid COD
+        <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" /> Unpaid COD (৳{order.totalAmount})
       </span>
     );
   };
@@ -237,9 +229,9 @@ export default function AdminOrders() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-navy">Order Management</h1>
+          <h1 className="text-2xl font-black text-navy">অর্ডার ম্যানেজমেন্ট ও কুরিয়ার কন্ট্রোল</h1>
           <p className="text-xs text-gray-500 mt-1">
-            Manage customer orders, check advance payments, and dispatch to Steadfast with 1-click
+            বিকাশ অগ্রিম পেমেন্ট যাচাই করুন এবং ১-ক্লিকে স্টেডফাস্ট কুরিয়ারে বুকিং করুন
           </p>
         </div>
 
@@ -247,7 +239,7 @@ export default function AdminOrders() {
           onClick={() => { setLoading(true); fetchOrders(); }}
           className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer"
         >
-          <RefreshCw className="w-4 h-4" /> Refresh Orders
+          <RefreshCw className="w-4 h-4" /> রিফ্রেশ করুন
         </button>
       </div>
 
@@ -259,20 +251,20 @@ export default function AdminOrders() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Order ID, Customer, Phone or Tracking Code..."
+            placeholder="অর্ডার আইডি, কাস্টমারের নাম, ফোন বা ট্র্যাকিং কোড দিয়ে খুঁজুন..."
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <label htmlFor="orderStatusFilter" className="text-xs font-bold text-gray-500">Status:</label>
+          <label htmlFor="orderStatusFilter" className="text-xs font-bold text-gray-500">স্ট্যাটাস:</label>
           <select
             id="orderStatusFilter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-gray-50 border border-gray-200 text-navy text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer"
           >
-            <option value="all">All Status</option>
+            <option value="all">সব স্ট্যাটাস</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             <option value="processing">Processing</option>
@@ -288,123 +280,132 @@ export default function AdminOrders() {
         {loading ? (
           <div className="py-16 flex flex-col items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-            <span className="text-xs text-gray-500 font-medium">Loading customer orders...</span>
+            <span className="text-xs text-gray-500 font-medium">অর্ডার ডাটাবেজ লোড হচ্ছে...</span>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-16 px-4">
             <ShoppingCart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-navy mb-1">No Orders Found</h3>
-            <p className="text-xs text-gray-500">There are no orders matching your current search criteria.</p>
+            <h3 className="text-base font-bold text-navy mb-1">কোনো অর্ডার পাওয়া যায়নি</h3>
+            <p className="text-xs text-gray-500">আপনার ফিল্টারের সাথে মিলে এমন কোনো অর্ডার নেই।</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50 text-gray-400 uppercase font-black text-[10px]">
-                  <th className="py-3 px-4">Order ID</th>
-                  <th className="py-3 px-4">Customer Details</th>
-                  <th className="py-3 px-4">Total Value</th>
-                  <th className="py-3 px-4">Payment & Dues</th>
-                  <th className="py-3 px-4">Status & Courier</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4">অর্ডার আইডি</th>
+                  <th className="py-3 px-4">কাস্টমার ও ঠিকানা</th>
+                  <th className="py-3 px-4">সর্বমোট মূল্য</th>
+                  <th className="py-3 px-4">পেমেন্ট ও বাকি ক্যাশ</th>
+                  <th className="py-3 px-4">স্ট্যাটাস ও ট্র্যাকিং</th>
+                  <th className="py-3 px-4 text-right">অ্যাকশন</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50/80 transition-colors">
-                    
-                    <td className="py-4 px-4 font-mono font-black text-navy">
-                      {order.orderNumber}
-                    </td>
+                {filteredOrders.map((order) => {
+                  const collectable = getCollectableCOD(order);
 
-                    <td className="py-4 px-4">
-                      <span className="font-bold text-navy block">{order.customerName}</span>
-                      <span className="text-[10px] text-gray-400 block font-mono">{order.customerPhone}</span>
-                      <span className="text-[10px] text-gray-500 block truncate max-w-48">
-                        {order.shippingAddress?.district}, {order.shippingAddress?.division}
-                      </span>
-                    </td>
+                  return (
+                    <tr key={order.id} className="hover:bg-gray-50/80 transition-colors">
+                      
+                      <td className="py-4 px-4 font-mono font-black text-navy">
+                        <div>{order.orderNumber}</div>
+                        {order.transactionId && (
+                          <span className="text-[9px] text-[#E2136E] font-bold block">
+                            Trx: {order.transactionId}
+                          </span>
+                        )}
+                      </td>
 
-                    <td className="py-4 px-4">
-                      <span className="font-black text-slate-900 font-mono block">
-                        ৳{order.totalAmount?.toLocaleString()}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        {order.items?.length || 0} Item(s)
-                      </span>
-                    </td>
+                      <td className="py-4 px-4">
+                        <span className="font-bold text-navy block">{order.customerName}</span>
+                        <span className="text-[10px] text-gray-400 block font-mono">{order.customerPhone}</span>
+                        <span className="text-[10px] text-gray-500 block truncate max-w-48">
+                          {order.shippingAddress?.district}, {order.shippingAddress?.division}
+                        </span>
+                      </td>
 
-                    <td className="py-4 px-4">
-                      {getPaymentBadge(order)}
-                    </td>
+                      <td className="py-4 px-4">
+                        <span className="font-black text-slate-900 font-mono block">
+                          ৳{order.totalAmount?.toLocaleString()}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {order.items?.length || 0}টি পণ্য ({order.totalWeight || 0.5} kg)
+                        </span>
+                      </td>
 
-                    <td className="py-4 px-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          {getStatusBadge(order.status)}
-                          {updatingId === order.id && <Loader2 className="w-3 h-3 text-primary animate-spin" />}
+                      <td className="py-4 px-4">
+                        {getPaymentBadge(order)}
+                      </td>
+
+                      <td className="py-4 px-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            {getStatusBadge(order.status)}
+                            {updatingId === order.id && <Loader2 className="w-3 h-3 text-primary animate-spin" />}
+                          </div>
+
+                          {order.trackingCode && (
+                            <a
+                              href={`https://steadfast.com.bd/t/${order.trackingCode}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline font-mono"
+                              title="Track on Steadfast"
+                            >
+                              <span>{order.trackingCode}</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
                         </div>
+                      </td>
 
-                        {order.trackingCode && (
-                          <a
-                            href={`https://steadfast.com.bd/t/${order.trackingCode}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline font-mono"
-                            title="Track on Steadfast"
+                      <td className="py-4 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          
+                          {order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                            <button
+                              onClick={() => handleDispatchCourier(order)}
+                              disabled={dispatchingId === order.id}
+                              className="px-3 py-1.5 bg-brand-green hover:bg-emerald-600 text-white rounded-xl text-[11px] font-black transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer hover:scale-105"
+                              title={`১-ক্লিকে কুরিয়ারে পাঠান (ক্যাশ কালেকশন: ৳${collectable})`}
+                            >
+                              {dispatchingId === order.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Send className="w-3.5 h-3.5" />
+                              )}
+                              Send (৳{collectable})
+                            </button>
+                          )}
+
+                          <select
+                            value={order.status}
+                            onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                            disabled={updatingId === order.id}
+                            className="bg-gray-50 border border-gray-200 text-[11px] font-bold text-navy rounded-xl px-2 py-1.5 focus:outline-none focus:border-primary cursor-pointer disabled:opacity-50"
                           >
-                            <span>{order.trackingCode}</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        )}
-                      </div>
-                    </td>
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
 
-                    <td className="py-4 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        
-                        {order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'cancelled' && (
                           <button
-                            onClick={() => handleDispatchCourier(order)}
-                            disabled={dispatchingId === order.id}
-                            className="px-3 py-1.5 bg-brand-green hover:bg-emerald-600 text-white rounded-xl text-[11px] font-black transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer hover:scale-105"
-                            title="1-Click Dispatch to Steadfast Courier"
+                            onClick={() => setSelectedOrder(order)}
+                            className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                            title="বিস্তারিত দেখুন"
                           >
-                            {dispatchingId === order.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Send className="w-3.5 h-3.5" />
-                            )}
-                            Send to Steadfast
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
+                        </div>
+                      </td>
 
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
-                          disabled={updatingId === order.id}
-                          className="bg-gray-50 border border-gray-200 text-[11px] font-bold text-navy rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-primary cursor-pointer disabled:opacity-50"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="processing">Processing</option>
-                          <option value="shipped">Shipped</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
-                          title="View Order Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -413,9 +414,7 @@ export default function AdminOrders() {
 
       {/* Order Details Modal with Transparent Financial Breakdown */}
       {selectedOrder && (() => {
-        const isFullPaid = isOrderFullPaid(selectedOrder);
-        const isAdvancePaid = isOrderAdvancePaid(selectedOrder);
-        const collectableCOD = isFullPaid ? 0 : (isAdvancePaid ? selectedOrder.subtotal : selectedOrder.totalAmount);
+        const collectableCOD = getCollectableCOD(selectedOrder);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -423,22 +422,31 @@ export default function AdminOrders() {
               
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <div>
-                  <span className="text-xs font-bold text-gray-400 uppercase">Order Details</span>
+                  <span className="text-xs font-bold text-gray-400 uppercase">অর্ডারের সম্পূর্ণ বিবরণ</span>
                   <h3 className="text-xl font-black text-navy">{selectedOrder.orderNumber}</h3>
                 </div>
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="p-1.5 text-gray-400 hover:text-navy hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="p-1.5 text-navy hover:bg-gray-100 rounded-lg transition-colors cursor-pointer border border-gray-200"
+                    title="প্রিন্ট চালান"
+                  >
+                    <Printer className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setSelectedOrder(null)}
+                    className="p-1.5 text-gray-400 hover:text-navy hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {selectedOrder.trackingCode && (
                 <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200 flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2 text-purple-900 font-bold">
                     <Truck className="w-4 h-4 text-purple-700 shrink-0" />
-                    <span>Dispatched with Steadfast: <strong className="font-mono">{selectedOrder.trackingCode}</strong></span>
+                    <span>স্টেডফাস্ট ট্র্যাকিং কোড: <strong className="font-mono">{selectedOrder.trackingCode}</strong></span>
                   </div>
                   <a
                     href={`https://steadfast.com.bd/t/${selectedOrder.trackingCode}`}
@@ -446,7 +454,7 @@ export default function AdminOrders() {
                     rel="noopener noreferrer"
                     className="px-3 py-1 bg-purple-600 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 hover:bg-purple-700 transition-colors font-mono"
                   >
-                    Track <ExternalLink className="w-3 h-3" />
+                    লাইভ ট্র্যাক <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               )}
@@ -454,7 +462,7 @@ export default function AdminOrders() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 space-y-1.5">
                   <h4 className="font-black text-navy flex items-center gap-1.5 text-xs">
-                    <User className="w-3.5 h-3.5 text-primary" /> Customer Info
+                    <User className="w-3.5 h-3.5 text-primary" /> কাস্টমারের তথ্য
                   </h4>
                   <p className="font-bold text-navy">{selectedOrder.customerName}</p>
                   <p className="text-gray-600 font-mono">{selectedOrder.customerPhone}</p>
@@ -463,7 +471,7 @@ export default function AdminOrders() {
 
                 <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 space-y-1.5">
                   <h4 className="font-black text-navy flex items-center gap-1.5 text-xs">
-                    <MapPin className="w-3.5 h-3.5 text-brand-green" /> Delivery Address
+                    <MapPin className="w-3.5 h-3.5 text-brand-green" /> ডেলিভারি ঠিকানা
                   </h4>
                   <p className="font-bold text-navy">{selectedOrder.shippingAddress?.fullName}</p>
                   <p className="text-gray-600 leading-relaxed">{selectedOrder.shippingAddress?.fullAddress}</p>
@@ -474,7 +482,7 @@ export default function AdminOrders() {
               </div>
 
               <div>
-                <h4 className="font-black text-navy text-[11px] uppercase tracking-wider mb-2">Purchased Items</h4>
+                <h4 className="font-black text-navy text-[11px] uppercase tracking-wider mb-2">অর্ডারের পণ্যসমূহ</h4>
                 <div className="border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100">
                   {selectedOrder.items?.map((item, idx) => (
                     <div key={idx} className="p-3 flex items-center justify-between text-xs gap-3">
@@ -498,31 +506,30 @@ export default function AdminOrders() {
               {/* Transparent Financial Breakdown */}
               <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2 text-xs">
                 <div className="flex justify-between text-slate-300">
-                  <span>Product Subtotal:</span>
+                  <span>পণ্যের মোট দাম:</span>
                   <span className="font-mono font-bold">৳{selectedOrder.subtotal?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
-                  <span>Delivery Charge:</span>
+                  <span>ডেলিভারি চার্জ:</span>
                   <span className="font-mono font-bold">৳{selectedOrder.deliveryFee?.toLocaleString()}</span>
                 </div>
 
-                {isAdvancePaid && !isFullPaid && (
-                  <div className="flex justify-between text-emerald-400 font-bold pt-1 border-t border-slate-800">
-                    <span>Advance Delivery Fee Paid (bKash):</span>
-                    <span className="font-mono">-৳{selectedOrder.deliveryFee?.toLocaleString()}</span>
+                {(selectedOrder.paidAmount && selectedOrder.paidAmount > 0) && (
+                  <div className="flex justify-between text-[#E2136E] font-bold pt-1 border-t border-slate-800">
+                    <span>বিকাশে অগ্রিম পাওয়া গেছে:</span>
+                    <span className="font-mono">-৳{selectedOrder.paidAmount?.toLocaleString()}</span>
                   </div>
                 )}
 
-                {isFullPaid && (
-                  <div className="flex justify-between text-pink-400 font-bold pt-1 border-t border-slate-800">
-                    <span>Full Payment Received (bKash):</span>
-                    <span className="font-mono">-৳{selectedOrder.totalAmount?.toLocaleString()}</span>
+                {selectedOrder.transactionId && (
+                  <div className="text-[11px] text-pink-300 font-mono">
+                    bKash TrxID: {selectedOrder.transactionId}
                   </div>
                 )}
 
                 <div className="flex justify-between text-sm font-black text-white pt-2 border-t border-slate-700">
                   <span className="flex items-center gap-1.5 text-amber-400">
-                    <Truck className="w-4 h-4" /> Steadfast COD to Collect:
+                    <Truck className="w-4 h-4" /> স্টেডফাস্ট কুরিয়ারের ক্যাশ কালেকশন (Due COD):
                   </span>
                   <span className="text-amber-400 font-mono font-black text-base">
                     ৳{collectableCOD.toLocaleString()}
@@ -542,7 +549,7 @@ export default function AdminOrders() {
                     ) : (
                       <Send className="w-4 h-4" />
                     )}
-                    Dispatch to Steadfast (Collect: ৳{collectableCOD})
+                    স্টেডফাস্টে বুকিং পাঠান (ক্যাশ তুলবে: ৳{collectableCOD})
                   </button>
                 ) : <div />}
 
@@ -550,7 +557,7 @@ export default function AdminOrders() {
                   onClick={() => setSelectedOrder(null)}
                   className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-navy font-bold text-xs rounded-xl transition-colors cursor-pointer"
                 >
-                  Close
+                  বন্ধ করুন
                 </button>
               </div>
 
