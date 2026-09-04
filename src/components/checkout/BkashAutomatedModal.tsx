@@ -3,90 +3,57 @@ import {
   X, 
   ShieldCheck, 
   Loader2, 
-  Lock, 
-  CheckCircle2, 
-  ArrowRight, 
-  RotateCcw, 
-  Phone 
+  ExternalLink, 
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { initiateBkashPayment } from '../../services/paymentService';
 
 interface BkashAutomatedModalProps {
   amount: number;
   orderNumber: string;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (trxId: string, phone: string) => void;
+  onSuccess?: (trxId: string, phone: string) => void;
 }
-
-type Step = 'number' | 'otp' | 'pin';
 
 export default function BkashAutomatedModal({
   amount,
   orderNumber,
   isOpen,
   onClose,
-  onSuccess,
 }: BkashAutomatedModalProps) {
-  const [step, setStep] = useState<Step>('number');
-  const [bkashNumber, setBkashNumber] = useState<string>('');
-  const [otp, setOtp] = useState<string>('');
-  const [pin, setPin] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  // ধাপ ১: বিকাশ নম্বর সাবমিট
-  const handleNumberSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanNumber = bkashNumber.replace(/[^0-9]/g, '');
+  // অফিশিয়াল বিকাশ পেমেন্ট ইনিশিয়েট ও রিডাইরেক্ট
+  const handleProceedToBkash = async () => {
+    try {
+      setIsProcessing(true);
+      setErrorMessage(null);
 
-    if (cleanNumber.length < 11) {
-      toast.error('অনুগ্রহ করে সঠিক ১১ ডিজিটের বিকাশ নম্বর দিন');
-      return;
-    }
+      // আমাদের সার্ভারলেস ব্যাকএন্ড থেকে বিকাশ গেটওয়ে লিংক তৈরি
+      const result = await initiateBkashPayment(orderNumber, amount);
 
-    setIsProcessing(true);
-    setTimeout(() => {
+      if (!result.success || !result.bkashURL) {
+        throw new Error(result.message || 'বিকাশ গেটওয়েতে সংযোগ করা সম্ভব হয়নি। পুনরায় চেষ্টা করুন।');
+      }
+
+      toast.success('অফিশিয়াল বিকাশ গেটওয়েতে রিডাইরেক্ট করা হচ্ছে...');
+
+      // সরাসরি বিকাশের অফিশিয়াল পেমেন্ট পোর্টালে রিডাইরেক্ট
+      window.location.href = result.bkashURL;
+
+    } catch (error: unknown) {
+      console.error('bKash Checkout Error:', error);
+      const err = error as Error;
+      setErrorMessage(err.message || 'পেমেন্ট গেটওয়েতে সমস্যা দেখা দিয়েছে।');
+      toast.error(err.message || 'পেমেন্ট শুরু করা যায়নি');
       setIsProcessing(false);
-      setStep('otp');
-      toast.success('আপনার নম্বরে ৬ ডিজিটের বিকাশ ওটিপি (OTP) পাঠানো হয়েছে');
-    }, 1000);
-  };
-
-  // ধাপ ২: OTP সাবমিট
-  const handleOtpSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (otp.trim().length < 4) {
-      toast.error('অনুগ্রহ করে সঠিক ওটিপি (OTP) কোড দিন');
-      return;
     }
-
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setStep('pin');
-    }, 800);
-  };
-
-  // ধাপ ৩: PIN সাবমিট ও পেমেন্ট সম্পন্ন
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (pin.trim().length < 5) {
-      toast.error('অনুগ্রহ করে আপনার ৫ ডিজিটের বিকাশ পিন দিন');
-      return;
-    }
-
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      const generatedTrxId = `TRX${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
-      onSuccess(generatedTrxId, bkashNumber);
-      toast.success('বিকাশ পেমেন্ট সফলভাবে সম্পন্ন হয়েছে!');
-      onClose();
-    }, 1500);
   };
 
   return (
@@ -98,7 +65,8 @@ export default function BkashAutomatedModal({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 p-1 text-white/80 hover:text-white rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            disabled={isProcessing}
+            className="absolute top-4 right-4 p-1 text-white/80 hover:text-white rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
             title="Close"
           >
             <X className="w-5 h-5" />
@@ -107,158 +75,62 @@ export default function BkashAutomatedModal({
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl font-black tracking-tight">bKash</span>
             <span className="text-[10px] uppercase font-bold bg-white text-[#E2136E] px-2 py-0.5 rounded-full">
-              Payment Gateway
+              Official Gateway
             </span>
           </div>
 
           <p className="text-xs text-white/90 font-medium">Merchant: ISAR Marketplace</p>
-          <div className="mt-3 py-2 px-4 bg-black/15 rounded-xl inline-block">
-            <span className="text-[11px] text-white/80 block">Total Amount:</span>
-            <span className="text-xl font-extrabold">৳{amount.toLocaleString()}</span>
+          
+          <div className="mt-3 py-2 px-5 bg-black/15 rounded-xl inline-block">
+            <span className="text-[11px] text-white/80 block">পরিশোধের মোট পরিমাণ:</span>
+            <span className="text-2xl font-black tracking-tight">৳{amount.toLocaleString()}</span>
           </div>
           <p className="text-[10px] text-white/70 mt-1">Invoice: {orderNumber}</p>
         </div>
 
-        {/* Step Body */}
-        <div className="p-6">
+        {/* Modal Body */}
+        <div className="p-6 text-center space-y-4">
           
-          {/* STEP 1: Phone Number Input */}
-          {step === 'number' && (
-            <form onSubmit={handleNumberSubmit} className="space-y-4">
-              <div className="space-y-1 text-left">
-                <label className="text-xs font-bold text-navy">
-                  আপনার বিকাশ একাউন্ট নম্বর দিন
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="tel"
-                    required
-                    value={bkashNumber}
-                    onChange={(e) => setBkashNumber(e.target.value)}
-                    placeholder="01XXXXXXXXX"
-                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl bg-gray-50 text-sm font-bold text-navy focus:bg-white focus:outline-none focus:border-[#E2136E] focus:ring-2 focus:ring-[#E2136E]/20 transition-all font-mono"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="w-full flex items-center justify-center gap-2 bg-[#E2136E] hover:bg-[#C20F5D] text-white font-extrabold py-3.5 px-6 rounded-xl text-sm transition-all shadow-md disabled:opacity-70"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> প্রসেসিং হচ্ছে...
-                  </>
-                ) : (
-                  <>
-                    পরবর্তী ধাপ (Proceed) <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
+          {errorMessage && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-left flex items-start gap-2 text-xs text-red-600">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{errorMessage}</span>
+            </div>
           )}
 
-          {/* STEP 2: OTP Verification */}
-          {step === 'otp' && (
-            <form onSubmit={handleOtpSubmit} className="space-y-4">
-              <div className="space-y-1 text-left">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-navy">
-                    বিকাশ ওটিপি (Verification Code)
-                  </label>
-                  <span className="text-[10px] text-gray-400 font-mono">Test: 123456</span>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="6-digit OTP code"
-                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl bg-gray-50 text-sm font-bold text-navy text-center tracking-widest focus:bg-white focus:outline-none focus:border-[#E2136E] focus:ring-2 focus:ring-[#E2136E]/20 transition-all font-mono"
-                  />
-                </div>
-              </div>
+          <div className="space-y-2 text-left bg-gray-50 p-4 rounded-2xl border border-gray-100">
+            <div className="flex items-center gap-2 text-xs font-bold text-navy">
+              <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+              <span>নিরাপদ ও অফিশিয়াল পেমেন্ট</span>
+            </div>
+            <p className="text-[11px] text-gray-500 leading-relaxed pl-6">
+              পরবর্তী বাটনে চাপলে আপনাকে বিকাশের অফিশিয়াল সুরক্ষিত পেজে নিয়ে যাওয়া হবে। সেখানে আপনার বিকাশ নম্বর ও পিন দিয়ে নিরাপদে পেমেন্ট সম্পন্ন করুন।
+            </p>
+          </div>
 
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>ওটিপি পাননি?</span>
-                <button
-                  type="button"
-                  onClick={() => toast.success('নতুন ওটিপি কোড পাঠানো হয়েছে')}
-                  className="text-[#E2136E] font-bold flex items-center gap-1 hover:underline"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" /> পুনরায় পাঠান
-                </button>
-              </div>
+          {/* Action Button */}
+          <button
+            type="button"
+            onClick={handleProceedToBkash}
+            disabled={isProcessing}
+            className="w-full flex items-center justify-center gap-2 bg-[#E2136E] hover:bg-[#C20F5D] text-white font-extrabold py-3.5 px-6 rounded-xl text-sm transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> সংযোগ করা হচ্ছে...
+              </>
+            ) : (
+              <>
+                <span>বিকাশ গেটওয়েতে যান</span>
+                <ExternalLink className="w-4 h-4" />
+              </>
+            )}
+          </button>
 
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="w-full flex items-center justify-center gap-2 bg-[#E2136E] hover:bg-[#C20F5D] text-white font-extrabold py-3.5 px-6 rounded-xl text-sm transition-all shadow-md disabled:opacity-70"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> ভেরিফাই হচ্ছে...
-                  </>
-                ) : (
-                  <>
-                    ওটিপি নিশ্চিত করুন <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* STEP 3: PIN Verification */}
-          {step === 'pin' && (
-            <form onSubmit={handlePinSubmit} className="space-y-4">
-              <div className="space-y-1 text-left">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-navy">
-                    আপনার বিকাশ পিন (bKash PIN) দিন
-                  </label>
-                  <span className="text-[10px] text-gray-400 font-mono">5 Digits</span>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    maxLength={5}
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder="•••••"
-                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl bg-gray-50 text-sm font-bold text-navy text-center tracking-widest focus:bg-white focus:outline-none focus:border-[#E2136E] focus:ring-2 focus:ring-[#E2136E]/20 transition-all font-mono"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="w-full flex items-center justify-center gap-2 bg-[#E2136E] hover:bg-[#C20F5D] text-white font-extrabold py-3.5 px-6 rounded-xl text-sm transition-all shadow-md disabled:opacity-70"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> পেমেন্ট সম্পন্ন হচ্ছে...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" /> পেমেন্ট কনফার্ম করুন (৳{amount.toLocaleString()})
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* Footer Security Notice */}
-          <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center gap-1.5 text-[10px] text-gray-400 text-center">
+          {/* Security Guarantee */}
+          <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-gray-400">
             <ShieldCheck className="w-4 h-4 text-brand-green" />
-            <span>128-bit Encrypted Official bKash Gateway</span>
+            <span>256-bit SSL Secured Official bKash Portal</span>
           </div>
 
         </div>
