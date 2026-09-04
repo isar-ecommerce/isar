@@ -45,7 +45,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const { user } = useAuthStore();
   const { feeInsideDhaka, feeOutsideDhaka } = useSettingsStore();
 
-  // ভাষা স্টেট (ডিফল্ট: ইংরেজি 'en')
   const [lang, setLang] = useState<'en' | 'bn'>('en');
 
   const [fullName, setFullName] = useState<string>('');
@@ -64,7 +63,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
   if (!isOpen || !product) return null;
 
-  // ভাষা ডিকশনারি
   const t = {
     en: {
       name: 'Full Name *',
@@ -89,7 +87,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       total: 'Total Payable:',
       orderNow: 'Order Now',
       payWithBkash: 'Pay with bKash',
-      processing: 'Processing Order...',
+      processing: 'Processing...',
       trustNotice: '100% Cash on Delivery available • Fast Home Delivery',
       errInfo: 'Please provide your name, phone number, and full address.',
       errPhone: 'Please enter a valid 11-digit mobile number.',
@@ -112,7 +110,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       codTitle: 'COD',
       codSub: 'ক্যাশ অন ডেলিভারি',
       bkashTitle: 'bKash',
-      bkashSub: 'বিকাশ অনলাইন পেমেন্ট',
+      bkashSub: 'অনলাইন পেমেন্ট',
       itemPrice: 'পণ্যের মূল্য',
       deliveryCharge: 'ডেলিভারি চার্জ',
       total: 'সর্বমোট প্রদেয়:',
@@ -126,7 +124,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     }
   }[lang];
 
-  // Steadfast কুরিয়ার রেট অটো-সিঙ্ক (গ্রাহক চেঞ্জ করতে পারবে না)
   const isDhakaCity = division.trim().toLowerCase() === 'dhaka' && district.trim().toLowerCase() === 'dhaka';
   const deliveryFee = isDhakaCity 
     ? (typeof feeInsideDhaka === 'number' ? feeInsideDhaka : 60)
@@ -155,7 +152,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     setUpazila(upazilas[0] || '');
   };
 
-  // ফোন নম্বর শুধুমাত্র ১১ ডিজিট নেওয়ার ফিল্টার
   const handlePhoneChange = (val: string) => {
     const numeric = val.replace(/\D/g, '').slice(0, 11);
     setPhone(numeric);
@@ -203,15 +199,16 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         paymentMethod,
       });
 
+      // বিকাশ পেমেন্ট কল
       if (paymentMethod === 'bkash') {
-        toast.loading(lang === 'bn' ? 'বিকাশ গেটওয়েতে যাচ্ছি...' : 'Connecting to bKash Gateway...');
+        toast.loading(lang === 'bn' ? 'বিকাশ গেটওয়েতে সংযোগ হচ্ছে...' : 'Connecting to bKash Gateway...');
         const bkashRes = await initiateBkashPayment(order.orderNumber, totalAmount);
         
         if (bkashRes.success && bkashRes.bkashURL) {
           window.location.href = bkashRes.bkashURL;
           return;
         } else {
-          toast.error(bkashRes.message || 'bKash Gateway connection failed.');
+          toast.error(bkashRes.message || 'bKash credentials not configured yet. Placed as COD order.');
         }
       }
 
@@ -251,7 +248,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
           </span>
 
           <div className="flex items-center gap-2">
-            {/* Language Switcher Toggle */}
             <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-[11px] font-bold">
               <button
                 type="button"
@@ -273,7 +269,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </button>
             </div>
 
-            {/* Close Button */}
             <button 
               type="button"
               onClick={onClose} 
@@ -341,7 +336,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               />
             </div>
 
-            {/* Phone (১১ ডিজিটের কঠোর ভ্যালিডেশন) */}
+            {/* Phone */}
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
                 <Phone className="w-3.5 h-3.5 text-emerald-600" /> {t.phone}
@@ -357,7 +352,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               />
             </div>
 
-            {/* Location Selectors */}
+            {/* Location */}
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
               <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                 {t.locationTitle}
@@ -429,7 +424,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               />
             </div>
 
-            {/* Delivery Fee: Clean ৳60 or ৳150 without any "(অটো-লক)" text */}
+            {/* Delivery Charge Display */}
             <div className="p-2.5 bg-blue-50/70 rounded-xl border border-blue-200 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <Truck className="w-4 h-4 text-blue-600 shrink-0" />
@@ -442,14 +437,12 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </span>
             </div>
 
-            {/* Payment Method Selector: COD vs bKash */}
+            {/* Payment Method Selector */}
             <div className="space-y-1 pt-0.5">
               <label className="text-[11px] font-bold text-slate-700 block">
                 {t.paymentTitle}
               </label>
               <div className="grid grid-cols-2 gap-2">
-                
-                {/* COD Option */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('cod')}
@@ -468,7 +461,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                   <span className="text-[10px] text-slate-500 block mt-1">{t.codSub}</span>
                 </button>
 
-                {/* bKash Option with Official Bird Logo */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('bkash')}
@@ -508,7 +500,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </div>
             </div>
 
-            {/* Action CTA Button */}
+            {/* Clean CTA Button: No price attached! Just "Order Now" or "Pay with bKash" */}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -526,7 +518,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 <>
                   <Zap className="w-4 h-4 fill-amber-400 text-amber-400" /> 
                   <span>
-                    {paymentMethod === 'bkash' ? t.payWithBkash : t.orderNow} — ৳{totalAmount.toLocaleString()}
+                    {paymentMethod === 'bkash' ? t.payWithBkash : t.orderNow}
                   </span>
                 </>
               )}
