@@ -1,20 +1,20 @@
-// Vercel Serverless Function: Secure bKash Tokenized Payment Gateway Proxy
+// Vercel Serverless Function: Production-Ready Secure bKash Tokenized Gateway Proxy
 
 declare const process: {
   env: Record<string, string | undefined>;
 };
 
 export interface BkashRequestBody {
-  action?: 'grant-token' | 'create-payment' | 'execute-payment' | 'query-payment';
-  id_token?: string;
+  action?: 'create-payment' | 'execute-payment' | 'query-payment';
   amount?: number | string;
   orderNumber?: string;
   paymentID?: string;
-  payerPhone?: string;
+  callbackURL?: string;
 }
 
 export interface ApiRequest {
   method?: string;
+  headers?: Record<string, string | string[] | undefined>;
   body?: BkashRequestBody;
 }
 
@@ -29,24 +29,84 @@ interface BkashTokenResponse {
   token_type?: string;
   expires_in?: number;
   statusMessage?: string;
+  statusCode?: string;
 }
 
 interface BkashCreateResponse {
-  paymentID?: string;
-  bkashURL?: string | null;
+  statusCode?: string;
   statusMessage?: string;
+  paymentID?: string;
+  bkashURL?: string;
 }
 
 interface BkashExecuteResponse {
+  statusCode?: string;
+  statusMessage?: string;
   paymentID?: string;
   trxID?: string;
   transactionStatus?: string;
-  amount?: string | number;
+  amount?: string;
+  currency?: string;
+  intent?: string;
+  merchantInvoiceNumber?: string;
+}
+
+interface BkashQueryResponse {
+  statusCode?: string;
   statusMessage?: string;
+  paymentID?: string;
+  trxID?: string;
+  transactionStatus?: string;
+  amount?: string;
+}
+
+// ইন-মেমোরি টোকেন ক্যাশিং
+let cachedToken: string | null = null;
+let tokenExpiryTime: number = 0;
+
+async function getBkashToken(baseUrl: string, appKey: string, appSecret: string, username: string, password: string): Promise<string> {
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiryTime) {
+    return cachedToken;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 9000);
+
+  try {
+    const res = await fetch(`${baseUrl}/token/grant`, {
+      method: 'POST',
+      headers: {
+        username: username,
+        password: password,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app_key: appKey,
+        app_secret: appSecret,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+    const data = (await res.json()) as BkashTokenResponse;
+
+    if (!res.ok || !data.id_token) {
+      throw new Error(data.statusMessage || 'bKash Authentication Failed (Token Grant Rejected)');
+    }
+
+    cachedToken = data.id_token;
+    tokenExpiryTime = now + 3000 * 1000;
+    return cachedToken;
+  } catch (err: unknown) {
+    clearTimeout(timeout);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    // ESLint fix: ক্যাচ করা 'err' হুবহু cause হিসেবে দেওয়া হয়েছে
+    throw new Error(`bKash Token Error: ${errorMsg}`, { cause: err });
+  }
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  // ১. শুধুমাত্র POST রিকোয়েস্ট গ্রহণ করবে
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
@@ -54,113 +114,67 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
   }
 
+  // ১. Vercel Environment Variables থেকে সিক্রেট কি লোড
+  const appKey = process.env.BKASH_APP_KEY?.trim();
+  const appSecret = process.env.BKASH_APP_SECRET?.trim();
+  const username = process.env.BKASH_USERNAME?.trim();
+  const password = process.env.BKASH_PASSWORD?.trim();
+  const isSandbox = process.env.BKASH_IS_SANDBOX !== 'false';
+
+  if (!appKey || !appSecret || !username || !password) {
+    return res.status(500).json({
+      success: false,
+      message: 'Server Configuration Error: bKash merchant credentials are not set in environment variables.',
+    });
+  }
+
+  const baseUrl = isSandbox
+    ? 'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout'
+    : 'https://tokenized.pay.bka.sh/v1.2.0-beta/tokenized/checkout';
+
   try {
-    // Type-Safe Body Destructuring
-    const body: BkashRequestBody = (req.body as BkashRequestBody) || {};
-    const { action, id_token, amount, orderNumber, paymentID } = body;
+    const body: BkashRequestBody = req.body || {};
+    const { action, amount, orderNumber, paymentID, callbackURL } = body;
 
-    // ২. সার্ভার এনভায়রনমেন্ট থেকে সিকিউর bKash Credentials লোড করা
-    const appKey = typeof process !== 'undefined' ? process.env.BKASH_APP_KEY : undefined;
-    const appSecret = typeof process !== 'undefined' ? process.env.BKASH_APP_SECRET : undefined;
-    const username = typeof process !== 'undefined' ? process.env.BKASH_USERNAME : undefined;
-    const password = typeof process !== 'undefined' ? process.env.BKASH_PASSWORD : undefined;
-    const isSandbox = typeof process !== 'undefined' ? process.env.BKASH_IS_SANDBOX !== 'false' : true;
+    // সার্ভার সাইডে অটোমেটিক টোকেন সংগ্রহ
+    const idToken = await getBkashToken(baseUrl, appKey, appSecret, username, password);
 
-    const baseUrl = isSandbox
-      ? 'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout'
-      : 'https://tokenized.pay.bka.sh/v1.2.0-beta/tokenized/checkout';
+    // ডাইনামিক কলব্যাক URL
+    const host = req.headers?.host || 'isar-8pek.vercel.app';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const finalCallbackUrl = callbackURL || `${protocol}://${host}/checkout?bkash_callback=true`;
 
-    // ক্রেডেনশিয়াল মিসিং থাকলে ফলব্যাক মেসেজ
-    if (!appKey || !appSecret || !username || !password) {
-      if (action === 'grant-token') {
-        return res.status(200).json({
-          success: true,
-          id_token: `sandbox_token_${Date.now()}`,
-          isMock: true,
-          message: 'Running in bKash test simulation mode. Add bKash credentials to .env for live gateway.',
-        });
-      }
-
-      if (action === 'create-payment') {
-        return res.status(200).json({
-          success: true,
-          paymentID: `PID_${Date.now()}`,
-          bkashURL: null,
-          isMock: true,
-        });
-      }
-
-      if (action === 'execute-payment') {
-        return res.status(200).json({
-          success: true,
-          trxID: `TRX${Math.floor(10000000 + Math.random() * 90000000)}`,
-          transactionStatus: 'Completed',
-          amount: amount || 0,
-          isMock: true,
-        });
-      }
-    }
-
-    // ৩. অ্যাকশন অনুযায়ী বিকাশ অফিশিয়াল API কল করা
     switch (action) {
-      // ধাপ ক: Grant Token (অ্যাক্সেস টোকেন তৈরি)
-      case 'grant-token': {
-        const tokenRes = await fetch(`${baseUrl}/token/grant`, {
-          method: 'POST',
-          headers: {
-            username: username || '',
-            password: password || '',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            app_key: appKey,
-            app_secret: appSecret,
-          }),
-        });
-
-        const tokenData = (await tokenRes.json()) as BkashTokenResponse;
-        if (tokenRes.ok && tokenData.id_token) {
-          return res.status(200).json({
-            success: true,
-            id_token: tokenData.id_token,
-          });
-        }
-
-        return res.status(400).json({
-          success: false,
-          message: tokenData.statusMessage || 'Failed to grant bKash token.',
-        });
-      }
-
-      // ধাপ খ: Create Payment
       case 'create-payment': {
-        if (!id_token || !amount || !orderNumber) {
+        const parsedAmount = Number(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0 || !orderNumber) {
           return res.status(400).json({
             success: false,
-            message: 'Missing required parameters for create-payment (id_token, amount, or orderNumber).',
+            message: 'Invalid amount or orderNumber for creating bKash payment.',
           });
         }
 
         const createRes = await fetch(`${baseUrl}/create`, {
           method: 'POST',
           headers: {
-            authorization: id_token,
-            'x-app-key': appKey || '',
+            authorization: idToken,
+            'x-app-key': appKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             mode: '0011',
             payerReference: 'ISAR-Customer',
-            callbackURL: 'https://isar.vercel.app/api/bkash-callback',
-            amount: String(amount),
+            callbackURL: finalCallbackUrl,
+            amount: parsedAmount.toFixed(2),
             currency: 'BDT',
             intent: 'sale',
-            merchantInvoiceNumber: String(orderNumber),
+            merchantInvoiceNumber: String(orderNumber).trim(),
           }),
         });
 
         const createData = (await createRes.json()) as BkashCreateResponse;
-        if (createRes.ok && createData.paymentID) {
+
+        if (createRes.ok && createData.statusCode === '0000' && createData.paymentID) {
           return res.status(200).json({
             success: true,
             paymentID: createData.paymentID,
@@ -170,55 +184,90 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
         return res.status(400).json({
           success: false,
-          message: createData.statusMessage || 'Failed to initiate bKash payment.',
+          message: createData.statusMessage || 'Failed to initiate bKash payment with gateway.',
         });
       }
 
-      // ধাপ গ: Execute Payment (ওটিপি ও পিনের পর পেমেন্ট চূড়ান্ত করা)
       case 'execute-payment': {
-        if (!id_token || !paymentID) {
+        if (!paymentID) {
           return res.status(400).json({
             success: false,
-            message: 'Missing required parameters for execute-payment (id_token or paymentID).',
+            message: 'Missing paymentID for executing bKash payment.',
           });
         }
 
         const execRes = await fetch(`${baseUrl}/execute`, {
           method: 'POST',
           headers: {
-            authorization: id_token,
-            'x-app-key': appKey || '',
+            authorization: idToken,
+            'x-app-key': appKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ paymentID }),
         });
 
         const execData = (await execRes.json()) as BkashExecuteResponse;
-        if (execRes.ok && execData.transactionStatus === 'Completed') {
+
+        if (execRes.ok && execData.statusCode === '0000' && execData.transactionStatus === 'Completed') {
           return res.status(200).json({
             success: true,
             trxID: execData.trxID,
             paymentID: execData.paymentID,
             transactionStatus: execData.transactionStatus,
             amount: execData.amount,
+            merchantInvoiceNumber: execData.merchantInvoiceNumber,
           });
         }
 
         return res.status(400).json({
           success: false,
-          message: execData.statusMessage || 'bKash payment execution failed or was cancelled.',
+          message: execData.statusMessage || 'bKash payment execution failed or cancelled by user.',
+        });
+      }
+
+      case 'query-payment': {
+        if (!paymentID) {
+          return res.status(400).json({
+            success: false,
+            message: 'Missing paymentID for querying payment status.',
+          });
+        }
+
+        const queryRes = await fetch(`${baseUrl}/payment/search/${paymentID}`, {
+          method: 'GET',
+          headers: {
+            authorization: idToken,
+            'x-app-key': appKey,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const queryData = (await queryRes.json()) as BkashQueryResponse;
+
+        if (queryRes.ok && queryData.statusCode === '0000') {
+          return res.status(200).json({
+            success: true,
+            status: queryData.transactionStatus,
+            trxID: queryData.trxID,
+            amount: queryData.amount,
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: queryData.statusMessage || 'Unable to query bKash payment.',
         });
       }
 
       default:
         return res.status(400).json({
           success: false,
-          message: 'Invalid action parameter.',
+          message: 'Invalid action. Supported actions: create-payment, execute-payment, query-payment.',
         });
     }
   } catch (error: unknown) {
-    const errorMsg = error instanceof Error ? error.message : 'Internal bKash gateway error.';
-    console.error('bKash API Error:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Internal bKash Gateway Proxy Error.';
+    console.error('bKash Handler Error:', errorMsg);
     return res.status(500).json({
       success: false,
       message: errorMsg,
