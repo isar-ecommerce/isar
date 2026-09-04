@@ -7,12 +7,13 @@ import {
   Loader2, 
   RefreshCw, 
   Eye, 
-  Phone, 
   User, 
   X, 
   Send, 
   Truck,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { collection, getDocs, doc, updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -20,6 +21,17 @@ import toast from 'react-hot-toast';
 import { db } from '../../firebase/config';
 import { sendOrderToCourier } from '../../services/courierService';
 import type { Order, OrderStatus } from '../../types/order';
+
+// টাইপ-সেফ পেমেন্ট ভ্যালিডেশন হেল্পার
+const isOrderFullPaid = (order: Order): boolean => {
+  return order.paymentStatus === 'paid' || order.paymentMethod === 'bkash';
+};
+
+const isOrderAdvancePaid = (order: Order): boolean => {
+  const paidAmt = (order as { paidAmount?: number }).paidAmount || 0;
+  const statusStr = String(order.paymentStatus || '');
+  return paidAmt >= (order.deliveryFee || 0) || statusStr === 'partial' || statusStr === 'paid_delivery_fee';
+};
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -30,7 +42,7 @@ export default function AdminOrders() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [dispatchingId, setDispatchingId] = useState<string | null>(null);
 
-  // ফায়ারস্টোর থেকে সব অর্ডার লোড করার ফাংশন
+  // ফায়ারস্টোর থেকে সব অর্ডার লোড করা
   const fetchOrders = useCallback(async () => {
     try {
       const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
@@ -61,7 +73,7 @@ export default function AdminOrders() {
     };
   }, [fetchOrders]);
 
-  // অর্ডারের স্ট্যাটাস ম্যানুয়াল আপডেট হ্যান্ডলার
+  // অর্ডারের স্ট্যাটাস ম্যানুয়াল আপডেট
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
       setUpdatingId(orderId);
@@ -89,11 +101,28 @@ export default function AdminOrders() {
     }
   };
 
-  // ১-ক্লিক কুরিয়ারে পার্সেল বুকিং হ্যান্ডলার (Steadfast Real-Time Dispatch)
+  // ১-ক্লিক কুরিয়ার ডিসপ্যাচ (ডেলিভারি ফি ডাবল চার্জিং বন্ধ)
   const handleDispatchCourier = async (order: Order) => {
     try {
       setDispatchingId(order.id);
-      const result = await sendOrderToCourier(order, 'Steadfast');
+
+      const isFullPaid = isOrderFullPaid(order);
+      const isAdvancePaid = isOrderAdvancePaid(order);
+
+      let finalCodToCollect = order.totalAmount;
+
+      if (isFullPaid) {
+        finalCodToCollect = 0; // কাস্টমার আগেই পুরো টাকা দিয়েছে
+      } else if (isAdvancePaid) {
+        finalCodToCollect = order.subtotal; // অগ্রিম ডেলিভারি চার্জ দেওয়া থাকলে শুধু পণ্যের দাম তুলবে
+      }
+
+      const orderToDispatch: Order = {
+        ...order,
+        totalAmount: finalCodToCollect,
+      };
+
+      const result = await sendOrderToCourier(orderToDispatch, 'Steadfast');
 
       setOrders((prev) =>
         prev.map((o) =>
@@ -123,7 +152,7 @@ export default function AdminOrders() {
         );
       }
 
-      toast.success(result.message);
+      toast.success(`Steadfast Booked! Collectable COD: ৳${finalCodToCollect}`);
     } catch (error: unknown) {
       console.error('Courier dispatch error:', error);
       const err = error as Error;
@@ -167,6 +196,38 @@ export default function AdminOrders() {
     }
   };
 
+  const getPaymentBadge = (order: Order) => {
+    const isFullPaid = isOrderFullPaid(order);
+    const isAdvancePaid = isOrderAdvancePaid(order);
+
+    if (isFullPaid) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#E2136E] bg-pink-50 border border-pink-200 px-2 py-0.5 rounded-md">
+          <CheckCircle2 className="w-3 h-3 shrink-0" /> Full Paid
+        </span>
+      );
+    }
+
+    if (isAdvancePaid) {
+      return (
+        <div className="space-y-0.5">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
+            Adv. ৳{order.deliveryFee} Paid
+          </span>
+          <span className="block text-[9px] font-bold text-slate-500">
+            Due: ৳{order.subtotal}
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
+        <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" /> Unpaid COD
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <Helmet>
@@ -178,7 +239,7 @@ export default function AdminOrders() {
         <div>
           <h1 className="text-2xl font-black text-navy">Order Management</h1>
           <p className="text-xs text-gray-500 mt-1">
-            Manage customer orders, update statuses and dispatch to Steadfast with 1-click
+            Manage customer orders, check advance payments, and dispatch to Steadfast with 1-click
           </p>
         </div>
 
@@ -242,8 +303,8 @@ export default function AdminOrders() {
                 <tr className="border-b border-gray-100 bg-gray-50/50 text-gray-400 uppercase font-black text-[10px]">
                   <th className="py-3 px-4">Order ID</th>
                   <th className="py-3 px-4">Customer Details</th>
-                  <th className="py-3 px-4">Total Amount</th>
-                  <th className="py-3 px-4">Payment</th>
+                  <th className="py-3 px-4">Total Value</th>
+                  <th className="py-3 px-4">Payment & Dues</th>
                   <th className="py-3 px-4">Status & Courier</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -252,23 +313,20 @@ export default function AdminOrders() {
                 {filteredOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50/80 transition-colors">
                     
-                    {/* Order ID */}
                     <td className="py-4 px-4 font-mono font-black text-navy">
                       {order.orderNumber}
                     </td>
 
-                    {/* Customer */}
                     <td className="py-4 px-4">
                       <span className="font-bold text-navy block">{order.customerName}</span>
-                      <span className="text-[10px] text-gray-400 block">{order.customerPhone}</span>
+                      <span className="text-[10px] text-gray-400 block font-mono">{order.customerPhone}</span>
                       <span className="text-[10px] text-gray-500 block truncate max-w-48">
                         {order.shippingAddress?.district}, {order.shippingAddress?.division}
                       </span>
                     </td>
 
-                    {/* Amount */}
                     <td className="py-4 px-4">
-                      <span className="font-black text-primary font-mono block">
+                      <span className="font-black text-slate-900 font-mono block">
                         ৳{order.totalAmount?.toLocaleString()}
                       </span>
                       <span className="text-[10px] text-gray-400">
@@ -276,16 +334,10 @@ export default function AdminOrders() {
                       </span>
                     </td>
 
-                    {/* Payment */}
-                    <td className="py-4 px-4 font-bold text-gray-600 uppercase text-[11px]">
-                      {order.paymentMethod === 'cod' ? (
-                        <span className="text-navy">COD</span>
-                      ) : (
-                        <span className="text-[#E2136E]">bKash Paid</span>
-                      )}
+                    <td className="py-4 px-4">
+                      {getPaymentBadge(order)}
                     </td>
 
-                    {/* Status & Courier Badge */}
                     <td className="py-4 px-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5">
@@ -293,27 +345,24 @@ export default function AdminOrders() {
                           {updatingId === order.id && <Loader2 className="w-3 h-3 text-primary animate-spin" />}
                         </div>
 
-                        {/* Live Steadfast Tracking Badge */}
                         {order.trackingCode && (
                           <a
                             href={`https://steadfast.com.bd/t/${order.trackingCode}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline font-mono"
                             title="Track on Steadfast"
                           >
-                            <span>{order.courierName || 'Steadfast'}: {order.trackingCode}</span>
+                            <span>{order.trackingCode}</span>
                             <ExternalLink className="w-2.5 h-2.5" />
                           </a>
                         )}
                       </div>
                     </td>
 
-                    {/* Actions */}
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         
-                        {/* 1-Click Courier Dispatch Button */}
                         {order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'cancelled' && (
                           <button
                             onClick={() => handleDispatchCourier(order)}
@@ -330,7 +379,6 @@ export default function AdminOrders() {
                           </button>
                         )}
 
-                        {/* Quick Status Select */}
                         <select
                           value={order.status}
                           onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
@@ -345,7 +393,6 @@ export default function AdminOrders() {
                           <option value="cancelled">Cancelled</option>
                         </select>
 
-                        {/* View Details Button */}
                         <button
                           onClick={() => setSelectedOrder(order)}
                           className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
@@ -364,140 +411,153 @@ export default function AdminOrders() {
         )}
       </div>
 
-      {/* Order Details Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-100 p-6 sm:p-8 space-y-6 relative">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <div>
-                <span className="text-xs font-bold text-gray-400 uppercase">Order Summary</span>
-                <h3 className="text-xl font-black text-navy">{selectedOrder.orderNumber}</h3>
-              </div>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="p-1.5 text-gray-400 hover:text-navy hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Order Details Modal with Transparent Financial Breakdown */}
+      {selectedOrder && (() => {
+        const isFullPaid = isOrderFullPaid(selectedOrder);
+        const isAdvancePaid = isOrderAdvancePaid(selectedOrder);
+        const collectableCOD = isFullPaid ? 0 : (isAdvancePaid ? selectedOrder.subtotal : selectedOrder.totalAmount);
 
-            {/* Courier Dispatch Status Banner */}
-            {selectedOrder.trackingCode && (
-              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-200 flex items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 text-purple-900 font-bold">
-                  <Truck className="w-4 h-4 text-purple-700 shrink-0" />
-                  <span>Dispatched with {selectedOrder.courierName || 'Steadfast'}: <strong className="font-mono">{selectedOrder.trackingCode}</strong></span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-100 p-6 sm:p-8 space-y-5 relative">
+              
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div>
+                  <span className="text-xs font-bold text-gray-400 uppercase">Order Details</span>
+                  <h3 className="text-xl font-black text-navy">{selectedOrder.orderNumber}</h3>
                 </div>
-                <a
-                  href={`https://steadfast.com.bd/t/${selectedOrder.trackingCode}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1 bg-purple-600 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 hover:bg-purple-700 transition-colors"
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="p-1.5 text-gray-400 hover:text-navy hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
                 >
-                  Live Track <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            )}
-
-            {/* Customer & Address Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-                <h4 className="font-black text-navy flex items-center gap-1.5 text-xs sm:text-sm">
-                  <User className="w-4 h-4 text-primary" /> Customer Info
-                </h4>
-                <p className="font-bold text-navy text-xs sm:text-sm">{selectedOrder.customerName}</p>
-                <p className="text-gray-600 flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5 text-gray-400" /> {selectedOrder.customerPhone}
-                </p>
-                <p className="text-gray-600">{selectedOrder.customerEmail}</p>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-                <h4 className="font-black text-navy flex items-center gap-1.5 text-xs sm:text-sm">
-                  <MapPin className="w-4 h-4 text-brand-green" /> Delivery Address
-                </h4>
-                <p className="font-bold text-navy">{selectedOrder.shippingAddress?.fullName}</p>
-                <p className="text-gray-600 leading-relaxed">{selectedOrder.shippingAddress?.fullAddress}</p>
-                <p className="text-gray-600">Thana: {selectedOrder.shippingAddress?.upazila}, District: {selectedOrder.shippingAddress?.district}</p>
-                <p className="text-gray-600">Division: {selectedOrder.shippingAddress?.division}</p>
-              </div>
-            </div>
-
-            {/* Purchased Items Table */}
-            <div>
-              <h4 className="font-black text-navy text-xs uppercase tracking-wider mb-3">Purchased Items</h4>
-              <div className="border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100">
-                {selectedOrder.items?.map((item, idx) => (
-                  <div key={idx} className="p-3.5 flex items-center justify-between text-xs gap-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={item.image || 'https://via.placeholder.com/60'}
-                        alt={item.productName}
-                        className="w-11 h-11 rounded-xl object-cover bg-gray-50 border border-gray-100 shrink-0"
-                      />
-                      <div>
-                        <p className="font-bold text-navy">{item.productName}</p>
-                        <p className="text-gray-400 text-[10px]">Qty: {item.quantity} × ৳{item.price?.toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <span className="font-black text-navy font-mono">৳{((item.price || 0) * (item.quantity || 1))?.toLocaleString()}</span>
+              {selectedOrder.trackingCode && (
+                <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-purple-900 font-bold">
+                    <Truck className="w-4 h-4 text-purple-700 shrink-0" />
+                    <span>Dispatched with Steadfast: <strong className="font-mono">{selectedOrder.trackingCode}</strong></span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Payment Summary */}
-            <div className="p-5 bg-navy text-white rounded-2xl space-y-2 text-xs">
-              <div className="flex justify-between text-gray-300">
-                <span>Subtotal:</span>
-                <span className="font-mono">৳{selectedOrder.subtotal?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-gray-300">
-                <span>Delivery Charge:</span>
-                <span className="font-mono">৳{selectedOrder.deliveryFee?.toLocaleString()}</span>
-              </div>
-              {(selectedOrder.discount || 0) > 0 && (
-                <div className="flex justify-between text-brand-green">
-                  <span>Coupon Discount:</span>
-                  <span className="font-mono">-৳{selectedOrder.discount?.toLocaleString()}</span>
+                  <a
+                    href={`https://steadfast.com.bd/t/${selectedOrder.trackingCode}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 bg-purple-600 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 hover:bg-purple-700 transition-colors font-mono"
+                  >
+                    Track <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               )}
-              <div className="flex justify-between text-sm font-black text-white pt-2 border-t border-navy-light">
-                <span>Total Amount:</span>
-                <span className="text-brand-gold text-base font-mono">৳{selectedOrder.totalAmount?.toLocaleString()}</span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 space-y-1.5">
+                  <h4 className="font-black text-navy flex items-center gap-1.5 text-xs">
+                    <User className="w-3.5 h-3.5 text-primary" /> Customer Info
+                  </h4>
+                  <p className="font-bold text-navy">{selectedOrder.customerName}</p>
+                  <p className="text-gray-600 font-mono">{selectedOrder.customerPhone}</p>
+                  <p className="text-gray-500 truncate">{selectedOrder.customerEmail}</p>
+                </div>
+
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 space-y-1.5">
+                  <h4 className="font-black text-navy flex items-center gap-1.5 text-xs">
+                    <MapPin className="w-3.5 h-3.5 text-brand-green" /> Delivery Address
+                  </h4>
+                  <p className="font-bold text-navy">{selectedOrder.shippingAddress?.fullName}</p>
+                  <p className="text-gray-600 leading-relaxed">{selectedOrder.shippingAddress?.fullAddress}</p>
+                  <p className="text-gray-500 font-semibold">
+                    {selectedOrder.shippingAddress?.upazila}, {selectedOrder.shippingAddress?.district}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {/* Modal Footer Actions */}
-            <div className="flex flex-wrap justify-between items-center gap-3 pt-2">
-              {selectedOrder.status !== 'shipped' && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' ? (
+              <div>
+                <h4 className="font-black text-navy text-[11px] uppercase tracking-wider mb-2">Purchased Items</h4>
+                <div className="border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100">
+                  {selectedOrder.items?.map((item, idx) => (
+                    <div key={idx} className="p-3 flex items-center justify-between text-xs gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={item.image || 'https://via.placeholder.com/60'}
+                          alt={item.productName}
+                          className="w-10 h-10 rounded-xl object-cover bg-gray-50 border border-gray-100 shrink-0"
+                        />
+                        <div>
+                          <p className="font-bold text-navy">{item.productName}</p>
+                          <p className="text-gray-400 text-[10px] font-mono">Qty: {item.quantity} × ৳{item.price?.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <span className="font-black text-navy font-mono">৳{((item.price || 0) * (item.quantity || 1))?.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Transparent Financial Breakdown */}
+              <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2 text-xs">
+                <div className="flex justify-between text-slate-300">
+                  <span>Product Subtotal:</span>
+                  <span className="font-mono font-bold">৳{selectedOrder.subtotal?.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Delivery Charge:</span>
+                  <span className="font-mono font-bold">৳{selectedOrder.deliveryFee?.toLocaleString()}</span>
+                </div>
+
+                {isAdvancePaid && !isFullPaid && (
+                  <div className="flex justify-between text-emerald-400 font-bold pt-1 border-t border-slate-800">
+                    <span>Advance Delivery Fee Paid (bKash):</span>
+                    <span className="font-mono">-৳{selectedOrder.deliveryFee?.toLocaleString()}</span>
+                  </div>
+                )}
+
+                {isFullPaid && (
+                  <div className="flex justify-between text-pink-400 font-bold pt-1 border-t border-slate-800">
+                    <span>Full Payment Received (bKash):</span>
+                    <span className="font-mono">-৳{selectedOrder.totalAmount?.toLocaleString()}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-sm font-black text-white pt-2 border-t border-slate-700">
+                  <span className="flex items-center gap-1.5 text-amber-400">
+                    <Truck className="w-4 h-4" /> Steadfast COD to Collect:
+                  </span>
+                  <span className="text-amber-400 font-mono font-black text-base">
+                    ৳{collectableCOD.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap justify-between items-center gap-3 pt-1">
+                {selectedOrder.status !== 'shipped' && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' ? (
+                  <button
+                    onClick={() => handleDispatchCourier(selectedOrder)}
+                    disabled={dispatchingId === selectedOrder.id}
+                    className="px-5 py-2.5 bg-brand-green hover:bg-emerald-600 text-white font-black text-xs rounded-xl transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer hover:scale-105"
+                  >
+                    {dispatchingId === selectedOrder.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Dispatch to Steadfast (Collect: ৳{collectableCOD})
+                  </button>
+                ) : <div />}
+
                 <button
-                  onClick={() => handleDispatchCourier(selectedOrder)}
-                  disabled={dispatchingId === selectedOrder.id}
-                  className="px-5 py-2.5 bg-brand-green hover:bg-emerald-600 text-white font-black text-xs rounded-xl transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+                  onClick={() => setSelectedOrder(null)}
+                  className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-navy font-bold text-xs rounded-xl transition-colors cursor-pointer"
                 >
-                  {dispatchingId === selectedOrder.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                  Dispatch to Steadfast Courier
+                  Close
                 </button>
-              ) : <div />}
+              </div>
 
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-navy font-bold text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                Close
-              </button>
             </div>
-
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );
