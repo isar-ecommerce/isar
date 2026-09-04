@@ -23,7 +23,11 @@ export interface SettingsState {
   instagramUrl: string;
   isLoaded: boolean;
 
+  // গ্লোবাল ল্যাঙ্গুয়েজ স্টেট (ডিফল্ট: ইংরেজি 'en')
+  language: 'en' | 'bn';
+
   // অ্যাকশনসমূহ
+  setLanguage: (lang: 'en' | 'bn') => void;
   setSettings: (newSettings: Partial<SettingsState>) => void;
   fetchSettings: () => Promise<void>;
 }
@@ -31,7 +35,7 @@ export interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      // ডিফল্ট ক্যাশ স্টেট
+      // ডিফল্ট ক্যাশ স্টেট (English by default)
       logoType: 'text',
       logoUrl: '',
       siteName: 'ISAR',
@@ -50,10 +54,12 @@ export const useSettingsStore = create<SettingsState>()(
       facebookUrl: 'https://facebook.com',
       instagramUrl: 'https://instagram.com',
       isLoaded: false,
+      language: 'en', // ডিফল্ট ইংরেজি
 
+      setLanguage: (lang: 'en' | 'bn') => set({ language: lang }),
       setSettings: (newSettings) => set((state) => ({ ...state, ...newSettings })),
 
-      // ফায়ারস্টোর থেকে ব্যাকগ্রাউন্ডে ডেটা রিড ও ক্যাশ আপডেট করা
+      // ফায়ারস্টোর থেকে সেটিংস ফেচ
       fetchSettings: async () => {
         try {
           const docRef = doc(db, 'settings', 'general');

@@ -13,12 +13,12 @@ import {
 
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { logoutUser } from '../../firebase/auth';
 import { getProducts } from '../../services/productService';
 import BrandLogo from '../common/BrandLogo';
 import type { Product } from '../../types/product';
 
-// ডেটাবেস খালি থাকলে লাইভ সার্চ সচল রাখার জন্য ফলব্যাক ক্যাটালগ
 const FALLBACK_SEARCH_PRODUCTS: Product[] = [
   {
     id: '1',
@@ -42,75 +42,6 @@ const FALLBACK_SEARCH_PRODUCTS: Product[] = [
     sellerId: 'admin',
     createdAt: new Date(),
     updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    name: 'Smart Watch Series 8 - Midnight Aluminum Case',
-    slug: 'smart-watch',
-    shortDescription: 'Track your health in real-time.',
-    description: 'Monitors heart rate, steps, sleep, and blood oxygen levels.',
-    price: 3200,
-    originalPrice: 4000,
-    stock: 8,
-    lowStockAlert: 2,
-    sku: 'WATCH-01',
-    categoryId: 'gadgets',
-    images: ['https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: false,
-    rating: 4.5,
-    reviewCount: 89,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    name: 'Ultra HD 4K Action Camera with Waterproof Case',
-    slug: 'action-camera',
-    shortDescription: 'Waterproof 4K recording camera.',
-    description: 'Capture your adventure moments with ultra-smooth 4K stabilization.',
-    price: 8500,
-    originalPrice: 9500,
-    stock: 5,
-    lowStockAlert: 1,
-    sku: 'CAM-01',
-    categoryId: 'cameras',
-    images: ['https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    rating: 4.9,
-    reviewCount: 210,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '4',
-    name: 'Minimalist Leather Backpack for Men & Women',
-    slug: 'leather-backpack',
-    shortDescription: 'Water-resistant premium leather backpack.',
-    description: 'Designed for daily commute and carrying 15.6 inch laptops safely.',
-    price: 2100,
-    originalPrice: 2500,
-    stock: 20,
-    lowStockAlert: 5,
-    sku: 'BAG-01',
-    categoryId: 'fashion',
-    images: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: false,
-    isTrending: false,
-    isNewArrival: true,
-    rating: 4.6,
-    reviewCount: 56,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
   }
 ];
 
@@ -128,8 +59,9 @@ export default function Header() {
 
   const { user, isAuthenticated } = useAuthStore();
   const itemCount = useCartStore((state) => state.getItemCount());
+  const { language, setLanguage } = useSettingsStore();
 
-  // লাইভ সার্চ ডিবাইন্সড ইফেক্ট (React 19 সেফ)
+  // লাইভ সার্চ ডিবাইন্সড ইফেক্ট
   useEffect(() => {
     if (!searchQuery.trim()) {
       Promise.resolve().then(() => {
@@ -211,14 +143,14 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-xs pt-safe-top">
-      <div className="container mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-4 sm:gap-8">
+      <div className="container mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-4 sm:gap-6">
         
-        {/* Left: Dynamic Brand Logo (3-Line Hamburger Menu removed for clean Daraz-style UI) */}
-        <div className="flex items-center">
+        {/* Left: Brand Logo */}
+        <div className="flex items-center shrink-0">
           <BrandLogo to="/" />
         </div>
 
-        {/* Middle: Desktop Search Bar with Live Autocomplete Suggestions */}
+        {/* Middle: Desktop Search Bar */}
         <div className="hidden md:flex flex-1 max-w-2xl relative" ref={searchRef}>
           <form onSubmit={handleSearch} className="w-full relative group">
             <input
@@ -226,7 +158,7 @@ export default function Header() {
               value={searchQuery}
               onChange={handleInputChange}
               onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
-              placeholder="Search for products, brands and more..."
+              placeholder={language === 'en' ? "Search for products, brands and more..." : "পণ্য, ব্র্যান্ড দিয়ে খুঁজুন..."}
               className="w-full h-11 pl-4 pr-12 rounded-full border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm text-navy placeholder:text-gray-400"
             />
             {searchQuery ? (
@@ -252,16 +184,16 @@ export default function Header() {
             <div className="absolute top-12 left-0 right-0 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
               {isSearching ? (
                 <div className="p-4 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 text-primary animate-spin" /> Searching products...
+                  <Loader2 className="w-4 h-4 text-primary animate-spin" /> {language === 'en' ? "Searching products..." : "পণ্য খোঁজা হচ্ছে..."}
                 </div>
               ) : searchResults.length === 0 ? (
                 <div className="p-4 text-center text-xs text-gray-500">
-                  No products found for "{searchQuery}"
+                  {language === 'en' ? `No products found for "${searchQuery}"` : `"${searchQuery}" এর কোনো পণ্য পাওয়া যায়নি`}
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
                   <div className="px-4 py-2 bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                    Instant Search Results
+                    {language === 'en' ? "Instant Search Results" : "সার্চ ফলাফল"}
                   </div>
                   {searchResults.map((product) => (
                     <Link
@@ -283,7 +215,7 @@ export default function Header() {
                           Cat: {product.categoryId || 'General'}
                         </p>
                       </div>
-                      <span className="text-xs font-extrabold text-primary shrink-0">
+                      <span className="text-xs font-extrabold text-primary shrink-0 font-mono">
                         ৳{product.price.toLocaleString()}
                       </span>
                     </Link>
@@ -292,7 +224,7 @@ export default function Header() {
                     onClick={handleSearch}
                     className="w-full p-2.5 bg-gray-50 hover:bg-primary hover:text-white text-xs font-bold text-navy text-center transition-colors block cursor-pointer"
                   >
-                    View All Results for "{searchQuery}"
+                    {language === 'en' ? `View All Results for "${searchQuery}"` : `সব ফলাফল দেখুন`}
                   </button>
                 </div>
               )}
@@ -300,10 +232,36 @@ export default function Header() {
           )}
         </div>
 
-        {/* Right: Actions (Account, Cart) */}
-        <div className="flex items-center gap-3 sm:gap-5">
+        {/* Right: Language Switcher, Account, Cart */}
+        <div className="flex items-center gap-2.5 sm:gap-4">
           
-          {/* User Account / Profile Dropdown */}
+          {/* Global Language Toggle (EN | বাং) */}
+          <div className="flex items-center bg-gray-100/90 rounded-xl p-0.5 border border-gray-200 text-xs font-black shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                language === 'en' 
+                  ? 'bg-navy text-white shadow-xs' 
+                  : 'text-gray-500 hover:text-navy'
+              }`}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('bn')}
+              className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                language === 'bn' 
+                  ? 'bg-blue-600 text-white shadow-xs' 
+                  : 'text-gray-500 hover:text-navy'
+              }`}
+            >
+              বাং
+            </button>
+          </div>
+
+          {/* User Account Dropdown */}
           {isAuthenticated && user ? (
             <div className="relative hidden sm:block" ref={dropdownRef}>
               <button
@@ -323,7 +281,6 @@ export default function Header() {
                 <ChevronDown className="w-4 h-4 text-gray-500 hidden lg:block" />
               </button>
 
-              {/* Dropdown Menu */}
               {isDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-modern-lg border border-gray-100 py-2 z-50 transform origin-top-right transition-all">
                   <div className="px-4 py-3 border-b border-gray-100 mb-2">
@@ -331,7 +288,6 @@ export default function Header() {
                     <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
                   </div>
                   
-                  {/* Admin বা Seller হলে ড্যাশবোর্ডের লিংক দেখাবে */}
                   {(user.role === 'admin' || user.role === 'super_admin') && (
                     <Link
                       to="/admin"
@@ -356,7 +312,7 @@ export default function Header() {
                     onClick={() => setIsDropdownOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
                   >
-                    <User className="w-4 h-4" /> My Profile
+                    <User className="w-4 h-4" /> {language === 'en' ? 'My Profile' : 'আমার প্রোফাইল'}
                   </Link>
                   
                   <Link
@@ -364,7 +320,7 @@ export default function Header() {
                     onClick={() => setIsDropdownOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
                   >
-                    <Package className="w-4 h-4" /> My Orders
+                    <Package className="w-4 h-4" /> {language === 'en' ? 'My Orders' : 'আমার অর্ডার'}
                   </Link>
                   
                   <div className="h-px bg-gray-100 my-2"></div>
@@ -373,7 +329,7 @@ export default function Header() {
                     onClick={handleLogout}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                   >
-                    <LogOut className="w-4 h-4" /> Logout
+                    <LogOut className="w-4 h-4" /> {language === 'en' ? 'Logout' : 'লগআউট'}
                   </button>
                 </div>
               )}
@@ -386,11 +342,11 @@ export default function Header() {
               <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                 <User className="w-5 h-5 text-gray-600 group-hover:text-primary" />
               </div>
-              <span className="hidden lg:block font-semibold">Login / Sign Up</span>
+              <span className="hidden lg:block font-semibold">{language === 'en' ? 'Login / Sign Up' : 'লগইন'}</span>
             </Link>
           )}
 
-          {/* Dynamic Cart Icon with Badge */}
+          {/* Cart Icon */}
           <Link 
             to="/cart" 
             className="relative p-2 text-navy hover:text-primary transition-colors group cursor-pointer"
@@ -403,6 +359,7 @@ export default function Header() {
               </span>
             )}
           </Link>
+
         </div>
       </div>
 
@@ -413,7 +370,7 @@ export default function Header() {
             type="text"
             value={searchQuery}
             onChange={handleInputChange}
-            placeholder="Search products..."
+            placeholder={language === 'en' ? "Search products..." : "পণ্য খুঁজুন..."}
             className="w-full h-10 pl-4 pr-10 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-all text-xs text-navy placeholder:text-gray-400"
           />
           <button
