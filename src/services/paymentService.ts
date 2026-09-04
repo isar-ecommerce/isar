@@ -17,7 +17,6 @@ export interface PaymentTransaction {
 export interface BkashInitiateResult {
   success: boolean;
   paymentID?: string;
-  id_token?: string;
   bkashURL?: string | null;
   message?: string;
 }
@@ -29,53 +28,37 @@ export interface BkashExecuteResult {
 }
 
 /**
- * ১. বিকাশ পেমেন্ট শুরু করার ফাংশন (Grant Token & Create Payment)
+ * ১. বিকাশ পেমেন্ট শুরু করার ফাংশন (Direct Server-to-Server Create Payment)
  */
 export const initiateBkashPayment = async (
   orderNumber: string,
   amount: number
 ): Promise<BkashInitiateResult> => {
   try {
-    // ধাপ ক: টোকেন সংগ্রহ
-    const tokenRes = await fetch('/api/bkash', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'grant-token' }),
-    });
-
-    const tokenData = await tokenRes.json();
-    if (!tokenRes.ok || !tokenData.success || !tokenData.id_token) {
-      throw new Error(tokenData.message || 'Failed to acquire bKash security token.');
-    }
-
-    const idToken = tokenData.id_token;
-
-    // ধাপ খ: পেমেন্ট ইনিশিয়েট
     const createRes = await fetch('/api/bkash', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'create-payment',
-        id_token: idToken,
         amount,
-        orderNumber,
+        orderNumber: String(orderNumber).trim(),
       }),
     });
 
     const createData = await createRes.json();
+
     if (!createRes.ok || !createData.success || !createData.paymentID) {
-      throw new Error(createData.message || 'Failed to create bKash payment request.');
+      throw new Error(createData.message || 'Failed to initiate bKash payment gateway.');
     }
 
     return {
       success: true,
       paymentID: createData.paymentID,
-      id_token: idToken,
-      bkashURL: createData.bkashURL,
+      bkashURL: createData.bkashURL || null,
     };
   } catch (error: unknown) {
     console.error('bKash payment initiation error:', error);
-    const err = error as Error;
+    const err = error instanceof Error ? error : new Error(String(error));
     return {
       success: false,
       message: err.message || 'Could not connect to bKash gateway.',
@@ -84,11 +67,10 @@ export const initiateBkashPayment = async (
 };
 
 /**
- * ২. বিকাশ পেমেন্ট ভেরিফাই ও এক্সিকিউট করার ফাংশন (Execute & Record in Firestore)
+ * ২. বিকাশ পেমেন্ট ভেরিফাই ও ফাইনাল করার ফাংশন (Execute & Record in Firestore)
  */
 export const verifyAndExecuteBkashPayment = async (
   paymentID: string,
-  id_token: string,
   orderId: string,
   orderNumber: string,
   amount: number,
@@ -101,14 +83,13 @@ export const verifyAndExecuteBkashPayment = async (
       body: JSON.stringify({
         action: 'execute-payment',
         paymentID,
-        id_token,
-        amount,
       }),
     });
 
     const execData = await execRes.json();
+
     if (!execRes.ok || !execData.success || !execData.trxID) {
-      throw new Error(execData.message || 'bKash payment verification failed.');
+      throw new Error(execData.message || 'bKash payment verification failed or cancelled by user.');
     }
 
     const trxId = execData.trxID;
@@ -121,14 +102,15 @@ export const verifyAndExecuteBkashPayment = async (
       transactionId: trxId,
       message: `bKash payment successful! TrxID: ${trxId}`,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('bKash payment verification error:', error);
-    throw error;
+    const err = error instanceof Error ? error : new Error(String(error));
+    throw new Error(err.message, { cause: error });
   }
 };
 
 /**
- * ৩. ফায়ারস্টোর ডেটাবেসে বিকাশ পেমেন্ট রেকর্ড ও অর্ডার 'paid' আপডেট করার সার্ভিস
+ * ৩. ফায়ারস্টোর ডেটাবেসে বিকাশ পেমেন্ট ট্রানজেকশন রেকর্ড ও অর্ডার 'paid' আপডেট
  */
 export const executeBkashPayment = async (
   orderId: string,
@@ -170,14 +152,15 @@ export const executeBkashPayment = async (
       transactionId,
       message: 'bKash payment completed and verified successfully!',
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('bKash payment execution error:', error);
-    throw error;
+    const err = error instanceof Error ? error : new Error(String(error));
+    throw new Error(err.message, { cause: error });
   }
 };
 
 /**
- * ৪. নগদ পেমেন্ট ভেরিফিকেশন সার্ভিস
+ * ৪. নগদ পেমেন্ট রেকর্ড সার্ভিস (ম্যানুয়াল বা গেটওয়ে ট্রানজেকশন)
  */
 export const executeNagadPayment = async (
   orderId: string,
@@ -216,8 +199,9 @@ export const executeNagadPayment = async (
       transactionId,
       message: 'Nagad payment completed successfully!',
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Nagad payment execution error:', error);
-    throw error;
+    const err = error instanceof Error ? error : new Error(String(error));
+    throw new Error(err.message, { cause: error });
   }
 };

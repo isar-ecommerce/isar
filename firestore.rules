@@ -12,7 +12,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // একবার ডাটা নিয়ে ভ্যারিয়েবলে রাখা (ফায়ারবেস রিড কমানোর জন্য)
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -27,37 +26,27 @@ service cloud.firestore {
         (getUserData().role == 'seller' || isAdmin());
     }
 
-    // ১. Users Collection: নিজেকে অ্যাডমিন বানানোর পথ সম্পূর্ণ বন্ধ
+    // ১. Users Collection Rules (প্রিভিলেজ এসকেলেশন ১০০% বন্ধ)
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      
-      // একাউন্ট তৈরির সময় 'role' ফিল্ড ছাড়া অথবা সর্বোচ্চ 'customer' রোল দিয়ে তৈরি করা যাবে
       allow create: if isOwner(userId) && 
         (!('role' in request.resource.data) || request.resource.data.role == 'customer');
-      
-      // প্রোফাইল এডিট করতে পারবে, কিন্তু কোনো অবস্থাতেই 'role' পরিবর্তন করতে পারবে না
       allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) 
                     || isAdmin();
-      
       allow delete: if isAdmin();
     }
 
-    // ২. Products Collection: কঠোর মালিকানা ও রেটিং সুরক্ষা
+    // ২. Products Collection Rules (কঠোর মালিকানা ও রেটিং সুরক্ষা)
     match /products/{productId} {
       allow read: if true;
-      
-      // প্রোডাক্ট তৈরির সময় সেলার আইডি বাধ্যতামূলক
       allow create: if isSeller() && 
         (request.resource.data.sellerId == request.auth.uid || isAdmin());
-      
-      // শুধু মূল সেলার বা অ্যাডমিন প্রোডাক্টের তথ্য বদলাতে পারবে
       allow update: if isAdmin() || 
         (isSeller() && resource.data.sellerId == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sellerId']));
-      
       allow delete: if isAdmin();
     }
 
-    // ৩. Reviews Collection: রিভিউ সিকিউরিটি
+    // ৩. Reviews Collection Rules
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
@@ -66,36 +55,42 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId) || isAdmin();
     }
 
-    // ৪. Categories Collection
+    // ৪. Categories Collection Rules
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // ৫. Orders Collection: অর্ডার ও পেমেন্ট টেম্পারিং ১০০% বন্ধ
+    // ৫. Orders Collection Rules (পেমেন্ট সম্পন্ন হলে 'paid' আপডেট করার পারমিশন সহ)
     match /orders/{orderId} {
-      // ফেক/বট অর্ডার রোধে ন্যূনতম ডাটা যাচাই (নাম্বার, ফোন ও ইনভয়েস বাধ্যতামূলক)
       allow create: if request.resource.data.totalAmount is number &&
                        request.resource.data.totalAmount >= 0 &&
                        request.resource.data.recipient_phone is string;
-      
-      // গ্রাহক শুধুমাত্র নিজের অর্ডার দেখতে পারবে, অ্যাডমিন সব দেখতে পারবে
       allow read: if isAdmin() || 
         (isAuthenticated() && resource.data.userId == request.auth.uid);
       
-      // কাস্টমার কখনোই অর্ডার আপডেট/ট্যাম্পার করতে পারবে না (শুধুমাত্র অ্যাডমিন করতে পারবে)
-      allow update: if isAdmin();
-      
+      // শুধুমাত্র অ্যাডমিন সম্পূর্ণ আপডেট করতে পারবে, অথবা বিকাশ পেমেন্ট সফল হলে স্ট্যাটাস 'paid' হবে
+      allow update: if isAdmin() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus', 'transactionId', 'paymentMethod', 'updatedAt']) &&
+         request.resource.data.paymentStatus == 'paid');
+         
       allow delete: if isAdmin();
     }
 
-    // ৬. Legal Pages CMS Rules
+    // ৬. Payments Collection Rules (বিকাশ ও নগদ ট্রানজেকশন হিস্ট্রি রেকর্ড)
+    match /payments/{paymentId} {
+      allow create: if true;
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.customerPhone == request.auth.token.phone_number);
+      allow update, delete: if isAdmin();
+    }
+
+    // ৭. Legal Pages CMS Rules
     match /legalPages/{slug} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // ৭. Website Settings Rules
+    // ৮. Website Settings Rules
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();
