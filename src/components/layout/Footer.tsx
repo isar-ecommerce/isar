@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, ShieldCheck } from 'lucide-react';
+import { Mail, Phone, MapPin, ShieldCheck, Truck } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 import BrandLogo from '../common/BrandLogo';
 
@@ -14,22 +14,22 @@ export default function Footer() {
   } = useSettingsStore();
 
   return (
-    <footer className="bg-navy text-white pt-10 md:pt-16 pb-6 md:pb-8 pb-safe-bottom print:hidden">
-      <div className="container mx-auto px-4">
+    <footer className="bg-navy text-white pt-10 md:pt-14 pb-8 pb-safe-bottom print:hidden">
+      <div className="container mx-auto px-4 max-w-6xl">
         
-        {/* Footer Grid (4-Cols on Desktop) */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-10 mb-8 md:mb-12">
+        {/* Footer Grid (Clean 4-Column Architecture) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 mb-10">
           
-          {/* Column 1: Brand & Contact Info */}
-          <div className="col-span-2 sm:col-span-2 lg:col-span-1 space-y-3 sm:space-y-4">
+          {/* Column 1: Brand & Live Contact */}
+          <div className="space-y-3.5">
             <BrandLogo adminMode={true} />
             <p className="text-gray-400 text-xs sm:text-sm leading-relaxed max-w-xs">
-              Bangladesh's premier destination for authentic bags, smartphone accessories, and daily lifestyle essentials.
+              Premium destination for authentic bags, smartphone accessories, and everyday lifestyle gear.
             </p>
             <div className="space-y-2 pt-1 text-xs sm:text-sm text-gray-300">
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-brand-gold shrink-0" />
-                <span>{contactPhone || '+880 1234 567890'}</span>
+                <span>{contactPhone || '+880 1604 341224'}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-brand-gold shrink-0" />
@@ -42,34 +42,59 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Column 2: Quick Links */}
+          {/* Column 2: Quick Links (Wishlist Removed, Orders & Catalog Kept) */}
           <div className="space-y-3">
-            <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Quick Links</h3>
-            <ul className="space-y-2 text-xs sm:text-sm">
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/products">Shop All</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/categories">Categories</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/wishlist">My Wishlist</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/about-us">About Us</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/faq">FAQ</Link></li>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Quick Links</h3>
+            <ul className="space-y-2.5 text-xs sm:text-sm">
+              <li>
+                <Link className="text-gray-400 hover:text-white transition-colors" to="/products">
+                  Shop All Products
+                </Link>
+              </li>
+              <li>
+                <Link className="text-gray-400 hover:text-white transition-colors" to="/categories">
+                  Categories
+                </Link>
+              </li>
+              <li>
+                <Link className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5" to="/orders">
+                  <Truck className="w-3.5 h-3.5 text-brand-gold" /> My Orders & Tracking
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 3: Customer Policies */}
           <div className="space-y-3">
-            <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Policies</h3>
-            <ul className="space-y-2 text-xs sm:text-sm">
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/privacy-policy">Privacy Policy</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/terms">Terms & Conditions</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/refund-policy">Refund Policy</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/return-policy">Return Policy</Link></li>
-              <li><Link className="text-gray-400 hover:text-white transition-colors" to="/shipping-policy">Shipping Policy</Link></li>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Policies</h3>
+            <ul className="space-y-2.5 text-xs sm:text-sm">
+              <li>
+                <Link className="text-gray-400 hover:text-white transition-colors" to="/privacy-policy">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link className="text-gray-400 hover:text-white transition-colors" to="/terms">
+                  Terms & Conditions
+                </Link>
+              </li>
+              <li>
+                <Link className="text-gray-400 hover:text-white transition-colors" to="/refund-policy">
+                  Return & Refund Policy
+                </Link>
+              </li>
+              <li>
+                <Link className="text-gray-400 hover:text-white transition-colors" to="/shipping-policy">
+                  Shipping Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
-          {/* Column 4: Social Media & Secure Payment Badges */}
-          <div className="col-span-2 sm:col-span-2 lg:col-span-1 space-y-4">
+          {/* Column 4: Social Links & Verified Payments */}
+          <div className="space-y-4">
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider mb-2.5">Follow Us</h3>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider mb-2.5">Follow Us</h3>
               <div className="flex items-center gap-2.5">
                 <a 
                   href={facebookUrl || 'https://facebook.com'} 
@@ -98,7 +123,7 @@ export default function Footer() {
             </div>
 
             <div>
-              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <h3 className="text-xs font-black text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-brand-green" /> Secure Payments
               </h3>
               <div className="flex flex-wrap gap-1.5 text-[11px] font-bold text-gray-300">
@@ -111,9 +136,9 @@ export default function Footer() {
 
         </div>
 
-        {/* Footer Bottom / Clean International Copyright */}
+        {/* Clean & Concise Copyright */}
         <div className="pt-6 border-t border-gray-800/80 text-center text-xs text-gray-500">
-          <p>&copy; {currentYear} ISAR Marketplace. All rights reserved.</p>
+          <p>&copy; {currentYear} ISAR. All rights reserved.</p>
         </div>
 
       </div>
