@@ -29,11 +29,11 @@ export default function Footer() {
             <div className="space-y-2 pt-1 text-xs sm:text-sm text-gray-300">
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-brand-gold shrink-0" />
-                <span>{contactPhone || '+880 1604 341224'}</span>
+                <span>{contactPhone || '+880 1624789764'}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-brand-gold shrink-0" />
-                <span>{contactEmail || 'support@isar.com.bd'}</span>
+                <span>{contactEmail || 'isar.store.bd@gmail.com'}</span>
               </div>
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-brand-gold shrink-0 mt-0.5" />
@@ -127,8 +127,7 @@ export default function Footer() {
                 <ShieldCheck className="w-4 h-4 text-brand-green" /> Secure Payments
               </h3>
               <div className="flex flex-wrap gap-1.5 text-[11px] font-bold text-gray-300">
-                <span className="px-2.5 py-1 border border-gray-800 rounded-lg bg-white/5">bKash</span>
-                <span className="px-2.5 py-1 border border-gray-800 rounded-lg bg-white/5">Nagad</span>
+                <span className="px-2.5 py-1 border border-gray-800 rounded-lg bg-white/5">bKash</span>     
                 <span className="px-2.5 py-1 border border-gray-800 rounded-lg bg-white/5">Cash on Delivery</span>
               </div>
             </div>
