@@ -17,18 +17,10 @@ import { getCategories, getProducts } from '../../services/productService';
 import { getCategoryIconConfig } from '../../utils/categoryIcons';
 import type { Category, Product } from '../../types/product';
 
-const INITIAL_CATEGORIES: Category[] = [
-  { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 },
-  { id: 'backpacks', name: 'Bags & Backpacks', slug: 'backpacks', status: 'active', order: 1 },
-  { id: 'phone-accessories', name: 'Phone Accessories', slug: 'phone-accessories', status: 'active', order: 2 },
-  { id: 'audio-gadgets', name: 'Audio & Earphones', slug: 'audio-gadgets', status: 'active', order: 3 },
-  { id: 'smart-gear', name: 'Smart Watches & Bands', slug: 'smart-gear', status: 'active', order: 4 },
-  { id: 'chargers', name: 'Cables & Chargers', slug: 'chargers', status: 'active', order: 5 },
-  { id: 'travel-lifestyle', name: 'Travel & Lifestyle', slug: 'travel-lifestyle', status: 'active', order: 6 },
-];
-
 export default function Categories() {
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([
+    { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 }
+  ]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [loading, setLoading] = useState<boolean>(true);
@@ -36,6 +28,7 @@ export default function Categories() {
 
   const addItemToCart = useCartStore((state) => state.addItem);
 
+  // শুধুমাত্র অ্যাডমিনের তৈরি করা আসল ক্যাটাগরি লোড হবে (কোনো ডামি ক্যাটাগরি থাকবে না)
   useEffect(() => {
     let isMounted = true;
 
@@ -48,7 +41,7 @@ export default function Categories() {
         ]);
 
         if (isMounted) {
-          if (fetchedCategories.length > 0) {
+          if (fetchedCategories && fetchedCategories.length > 0) {
             const activeCustom = fetchedCategories.filter(c => c.status === 'active');
             setCategories([
               { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 },
@@ -56,7 +49,7 @@ export default function Categories() {
             ]);
           }
 
-          if (fetchedProducts.length > 0) {
+          if (fetchedProducts && fetchedProducts.length > 0) {
             setProducts(fetchedProducts);
           }
         }
@@ -76,7 +69,7 @@ export default function Categories() {
     };
   }, []);
 
-  // TypeScript Safe Category & Search Filter
+  // সিলেক্টেড ক্যাটাগরি ও সার্চ ফিল্টারিং
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const customCategoryName = (product as { categoryName?: string }).categoryName || '';
@@ -107,7 +100,7 @@ export default function Categories() {
     <div className="bg-secondary min-h-screen py-6 md:py-10">
       <Helmet>
         <title>Categories & Catalog | ISAR</title>
-        <meta name="description" content="Explore all bags, smartphone accessories, and lifestyle collections at ISAR." />
+        <meta name="description" content="Explore product collections at ISAR." />
       </Helmet>
 
       <div className="container mx-auto px-4 max-w-6xl space-y-6">
@@ -137,7 +130,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* 1. Horizontal Category Tab Bar */}
+        {/* 1. Category Tab Bar (Only Admin Created Categories) */}
         <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-modern border border-gray-100">
           <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
             {categories.map((cat) => {

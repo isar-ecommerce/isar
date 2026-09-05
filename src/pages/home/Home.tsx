@@ -21,16 +21,10 @@ import { getCategoryIconConfig } from '../../utils/categoryIcons';
 import FlashSaleTimer from '../../components/home/FlashSaleTimer';
 import type { Product, Category } from '../../types/product';
 
-// ISAR Niche Default Categories (Bags, Accessories & Smart Lifestyle)
-const INITIAL_CATEGORIES: Category[] = [
-  { id: 'backpacks', name: 'Bags & Backpacks', slug: 'backpacks', status: 'active', order: 1 },
-  { id: 'phone-accessories', name: 'Phone Accessories', slug: 'phone-accessories', status: 'active', order: 2 },
-  { id: 'audio-gadgets', name: 'Audio & Earphones', slug: 'audio-gadgets', status: 'active', order: 3 },
-  { id: 'smart-gear', name: 'Smart Watches & Bands', slug: 'smart-gear', status: 'active', order: 4 },
-  { id: 'chargers', name: 'Cables & Chargers', slug: 'chargers', status: 'active', order: 5 },
-  { id: 'travel-lifestyle', name: 'Travel & Lifestyle', slug: 'travel-lifestyle', status: 'active', order: 6 },
-];
+// কোনো হার্ডকোডেড ক্যাটাগরি নেই - শুধুমাত্র ফায়ারস্টোর অ্যাডমিনের ক্যাটাগরি লোড হবে
+const INITIAL_CATEGORIES: Category[] = [];
 
+// ফলব্যাক প্রোডাক্ট (Bags & Phone Accessories)
 const FALLBACK_PRODUCTS: Product[] = [
   {
     id: '1',
@@ -80,23 +74,23 @@ const FALLBACK_PRODUCTS: Product[] = [
   },
   {
     id: '3',
-    name: 'Wireless Active Noise-Cancelling Earbuds Pro',
-    slug: 'anc-wireless-earbuds',
-    shortDescription: 'Deep bass sound with crystal-clear call microphone.',
-    description: 'Up to 36 hours total playtime with smart touch controls.',
-    price: 2200,
-    originalPrice: 2900,
-    rating: 4.7,
-    reviewCount: 68,
-    stock: 18,
+    name: 'Water-Resistant Anti-Theft Crossbody Sling Bag',
+    slug: 'anti-theft-sling-bag',
+    shortDescription: 'Compact multi-pocket shoulder chest bag for daily essentials.',
+    description: 'Ultra-lightweight durable fabric with secure hidden zipper pockets.',
+    price: 1450,
+    originalPrice: 1950,
+    rating: 4.8,
+    reviewCount: 52,
+    stock: 20,
     lowStockAlert: 2,
-    sku: 'AUD-01',
-    categoryId: 'audio-gadgets',
-    images: ['https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=500&q=80'],
+    sku: 'BAG-02',
+    categoryId: 'backpacks',
+    images: ['https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=500&q=80'],
     status: 'active',
     isFeatured: true,
     isTrending: true,
-    isNewArrival: false,
+    isNewArrival: true,
     sellerId: 'admin',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -111,6 +105,7 @@ export default function Home() {
   const sliderRef = useRef<HTMLDivElement>(null);
   const addItemToCart = useCartStore((state) => state.addItem);
 
+  // ফায়ারস্টোর থেকে অ্যাডমিনের আসল ক্যাটাগরি ও প্রোডাক্ট লোড করা
   useEffect(() => {
     let isMounted = true;
 
@@ -122,14 +117,17 @@ export default function Home() {
         ]);
 
         if (isMounted) {
-          if (fetchedProducts.length > 0) {
+          if (fetchedProducts && fetchedProducts.length > 0) {
             setProducts(fetchedProducts);
           } else {
             setProducts(FALLBACK_PRODUCTS);
           }
 
-          if (fetchedCategories.length > 0) {
-            setCategories(fetchedCategories);
+          if (fetchedCategories && fetchedCategories.length > 0) {
+            const activeOnly = fetchedCategories
+              .filter(c => c.status === 'active')
+              .sort((a, b) => (a.order || 0) - (b.order || 0));
+            setCategories(activeOnly);
           }
         }
       } catch (error) {
@@ -263,34 +261,36 @@ export default function Home() {
         <FlashSaleTimer />
       </section>
 
-      {/* Dynamic Categories Section */}
-      <section className="pt-5 pb-4 container mx-auto px-3 sm:px-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base sm:text-xl font-black text-navy">Categories</h2>
-          <Link to="/categories" className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 group">
-            See All <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </Link>
-        </div>
-        
-        <div className="flex sm:grid sm:grid-cols-3 md:grid-cols-6 gap-3 overflow-x-auto no-scrollbar pb-2">
-          {categories.map((category) => {
-            const { icon: Icon, color } = getCategoryIconConfig(category.name || category.slug);
-            
-            return (
-              <Link 
-                key={category.id} 
-                to={`/products?category=${category.id}`}
-                className="bg-white rounded-2xl p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-modern hover:shadow-modern-lg transition-all border border-gray-100 group w-28 sm:w-auto shrink-0 min-h-24 cursor-pointer"
-              >
-                <div className={`w-11 h-11 sm:w-13 sm:h-13 rounded-full flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0`}>
-                  <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <span className="text-[11px] sm:text-xs font-bold text-navy text-center line-clamp-1">{category.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      {/* Dynamic Categories Section (Shows ONLY if categories exist in Admin) */}
+      {categories.length > 0 && (
+        <section className="pt-5 pb-4 container mx-auto px-3 sm:px-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base sm:text-xl font-black text-navy">Categories</h2>
+            <Link to="/categories" className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 group">
+              See All <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+          
+          <div className="flex sm:grid sm:grid-cols-3 md:grid-cols-6 gap-3 overflow-x-auto no-scrollbar pb-2">
+            {categories.map((category) => {
+              const { icon: Icon, color } = getCategoryIconConfig(category.name || category.slug);
+              
+              return (
+                <Link 
+                  key={category.id} 
+                  to={`/products?category=${category.id}`}
+                  className="bg-white rounded-2xl p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-modern hover:shadow-modern-lg transition-all border border-gray-100 group w-28 sm:w-auto shrink-0 min-h-24 cursor-pointer"
+                >
+                  <div className={`w-11 h-11 sm:w-13 sm:h-13 rounded-full flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0`}>
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <span className="text-[11px] sm:text-xs font-bold text-navy text-center line-clamp-1">{category.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Trending Products Section */}
       <section className="py-6 container mx-auto px-3 sm:px-4">
@@ -372,7 +372,7 @@ export default function Home() {
                     <div>
                       <span className="text-sm sm:text-base font-black text-primary font-mono">{product.price.toLocaleString()} BDT</span>
                       {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="text-[10px] text-gray-400 line-through ml-1 block sm:inline">{product.originalPrice.toLocaleString()} BDT</span>
+                        <span className="text-[10px] text-gray-400 line-through ml-1 block sm:inline font-mono">{product.originalPrice.toLocaleString()} BDT</span>
                       )}
                     </div>
                     
