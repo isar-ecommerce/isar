@@ -7,6 +7,7 @@ import {
   Loader2, 
   Phone, 
   User, 
+  Mail,
   Plus, 
   Minus, 
   Zap, 
@@ -45,6 +46,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const { user } = useAuthStore();
 
   const [fullName, setFullName] = useState<string>('');
+  const [email, setEmail] = useState<string>(user?.email || '');
   const [phone, setPhone] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [paymentMode, setPaymentMode] = useState<'partial_cod' | 'full_online'>('partial_cod');
@@ -110,8 +112,14 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const handleOrderSubmit = (e: FormEvent) => {
     e.preventDefault();
 
-    if (!fullName.trim() || !phone || !fullAddress.trim()) {
-      toast.error('Please provide your full name, phone number, and address.');
+    if (!fullName.trim() || !phone || !email.trim() || !fullAddress.trim()) {
+      toast.error('Please enter your full name, email, phone number, and address.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      toast.error('Please enter a valid email address to receive invoice.');
       return;
     }
 
@@ -143,7 +151,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
-        customerEmail: user?.email || 'customer@isar.com.bd',
+        customerEmail: email.trim(),
         customerPhone: phone,
         shippingAddress,
         deliveryZone,
@@ -160,6 +168,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         transactionId: trxId,
       });
 
+      // ডিজিটাল ইনভয়েস ইমেইল সরাসরি পাঠানো
       sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount);
       sendOrderConfirmationEmail(order);
       sendAdminOrderAlert(order);
@@ -256,18 +265,33 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
             <form onSubmit={handleOrderSubmit} className="space-y-2.5">
               
-              {/* Name & Phone */}
+              {/* Full Name */}
+              <div className="space-y-0.5">
+                <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
+                  <User className="w-3 h-3 text-blue-600" /> Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all shadow-xs"
+                />
+              </div>
+
+              {/* Email & Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-0.5">
                   <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                    <User className="w-3 h-3 text-blue-600" /> Full Name *
+                    <Mail className="w-3 h-3 text-indigo-600" /> Email (For Invoice) *
                   </label>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. John Doe"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@gmail.com"
                     className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all shadow-xs"
                   />
                 </div>
@@ -365,7 +389,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </span>
               </div>
 
-              {/* Payment Mode Options */}
+              {/* Payment Mode Selection */}
               <div className="space-y-1 pt-0.5">
                 <span className="text-[10px] font-bold text-slate-700 block">
                   Payment Method:
@@ -454,7 +478,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </div>
               </div>
 
-              {/* Submit Button */}
+              {/* Order Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
