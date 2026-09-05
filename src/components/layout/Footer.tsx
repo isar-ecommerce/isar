@@ -17,16 +17,16 @@ export default function Footer() {
     <footer className="bg-navy text-white pt-10 md:pt-16 pb-6 md:pb-8 pb-safe-bottom print:hidden">
       <div className="container mx-auto px-4">
         
-        {/* Footer Grid (Compact on mobile, 4-cols on desktop) */}
+        {/* Footer Grid (4-Cols on Desktop) */}
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-10 mb-8 md:mb-12">
           
-          {/* Column 1: Brand & Live Contact Info */}
+          {/* Column 1: Brand & Contact Info */}
           <div className="col-span-2 sm:col-span-2 lg:col-span-1 space-y-3 sm:space-y-4">
             <BrandLogo adminMode={true} />
             <p className="text-gray-400 text-xs sm:text-sm leading-relaxed max-w-xs">
-              Bangladesh's premier e-commerce marketplace for authentic quality products.
+              Bangladesh's premier destination for authentic bags, smartphone accessories, and daily lifestyle essentials.
             </p>
-            <div className="space-y-1.5 pt-2 text-xs sm:text-sm text-gray-300">
+            <div className="space-y-2 pt-1 text-xs sm:text-sm text-gray-300">
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-brand-gold shrink-0" />
                 <span>{contactPhone || '+880 1234 567890'}</span>
@@ -66,17 +66,16 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 4: Social Media & Payment */}
+          {/* Column 4: Social Media & Secure Payment Badges */}
           <div className="col-span-2 sm:col-span-2 lg:col-span-1 space-y-4">
             <div>
               <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider mb-2.5">Follow Us</h3>
               <div className="flex items-center gap-2.5">
-                {/* Official Facebook SVG */}
                 <a 
                   href={facebookUrl || 'https://facebook.com'} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-primary transition-all"
+                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-primary transition-all cursor-pointer"
                   aria-label="Facebook"
                 >
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -84,12 +83,11 @@ export default function Footer() {
                   </svg>
                 </a>
                 
-                {/* Official Instagram SVG */}
                 <a 
                   href={instagramUrl || 'https://instagram.com'} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-pink-600 transition-all"
+                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-pink-600 transition-all cursor-pointer"
                   aria-label="Instagram"
                 >
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -113,10 +111,9 @@ export default function Footer() {
 
         </div>
 
-        {/* Footer Bottom / Copyright */}
-        <div className="pt-6 border-t border-gray-800/80 text-center flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-gray-500">
+        {/* Footer Bottom / Clean International Copyright */}
+        <div className="pt-6 border-t border-gray-800/80 text-center text-xs text-gray-500">
           <p>&copy; {currentYear} ISAR Marketplace. All rights reserved.</p>
-          <p>Designed for Bangladesh</p>
         </div>
 
       </div>

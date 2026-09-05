@@ -41,6 +41,11 @@ export default function ProductDetail() {
   const addItemToCart = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
+  // স্ক্রোলিং বাগ ফিক্স: পেজ ওপেন হওয়ামাত্রই একদম ওপর থেকে লোড হবে
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -128,18 +133,12 @@ export default function ProductDetail() {
     );
   }
 
-  const categoryTag = (() => {
-    const cat = (product as { categoryName?: string }).categoryName || product.categoryId || '';
-    if (!cat || cat.length > 15) {
-      return 'ISAR EXCLUSIVE';
-    }
-    return cat.toUpperCase();
-  })();
+  const categoryTag = ((product as { categoryName?: string }).categoryName || product.categoryId || 'Authentic Gear').toUpperCase();
 
   return (
     <div className="bg-secondary min-h-screen py-6 md:py-10">
       <Helmet>
-        <title>{`${product.name} | ISAR Marketplace`}</title>
+        <title>{`${product.name} | ISAR`}</title>
         <meta name="description" content={product.shortDescription || product.name} />
       </Helmet>
 
@@ -195,7 +194,7 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Right Column: Product Information */}
+            {/* Right Column: Product Information & Order Actions */}
             <div className="flex flex-col space-y-5">
               
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -227,14 +226,15 @@ export default function ProductDetail() {
                 <span className="text-xs text-gray-500 font-medium">{product.reviewCount || 1} Verified Customer Review(s)</span>
               </div>
 
+              {/* Price Box in Clean BDT */}
               <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-baseline gap-3 flex-wrap shadow-inner">
                 <span className="text-3xl sm:text-4xl font-black text-primary font-mono">
-                  ৳{product.price.toLocaleString()}
+                  {product.price.toLocaleString()} BDT
                 </span>
                 {product.originalPrice && product.originalPrice > product.price && (
                   <>
-                    <span className="text-lg text-gray-400 line-through font-semibold">
-                      ৳{product.originalPrice.toLocaleString()}
+                    <span className="text-lg text-gray-400 line-through font-semibold font-mono">
+                      {product.originalPrice.toLocaleString()} BDT
                     </span>
                     <span className="text-xs font-extrabold text-red-600 bg-red-100 px-2.5 py-1 rounded-lg">
                       -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
@@ -251,7 +251,7 @@ export default function ProductDetail() {
 
               <div className="space-y-4 pt-2">
                 <div className="flex items-center gap-4">
-                  <span className="text-xs font-bold text-navy uppercase tracking-wider">পরিমাণ (Quantity):</span>
+                  <span className="text-xs font-bold text-navy uppercase tracking-wider">Quantity:</span>
                   <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50">
                     <button 
                       onClick={() => handleQuantityChange('decrease')}
@@ -274,7 +274,7 @@ export default function ProductDetail() {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  {/* খাঁটি ইংরেজিতে Order Now বাটন */}
+                  {/* High-Converting Order Now Button */}
                   <button
                     onClick={() => setIsExpressModalOpen(true)}
                     disabled={product.stock === 0}
@@ -309,10 +309,11 @@ export default function ProductDetail() {
                 </div>
               </div>
 
+              {/* 4 Trust Badges */}
               <div className="grid grid-cols-4 gap-2 pt-6 border-t border-gray-100 text-center">
                 <div className="flex flex-col items-center gap-1">
                   <Truck className="w-5 h-5 text-primary" />
-                  <span className="text-[10px] font-bold text-navy leading-tight">Fast Delivery BD</span>
+                  <span className="text-[10px] font-bold text-navy leading-tight">Fast Delivery</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <ShieldCheck className="w-5 h-5 text-brand-green" />
@@ -383,6 +384,7 @@ export default function ProductDetail() {
           </div>
         </div>
 
+        {/* 2-Column Responsive Verified Reviews */}
         <ProductReviews 
           productId={product.id} 
           productName={product.name} 
