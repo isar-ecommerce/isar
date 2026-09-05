@@ -1,10 +1,15 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import MobileNav from '../components/layout/MobileNav';
 import FloatingContact from '../components/common/FloatingContact';
 
 export default function MainLayout() {
+  const location = useLocation();
+
+  // ফুটার শুধুমাত্র এবং শুধুমাত্র হোমপেজে (/) লোড হবে
+  const isHomePage = location.pathname === '/';
+
   return (
     <div className="flex flex-col min-h-screen bg-secondary print:bg-white">
       {/* Global Header (Hidden during print) */}
@@ -22,10 +27,12 @@ export default function MainLayout() {
         <FloatingContact />
       </div>
 
-      {/* Global Footer */}
-      <div className="print:hidden">
-        <Footer />
-      </div>
+      {/* Footer strictly on Homepage ONLY */}
+      {isHomePage && (
+        <div className="print:hidden">
+          <Footer />
+        </div>
+      )}
       
       {/* Mobile Bottom Navigation */}
       <div className="print:hidden">
