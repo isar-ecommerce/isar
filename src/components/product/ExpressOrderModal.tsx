@@ -111,7 +111,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
     e.preventDefault();
 
     if (!fullName.trim() || !phone || !fullAddress.trim()) {
-      toast.error('Please enter your full name, phone number, and address.');
+      toast.error('Please provide your full name, phone number, and address.');
       return;
     }
 
@@ -166,8 +166,8 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
       toast.success(
         isPartial 
-          ? `Advance payment of ৳${payNowAmount} verified! Remaining ৳${dueOnDelivery} due on delivery.`
-          : `Full payment of ৳${totalAmount} verified! Order confirmed.`
+          ? `Advance payment of ${payNowAmount} BDT verified! Remaining ${dueOnDelivery} BDT due on delivery.`
+          : `Full payment of ${totalAmount} BDT verified! Order confirmed.`
       );
 
       setIsBkashModalOpen(false);
@@ -198,7 +198,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
       <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
         <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative my-auto">
           
-          {/* Brand Header */}
+          {/* Header */}
           <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
             <span className="text-sm font-black tracking-widest text-white">ISAR EXPRESS CHECKOUT</span>
 
@@ -228,7 +228,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               <div className="flex-1 min-w-0">
                 <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">{product.name}</h4>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-black text-blue-600 font-mono">৳{product.price.toLocaleString()}</span>
+                  <span className="text-xs font-black text-blue-600 font-mono">{product.price.toLocaleString()} BDT</span>
                   <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
                     <Scale className="w-2.5 h-2.5" /> {totalWeight} kg
                   </span>
@@ -358,10 +358,10 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               <div className="px-2.5 py-1.5 bg-blue-50/70 rounded-lg border border-blue-200/80 flex items-center justify-between text-[11px]">
                 <div className="flex items-center gap-1.5">
                   <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span className="font-semibold text-slate-800">Steadfast Courier Delivery Fee:</span>
+                  <span className="font-semibold text-slate-800">Steadfast Delivery Fee:</span>
                 </div>
                 <span className="font-black text-blue-700 font-mono">
-                  ৳{deliveryFee}
+                  {deliveryFee} BDT
                 </span>
               </div>
 
@@ -394,7 +394,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                      Pay only ৳{deliveryFee} delivery fee via bKash now. Pay product price (৳{subtotal.toLocaleString()}) on delivery.
+                      Pay only {deliveryFee} BDT delivery fee via bKash now. Pay product price ({subtotal.toLocaleString()} BDT) on delivery.
                     </span>
                   </div>
                   {paymentMode === 'partial_cod' && (
@@ -420,7 +420,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                       Full Online Payment (bKash)
                     </span>
                     <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                      Pay total ৳{totalAmount.toLocaleString()} via bKash now. Zero cash due on delivery.
+                      Pay total {totalAmount.toLocaleString()} BDT via bKash now. Zero cash due on delivery.
                     </span>
                   </div>
                   {paymentMode === 'full_online' && (
@@ -429,32 +429,32 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </button>
               </div>
 
-              {/* Pricing Breakdown */}
+              {/* Bill Breakdown */}
               <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1 text-[11px]">
                 <div className="flex justify-between text-slate-600">
                   <span>Product Price ({quantity}):</span>
-                  <span className="font-bold text-slate-900 font-mono">৳{subtotal.toLocaleString()}</span>
+                  <span className="font-bold text-slate-900 font-mono">{subtotal.toLocaleString()} BDT</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Delivery Charge:</span>
-                  <span className="font-bold text-slate-900 font-mono">৳{deliveryFee.toLocaleString()}</span>
+                  <span className="font-bold text-slate-900 font-mono">{deliveryFee.toLocaleString()} BDT</span>
                 </div>
                 
                 <div className="pt-1 border-t border-slate-200 space-y-0.5">
                   <div className="flex justify-between text-[#E2136E] font-black">
                     <span>To Pay Now (bKash):</span>
-                    <span className="font-mono text-xs">৳{payNowAmount.toLocaleString()}</span>
+                    <span className="font-mono text-xs">{payNowAmount.toLocaleString()} BDT</span>
                   </div>
                   {paymentMode === 'partial_cod' && (
                     <div className="flex justify-between text-slate-600 font-bold text-[10px]">
                       <span>Due on Delivery (Cash):</span>
-                      <span className="font-mono text-slate-900">৳{dueOnDelivery.toLocaleString()}</span>
+                      <span className="font-mono text-slate-900">{dueOnDelivery.toLocaleString()} BDT</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Submit CTA */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -467,7 +467,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 ) : (
                   <>
                     <Zap className="w-3.5 h-3.5 fill-white text-white" /> 
-                    <span>Pay ৳{payNowAmount.toLocaleString()} & Confirm Order</span>
+                    <span>Pay {payNowAmount.toLocaleString()} BDT & Confirm Order</span>
                   </>
                 )}
               </button>

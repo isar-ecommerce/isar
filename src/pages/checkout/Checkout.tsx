@@ -9,9 +9,9 @@ import {
   ArrowLeft, 
   Lock, 
   Phone, 
-  User,
-  Scale,
-  CheckCircle2
+  User, 
+  Scale, 
+  CheckCircle2 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -188,8 +188,8 @@ export default function Checkout() {
       clearCart();
       toast.success(
         isPartial 
-          ? `Advance payment of ৳${advanceAmountToPay} received! Due on delivery: ৳${codDueAmount}.`
-          : `Full payment of ৳${total} received! Order confirmed successfully.`
+          ? `Advance payment of ${advanceAmountToPay} BDT received! Due on delivery: ${codDueAmount} BDT.`
+          : `Full payment of ${total} BDT received! Order confirmed successfully.`
       );
 
       navigate('/order-success', {
@@ -235,10 +235,9 @@ export default function Checkout() {
 
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column: Shipping Address & Payment Selection */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Delivery Address Card */}
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -252,7 +251,6 @@ export default function Checkout() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* Full Name */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Full Name *</label>
                   <div className="relative">
@@ -268,7 +266,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Mobile Number */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Mobile Number (11 Digits) *</label>
                   <div className="relative">
@@ -284,7 +281,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Alternative Phone */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Alternative Phone (Optional)</label>
                   <div className="relative">
@@ -299,7 +295,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Division */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Division *</label>
                   <select
@@ -313,7 +308,6 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* District */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">District *</label>
                   <select
@@ -327,7 +321,6 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* Thana / Upazila */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Thana / Upazila *</label>
                   <select
@@ -341,7 +334,6 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* Full Address */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Full Street Address *</label>
                   <textarea
@@ -354,7 +346,6 @@ export default function Checkout() {
                   />
                 </div>
 
-                {/* Delivery Notes */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Delivery Notes (Optional)</label>
                   <input
@@ -382,7 +373,6 @@ export default function Checkout() {
               </div>
 
               <div className="space-y-3">
-                {/* Option 1: COD with Advance Shipping Fee */}
                 <label 
                   className={`flex items-start justify-between p-4.5 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentOption === 'cod_advance' 
@@ -409,7 +399,7 @@ export default function Checkout() {
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                        Pay only <strong className="text-navy font-bold">৳{deliveryFee}</strong> delivery fee via bKash now. Pay product price <strong className="text-[#E2136E] font-bold">৳{codDueAmount}</strong> in cash on delivery.
+                        Pay only <strong className="text-navy font-bold">{deliveryFee} BDT</strong> delivery fee via bKash now. Pay product price <strong className="text-[#E2136E] font-bold">{codDueAmount} BDT</strong> in cash on delivery.
                       </p>
                     </div>
                   </div>
@@ -418,7 +408,6 @@ export default function Checkout() {
                   )}
                 </label>
 
-                {/* Option 2: Full Online Payment */}
                 <label 
                   className={`flex items-start justify-between p-4.5 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentOption === 'full_online' 
@@ -440,7 +429,7 @@ export default function Checkout() {
                         Full Online Payment (bKash)
                       </span>
                       <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                        Pay full amount <strong className="text-navy font-bold">৳{total}</strong> via bKash now. Zero cash due on delivery.
+                        Pay full amount <strong className="text-navy font-bold">{total} BDT</strong> via bKash now. Zero cash due on delivery.
                       </p>
                     </div>
                   </div>
@@ -450,7 +439,6 @@ export default function Checkout() {
                 </label>
               </div>
 
-              {/* bKash Badge */}
               <div className="flex items-center justify-between p-3.5 bg-pink-50/60 border border-pink-100 rounded-xl">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#E2136E] animate-pulse" />
@@ -465,7 +453,7 @@ export default function Checkout() {
 
           </div>
 
-          {/* Right Column: Order Items & Pricing Breakdown */}
+          {/* Right Column */}
           <div className="space-y-6">
             
             <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-6 sticky top-24">
@@ -488,9 +476,9 @@ export default function Checkout() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-navy truncate">{item.product.name}</p>
-                      <p className="text-[11px] text-gray-500 font-medium">Qty: {item.quantity} × ৳{item.product.price.toLocaleString()}</p>
+                      <p className="text-[11px] text-gray-500 font-medium">Qty: {item.quantity} × {item.product.price.toLocaleString()} BDT</p>
                     </div>
-                    <span className="text-xs font-black text-navy font-mono">৳{(item.product.price * item.quantity).toLocaleString()}</span>
+                    <span className="text-xs font-black text-navy font-mono">{(item.product.price * item.quantity).toLocaleString()} BDT</span>
                   </div>
                 ))}
               </div>
@@ -498,7 +486,7 @@ export default function Checkout() {
               <div className="space-y-3 pt-4 border-t border-gray-100 text-xs sm:text-sm">
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Product Subtotal</span>
-                  <span className="font-bold text-navy font-mono">৳{subtotal.toLocaleString()}</span>
+                  <span className="font-bold text-navy font-mono">{subtotal.toLocaleString()} BDT</span>
                 </div>
 
                 <div className="flex justify-between text-gray-600 font-medium">
@@ -506,30 +494,30 @@ export default function Checkout() {
                     <span className="block">Delivery Charge</span>
                     <span className="text-[10px] text-gray-400">{getZoneLabel()}</span>
                   </div>
-                  <span className="font-bold text-navy font-mono">৳{deliveryFee.toLocaleString()}</span>
+                  <span className="font-bold text-navy font-mono">{deliveryFee.toLocaleString()} BDT</span>
                 </div>
 
                 {discount > 0 && (
                   <div className="flex justify-between text-brand-green font-bold">
                     <span>Discount</span>
-                    <span className="font-mono">-৳{discount.toLocaleString()}</span>
+                    <span className="font-mono">-{discount.toLocaleString()} BDT</span>
                   </div>
                 )}
 
                 <div className="flex justify-between text-sm font-bold text-gray-700 pt-2 border-t border-gray-100">
                   <span>Total Payable</span>
-                  <span className="font-mono font-bold text-navy">৳{total.toLocaleString()}</span>
+                  <span className="font-mono font-bold text-navy">{total.toLocaleString()} BDT</span>
                 </div>
 
-                {/* Live Advance vs COD Breakdown Box */}
+                {/* Balance Box */}
                 <div className="p-3.5 bg-linear-to-r from-pink-50 to-white rounded-2xl border border-pink-100 space-y-2">
                   <div className="flex justify-between items-center text-xs font-black text-[#E2136E]">
                     <span>To Pay Now (bKash):</span>
-                    <span className="font-mono text-sm">৳{advanceAmountToPay.toLocaleString()}</span>
+                    <span className="font-mono text-sm">{advanceAmountToPay.toLocaleString()} BDT</span>
                   </div>
                   <div className="flex justify-between items-center text-[11px] font-bold text-gray-600">
                     <span>Cash on Delivery Due:</span>
-                    <span className="font-mono font-black text-navy">৳{codDueAmount.toLocaleString()}</span>
+                    <span className="font-mono font-black text-navy">{codDueAmount.toLocaleString()} BDT</span>
                   </div>
                 </div>
 
@@ -546,7 +534,7 @@ export default function Checkout() {
                   </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4" /> Pay ৳{advanceAmountToPay.toLocaleString()} & Confirm Order
+                    <Lock className="w-4 h-4" /> Pay {advanceAmountToPay.toLocaleString()} BDT & Confirm Order
                   </>
                 )}
               </button>
@@ -564,7 +552,7 @@ export default function Checkout() {
 
       </div>
 
-      {/* Automated bKash Modal with Clean State OrderNumber */}
+      {/* Automated bKash Modal */}
       <BkashAutomatedModal
         amount={advanceAmountToPay}
         orderNumber={clientOrderNumber}

@@ -138,7 +138,7 @@ export default function AdminOrders() {
         setSelectedOrder((prev) => (prev ? { ...prev, ...updatedFields } : null));
       }
 
-      toast.success(`Steadfast Booked! Collectable COD: ৳${finalCodToCollect}`);
+      toast.success(`Steadfast Booked! Collectable COD: ${finalCodToCollect} BDT`);
     } catch (error: unknown) {
       console.error('Courier dispatch error:', error);
       const err = error as Error;
@@ -197,10 +197,10 @@ export default function AdminOrders() {
       return (
         <div className="space-y-0.5">
           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
-            Adv. ৳{order.paidAmount || order.deliveryFee} Paid
+            Adv. {order.paidAmount || order.deliveryFee} BDT Paid
           </span>
           <span className="block text-[10px] font-bold text-[#E2136E]">
-            COD Due: ৳{codDue}
+            COD Due: {codDue} BDT
           </span>
         </div>
       );
@@ -208,7 +208,7 @@ export default function AdminOrders() {
 
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
-        <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" /> Unpaid COD (৳{order.totalAmount})
+        <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" /> Unpaid COD ({order.totalAmount} BDT)
       </span>
     );
   };
@@ -319,7 +319,7 @@ export default function AdminOrders() {
 
                       <td className="py-4 px-4">
                         <span className="font-black text-slate-900 font-mono block">
-                          ৳{order.totalAmount?.toLocaleString()}
+                          {order.totalAmount?.toLocaleString()} BDT
                         </span>
                         <span className="text-[10px] text-gray-400">
                           {order.items?.length || 0} Item(s) ({order.totalWeight || 0.5} kg)
@@ -359,14 +359,14 @@ export default function AdminOrders() {
                               onClick={() => handleDispatchCourier(order)}
                               disabled={dispatchingId === order.id}
                               className="px-3 py-1.5 bg-brand-green hover:bg-emerald-600 text-white rounded-xl text-[11px] font-black transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer hover:scale-105"
-                              title={`1-Click Dispatch to Steadfast (Collect: ৳${collectable})`}
+                              title={`1-Click Dispatch to Steadfast (Collect: ${collectable} BDT)`}
                             >
                               {dispatchingId === order.id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
                                 <Send className="w-3.5 h-3.5" />
                               )}
-                              Send (৳{collectable})
+                              Send ({collectable} BDT)
                             </button>
                           )}
 
@@ -484,10 +484,10 @@ export default function AdminOrders() {
                         />
                         <div>
                           <p className="font-bold text-navy">{item.productName}</p>
-                          <p className="text-gray-400 text-[10px] font-mono">Qty: {item.quantity} × ৳{item.price?.toLocaleString()}</p>
+                          <p className="text-gray-400 text-[10px] font-mono">Qty: {item.quantity} × {item.price?.toLocaleString()} BDT</p>
                         </div>
                       </div>
-                      <span className="font-black text-navy font-mono">৳{((item.price || 0) * (item.quantity || 1))?.toLocaleString()}</span>
+                      <span className="font-black text-navy font-mono">{((item.price || 0) * (item.quantity || 1))?.toLocaleString()} BDT</span>
                     </div>
                   ))}
                 </div>
@@ -497,17 +497,17 @@ export default function AdminOrders() {
               <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2 text-xs">
                 <div className="flex justify-between text-slate-300">
                   <span>Product Subtotal:</span>
-                  <span className="font-mono font-bold">৳{selectedOrder.subtotal?.toLocaleString()}</span>
+                  <span className="font-mono font-bold">{selectedOrder.subtotal?.toLocaleString()} BDT</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
                   <span>Delivery Charge:</span>
-                  <span className="font-mono font-bold">৳{selectedOrder.deliveryFee?.toLocaleString()}</span>
+                  <span className="font-mono font-bold">{selectedOrder.deliveryFee?.toLocaleString()} BDT</span>
                 </div>
 
                 {(selectedOrder.paidAmount && selectedOrder.paidAmount > 0) && (
                   <div className="flex justify-between text-[#E2136E] font-bold pt-1 border-t border-slate-800">
                     <span>Advance Received (bKash):</span>
-                    <span className="font-mono">-৳{selectedOrder.paidAmount?.toLocaleString()}</span>
+                    <span className="font-mono">-{selectedOrder.paidAmount?.toLocaleString()} BDT</span>
                   </div>
                 )}
 
@@ -522,7 +522,7 @@ export default function AdminOrders() {
                     <Truck className="w-4 h-4" /> Steadfast Cash to Collect (Due COD):
                   </span>
                   <span className="text-amber-400 font-mono font-black text-base">
-                    ৳{collectableCOD.toLocaleString()}
+                    {collectableCOD.toLocaleString()} BDT
                   </span>
                 </div>
               </div>
@@ -539,7 +539,7 @@ export default function AdminOrders() {
                     ) : (
                       <Send className="w-4 h-4" />
                     )}
-                    Dispatch to Steadfast (Collect: ৳{collectableCOD})
+                    Dispatch to Steadfast (Collect: {collectableCOD} BDT)
                   </button>
                 ) : <div />}
 
