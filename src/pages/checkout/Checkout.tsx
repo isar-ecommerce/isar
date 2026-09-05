@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
   ShieldCheck, 
@@ -11,20 +11,19 @@ import {
   Phone, 
   User, 
   Scale, 
-  CheckCircle2 
+  CheckCircle2,
+  Mail
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
 import { createOrder, calculateDynamicDeliveryFee } from '../../services/orderService';
-import { executeBkashPayment } from '../../services/paymentService';
 import { 
   sendOrderConfirmationSMS, 
   sendOrderConfirmationEmail, 
   sendAdminOrderAlert 
 } from '../../services/notificationService';
-import BkashAutomatedModal from '../../components/checkout/BkashAutomatedModal';
 import { 
   BANGLADESH_DIVISIONS, 
   getDistrictsByDivision, 
@@ -36,6 +35,7 @@ type PaymentOption = 'cod_advance' | 'full_online';
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const { 
     items, 
@@ -49,6 +49,7 @@ export default function Checkout() {
   const discount = getDiscount();
 
   const [fullName, setFullName] = useState<string>('');
+  const [email, setEmail] = useState<string>(user?.email || '');
   const [phone, setPhone] = useState<string>('');
   const [alternatePhone, setAlternatePhone] = useState<string>('');
   
@@ -63,9 +64,76 @@ export default function Checkout() {
 
   const [paymentOption, setPaymentOption] = useState<PaymentOption>('cod_advance');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isBkashModalOpen, setIsBkashModalOpen] = useState<boolean>(false);
 
-  const [clientOrderNumber] = useState<string>(() => `ISAR-${Date.now().toString().slice(-6)}`);
+  // অফিশিয়াল বিকাশ কলব্যাক হ্যান্ডলার
+  useEffect(() => {
+    const paymentID = searchParams.get('paymentID');
+    const status = searchParams.get('status');
+
+    if (paymentID && status === 'success') {
+      const pendingDataStr = sessionStorage.getItem('isar_pending_order');
+      if (!pendingDataStr) return;
+
+      const executePayment = async () => {
+        try {
+          setIsSubmitting(true);
+          const toastId = toast.loading('Executing and verifying bKash payment...');
+
+          const execRes = await fetch('/api/bkash', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'execute-payment',
+              paymentID,
+            }),
+          });
+
+          const execData = await execRes.json();
+          toast.dismiss(toastId);
+
+          if (execRes.ok && execData.success) {
+            const pendingOrder = JSON.parse(pendingDataStr);
+            sessionStorage.removeItem('isar_pending_order');
+
+            const order = await createOrder({
+              ...pendingOrder,
+              transactionId: execData.trxID,
+            });
+
+            sendOrderConfirmationSMS(order.customerPhone, order.orderNumber, order.totalAmount);
+            sendOrderConfirmationEmail(order);
+            sendAdminOrderAlert(order);
+
+            clearCart();
+            toast.success(`Payment verified! TrxID: ${execData.trxID}`);
+
+            navigate('/order-success', {
+              state: {
+                order: {
+                  ...order,
+                  paymentStatus: pendingOrder.paymentStatus,
+                  paidAmount: pendingOrder.paidAmount,
+                  dueAmount: pendingOrder.dueAmount,
+                  totalAmount: pendingOrder.totalAmount,
+                },
+              },
+            });
+          } else {
+            toast.error(execData.message || 'Payment execution failed.');
+          }
+        } catch (err) {
+          console.error('Execute error:', err);
+          toast.error('Payment verification error.');
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      executePayment();
+    } else if (status === 'cancel' || status === 'failure') {
+      toast.error('bKash payment was cancelled or failed.');
+    }
+  }, [searchParams, navigate, clearCart]);
 
   const totalWeight = useMemo(() => {
     return items.reduce((sum, item) => {
@@ -86,12 +154,8 @@ export default function Checkout() {
     return Math.max(0, subtotal + deliveryFee - discount);
   }, [subtotal, deliveryFee, discount]);
 
-  useEffect(() => {
-    if (items.length === 0) {
-      toast.error('Your cart is empty');
-      navigate('/cart');
-    }
-  }, [items, navigate]);
+  const advanceAmountToPay = paymentOption === 'cod_advance' ? deliveryFee : total;
+  const codDueAmount = paymentOption === 'cod_advance' ? Math.max(0, subtotal - discount) : 0;
 
   const handleDivisionChange = (newDivision: string) => {
     setDivision(newDivision);
@@ -113,12 +177,15 @@ export default function Checkout() {
     setUpazila(upazilas[0] || '');
   };
 
-  const advanceAmountToPay = paymentOption === 'cod_advance' ? deliveryFee : total;
-  const codDueAmount = paymentOption === 'cod_advance' ? Math.max(0, subtotal - discount) : 0;
-
   const validateForm = () => {
-    if (!fullName.trim() || !phone.trim() || !district.trim() || !upazila.trim() || !fullAddress.trim()) {
+    if (!fullName.trim() || !phone.trim() || !email.trim() || !district.trim() || !upazila.trim() || !fullAddress.trim()) {
       toast.error('Please fill in all required shipping fields');
+      return false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      toast.error('Please enter a valid email address');
       return false;
     }
 
@@ -131,33 +198,29 @@ export default function Checkout() {
     return true;
   };
 
-  const getShippingAddress = (): ShippingAddress => ({
-    fullName: fullName.trim(),
-    phone: phone.trim(),
-    alternatePhone: alternatePhone.trim() || undefined,
-    division,
-    district,
-    upazila,
-    fullAddress: fullAddress.trim(),
-    deliveryNotes: deliveryNotes.trim() || undefined,
-  });
-
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    setIsBkashModalOpen(true);
-  };
 
-  const handleBkashSuccess = async (trxId: string, bkashPhone: string) => {
     try {
       setIsSubmitting(true);
-      const shippingAddress = getShippingAddress();
-      const isPartial = paymentOption === 'cod_advance';
+      const generatedOrderNumber = `ISAR-${Date.now().toString().slice(-6)}`;
 
-      const order = await createOrder({
+      const shippingAddress: ShippingAddress = {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        alternatePhone: alternatePhone.trim() || undefined,
+        division,
+        district,
+        upazila,
+        fullAddress: fullAddress.trim(),
+        deliveryNotes: deliveryNotes.trim() || undefined,
+      };
+
+      sessionStorage.setItem('isar_pending_order', JSON.stringify({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
-        customerEmail: user?.email || 'customer@isar.com.bd',
+        customerEmail: email.trim(),
         customerPhone: phone.trim(),
         shippingAddress,
         deliveryZone,
@@ -169,43 +232,33 @@ export default function Checkout() {
         couponCode: appliedCoupon?.code,
         totalAmount: total,
         paymentMethod: 'bkash',
-        paymentStatus: isPartial ? 'partial_paid' : 'paid',
+        paymentStatus: paymentOption === 'cod_advance' ? 'partial_paid' : 'paid',
         paidAmount: advanceAmountToPay,
         dueAmount: codDueAmount,
-        transactionId: trxId,
+        orderNumber: generatedOrderNumber,
+      }));
+
+      const res = await fetch('/api/bkash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create-payment',
+          amount: advanceAmountToPay,
+          orderNumber: generatedOrderNumber,
+          callbackURL: `${window.location.origin}/checkout?bkash_callback=true`,
+        }),
       });
 
-      try {
-        await executeBkashPayment(order.id, order.orderNumber, advanceAmountToPay, bkashPhone, trxId);
-      } catch (logErr) {
-        console.warn('Payment logging notice:', logErr);
+      const data = await res.json();
+
+      if (res.ok && data.success && data.bkashURL) {
+        window.location.assign(data.bkashURL);
+      } else {
+        toast.error(data.message || 'Failed to initiate bKash payment.');
       }
-
-      sendOrderConfirmationSMS(phone.trim(), order.orderNumber, total);
-      sendOrderConfirmationEmail(order);
-      sendAdminOrderAlert(order);
-
-      clearCart();
-      toast.success(
-        isPartial 
-          ? `Advance payment of ${advanceAmountToPay} BDT received! Due on delivery: ${codDueAmount} BDT.`
-          : `Full payment of ${total} BDT received! Order confirmed successfully.`
-      );
-
-      navigate('/order-success', {
-        state: {
-          order: {
-            ...order,
-            paymentStatus: isPartial ? 'partial_paid' : 'paid',
-            paidAmount: advanceAmountToPay,
-            dueAmount: codDueAmount,
-            totalAmount: total,
-          },
-        },
-      });
-    } catch (error) {
-      console.error('Bkash post-payment error:', error);
-      toast.error('Payment verified, but failed to create order record. Please contact support.');
+    } catch (err) {
+      console.error('Checkout error:', err);
+      toast.error('Connection error with bKash.');
     } finally {
       setIsSubmitting(false);
     }
@@ -221,7 +274,7 @@ export default function Checkout() {
     <div className="bg-secondary min-h-screen py-8 md:py-12">
       <Helmet>
         <title>Checkout | ISAR Marketplace</title>
-        <meta name="description" content="Secure checkout with Steadfast weight-based delivery and bKash." />
+        <meta name="description" content="Secure checkout with Steadfast weight-based delivery and official bKash." />
       </Helmet>
 
       <div className="container mx-auto px-4 max-w-6xl">
@@ -235,7 +288,6 @@ export default function Checkout() {
 
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
@@ -251,6 +303,7 @@ export default function Checkout() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
+                {/* Full Name */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Full Name *</label>
                   <div className="relative">
@@ -266,6 +319,23 @@ export default function Checkout() {
                   </div>
                 </div>
 
+                {/* Email */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-xs font-bold text-navy">Email (For Invoice) *</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="customer@gmail.com"
+                      className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Mobile Number */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Mobile Number (11 Digits) *</label>
                   <div className="relative">
@@ -281,6 +351,7 @@ export default function Checkout() {
                   </div>
                 </div>
 
+                {/* Alternative Phone */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Alternative Phone (Optional)</label>
                   <div className="relative">
@@ -295,6 +366,7 @@ export default function Checkout() {
                   </div>
                 </div>
 
+                {/* Division */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Division *</label>
                   <select
@@ -308,6 +380,7 @@ export default function Checkout() {
                   </select>
                 </div>
 
+                {/* District */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">District *</label>
                   <select
@@ -321,6 +394,7 @@ export default function Checkout() {
                   </select>
                 </div>
 
+                {/* Thana / Upazila */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Thana / Upazila *</label>
                   <select
@@ -334,6 +408,7 @@ export default function Checkout() {
                   </select>
                 </div>
 
+                {/* Full Address */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Full Street Address *</label>
                   <textarea
@@ -346,13 +421,14 @@ export default function Checkout() {
                   />
                 </div>
 
+                {/* Delivery Notes */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Delivery Notes (Optional)</label>
                   <input
                     type="text"
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
-                    placeholder="e.g. Please call before arriving"
+                    placeholder="e.g. Call before delivery"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -368,7 +444,7 @@ export default function Checkout() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-navy">Payment Method</h2>
-                  <p className="text-xs text-gray-500">Secure automated bKash Payment Gateway</p>
+                  <p className="text-xs text-gray-500">Official bKash Payment Gateway</p>
                 </div>
               </div>
 
@@ -399,7 +475,7 @@ export default function Checkout() {
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                        Pay only <strong className="text-navy font-bold">{deliveryFee} BDT</strong> delivery fee via bKash now. Pay product price <strong className="text-[#E2136E] font-bold">{codDueAmount} BDT</strong> in cash on delivery.
+                        Pay only <strong className="text-navy font-bold">{deliveryFee} BDT</strong> delivery fee via official bKash now. Pay product price <strong className="text-[#E2136E] font-bold">{codDueAmount} BDT</strong> on delivery.
                       </p>
                     </div>
                   </div>
@@ -426,10 +502,10 @@ export default function Checkout() {
                     />
                     <div>
                       <span className="font-black text-xs sm:text-sm text-navy block">
-                        Full Online Payment (bKash)
+                        Full Online Payment (Official bKash)
                       </span>
                       <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                        Pay full amount <strong className="text-navy font-bold">{total} BDT</strong> via bKash now. Zero cash due on delivery.
+                        Pay full amount <strong className="text-navy font-bold">{total} BDT</strong> via official bKash now. Zero cash due on delivery.
                       </p>
                     </div>
                   </div>
@@ -442,10 +518,10 @@ export default function Checkout() {
               <div className="flex items-center justify-between p-3.5 bg-pink-50/60 border border-pink-100 rounded-xl">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#E2136E] animate-pulse" />
-                  <span className="text-xs font-bold text-navy">Automated bKash Gateway</span>
+                  <span className="text-xs font-bold text-navy">Official bKash Payment Gateway</span>
                 </div>
                 <span className="text-[11px] font-black text-[#E2136E] bg-white px-2.5 py-1 rounded-lg border border-pink-200">
-                  bKash Payment Gateway
+                  256-Bit SSL Secured
                 </span>
               </div>
 
@@ -509,7 +585,6 @@ export default function Checkout() {
                   <span className="font-mono font-bold text-navy">{total.toLocaleString()} BDT</span>
                 </div>
 
-                {/* Balance Box */}
                 <div className="p-3.5 bg-linear-to-r from-pink-50 to-white rounded-2xl border border-pink-100 space-y-2">
                   <div className="flex justify-between items-center text-xs font-black text-[#E2136E]">
                     <span>To Pay Now (bKash):</span>
@@ -530,18 +605,18 @@ export default function Checkout() {
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Processing Order...
+                    <Loader2 className="w-5 h-5 animate-spin" /> Connecting Official bKash Gateway...
                   </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4" /> Pay {advanceAmountToPay.toLocaleString()} BDT & Confirm Order
+                    <Lock className="w-4 h-4" /> Pay {advanceAmountToPay.toLocaleString()} BDT with bKash
                   </>
                 )}
               </button>
 
               <div className="flex items-center justify-center gap-1 text-[11px] text-gray-400 font-medium">
                 <ShieldCheck className="w-4 h-4 text-brand-green" />
-                <span>Encrypted & Safe Bangladeshi Checkout</span>
+                <span>Encrypted & Safe Official bKash Portal</span>
               </div>
 
             </div>
@@ -551,15 +626,6 @@ export default function Checkout() {
         </form>
 
       </div>
-
-      {/* Automated bKash Modal */}
-      <BkashAutomatedModal
-        amount={advanceAmountToPay}
-        orderNumber={clientOrderNumber}
-        isOpen={isBkashModalOpen}
-        onClose={() => setIsBkashModalOpen(false)}
-        onSuccess={handleBkashSuccess}
-      />
     </div>
   );
 }
