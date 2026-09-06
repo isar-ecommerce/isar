@@ -18,11 +18,37 @@ import { getCategories, getProducts } from '../../services/productService';
 import { getCategoryIconConfig } from '../../utils/categoryIcons';
 import type { Category, Product } from '../../types/product';
 
+const INITIAL_CATEGORIES: Category[] = [
+  { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 }
+];
+
+// স্ট্যাটিক ও পারফরম্যান্ট স্মার্ট ক্যাটাগরি ম্যাচিং ইঞ্জিন
+const isProductInCategory = (product: Product, targetCatId: string, categories: Category[]) => {
+  if (targetCatId === 'all') return true;
+
+  const clean = (str?: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const pCatId = clean(product.categoryId);
+  const pCatName = clean((product as { categoryName?: string }).categoryName);
+  const pName = clean(product.name);
+
+  const targetCatObj = categories.find(c => c.id === targetCatId);
+  const targetId = clean(targetCatId);
+  const targetSlug = clean(targetCatObj?.slug);
+  const targetName = clean(targetCatObj?.name);
+
+  if (pCatId && (pCatId === targetId || pCatId === targetSlug)) return true;
+  if (targetSlug && pCatId && (pCatId.includes(targetSlug) || targetSlug.includes(pCatId))) return true;
+  if (targetName && pCatName && (pCatName.includes(targetName) || targetName.includes(pCatName))) return true;
+  if (targetName.length >= 4 && pName.includes(targetName)) return true;
+  if (targetSlug.length >= 4 && pName.includes(targetSlug)) return true;
+
+  return false;
+};
+
 export default function Categories() {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<Category[]>([
-    { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 }
-  ]);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [loading, setLoading] = useState<boolean>(true);
@@ -70,33 +96,9 @@ export default function Categories() {
     };
   }, []);
 
-  // স্মার্ট ক্যাটাগরি ম্যাচিং
-  const isProductInCategory = (product: Product, targetCatId: string) => {
-    if (targetCatId === 'all') return true;
-
-    const clean = (str?: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    const pCatId = clean(product.categoryId);
-    const pCatName = clean((product as { categoryName?: string }).categoryName);
-    const pName = clean(product.name);
-
-    const targetCatObj = categories.find(c => c.id === targetCatId);
-    const targetId = clean(targetCatId);
-    const targetSlug = clean(targetCatObj?.slug);
-    const targetName = clean(targetCatObj?.name);
-
-    if (pCatId && (pCatId === targetId || pCatId === targetSlug)) return true;
-    if (targetSlug && pCatId && (pCatId.includes(targetSlug) || targetSlug.includes(pCatId))) return true;
-    if (targetName && pCatName && (pCatName.includes(targetName) || targetName.includes(pCatName))) return true;
-    if (targetName.length >= 4 && pName.includes(targetName)) return true;
-    if (targetSlug.length >= 4 && pName.includes(targetSlug)) return true;
-
-    return false;
-  };
-
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const matchesCategory = isProductInCategory(product, selectedCategoryId);
+      const matchesCategory = isProductInCategory(product, selectedCategoryId, categories);
 
       const matchesSearch = 
         !searchQuery.trim() || 
@@ -107,7 +109,6 @@ export default function Categories() {
     });
   }, [products, selectedCategoryId, categories, searchQuery]);
 
-  // Buy Now: সরাসরি কার্টে নিয়ে /checkout পেজে নিয়ে যাবে
   const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -209,7 +210,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Products Grid (Pure BDT & No Wishlist) */}
+        {/* Products Grid */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
@@ -242,10 +243,8 @@ export default function Categories() {
                   key={product.id}
                   className="bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col"
                 >
-                  {/* Product Image Frame */}
+                  {/* Product Image */}
                   <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 sm:p-3 flex items-center justify-center">
-                    
-                    {/* Sold Out Stamp */}
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
                         <span className="text-red-500 font-black text-lg sm:text-xl tracking-widest uppercase border-3 border-red-500 py-1 px-3 rounded-xl rotate-[-15deg] shadow-2xl bg-white/95">
@@ -294,7 +293,6 @@ export default function Categories() {
                       )}
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="mt-auto pt-2 border-t border-gray-100">
                       {isOutOfStock ? (
                         <button 
