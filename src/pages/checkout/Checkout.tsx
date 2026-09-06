@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
   ShieldCheck, 
@@ -33,6 +33,7 @@ import type { ShippingAddress, PaymentMethod } from '../../types/order';
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const { 
@@ -60,11 +61,24 @@ export default function Checkout() {
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
 
-  // শুধুমাত্র ২টি পরিষ্কার অপশন: 'cod' অথবা 'bkash'
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // অফিশিয়াল বিকাশ কলব্যাক লিসেনার
+  // চেকআউট পেজে ঢোকামাত্রই একদম ওপর থেকে লোড হবে
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // ডায়নামিক ব্যাক বাটন (যে পেজ থেকে আসবে, ঠিক সেই পেজে ফিরিয়ে নেবে)
+  const originState = location.state as { from?: string; path?: string } | null;
+  const backButtonLabel = originState?.from ? `Back to ${originState.from}` : 'Back to Cart';
+  const backButtonPath = originState?.path || '/cart';
+
+  const handleBackNavigation = () => {
+    navigate(backButtonPath);
+  };
+
+  // বিকাশ কলব্যাক লিসেনার
   useEffect(() => {
     const paymentID = searchParams.get('paymentID');
     const status = searchParams.get('status');
@@ -220,7 +234,6 @@ export default function Checkout() {
         deliveryNotes: deliveryNotes.trim() || undefined,
       };
 
-      // ১. বিকাশ অনলাইন পেমেন্ট সিলেক্ট করলে
       if (paymentMethod === 'bkash') {
         sessionStorage.setItem('isar_pending_order', JSON.stringify({
           userId: user?.uid || 'guest-user',
@@ -264,7 +277,6 @@ export default function Checkout() {
         }
       }
 
-      // ২. ক্যাশ অন ডেলিভারি (COD): ০ অগ্রিম, ১০০% ডেলিভারির সময় ক্যাশ
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -326,19 +338,24 @@ export default function Checkout() {
 
       <div className="container mx-auto px-4 max-w-6xl">
         
+        {/* Dynamic Back Button */}
         <div className="mb-6">
-          <Link to="/cart" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary-dark transition-colors cursor-pointer">
-            <ArrowLeft className="w-4 h-4" /> Back to Cart
-          </Link>
+          <button
+            type="button"
+            onClick={handleBackNavigation}
+            className="inline-flex items-center gap-2 text-xs md:text-sm font-bold text-primary hover:text-primary-dark transition-colors cursor-pointer group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>{backButtonLabel}</span>
+          </button>
           <h1 className="text-2xl md:text-3xl font-extrabold text-navy mt-2">Checkout</h1>
         </div>
 
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column: Delivery Address & Clean Payment Options */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Delivery Address Card */}
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -352,7 +369,6 @@ export default function Checkout() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* Full Name */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Full Name *</label>
                   <div className="relative">
@@ -368,7 +384,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Email */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Email *</label>
                   <div className="relative">
@@ -384,7 +399,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Mobile Number */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Mobile Number (11 Digits) *</label>
                   <div className="relative">
@@ -400,7 +414,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Alternative Phone */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Alternative Phone (Optional)</label>
                   <div className="relative">
@@ -415,7 +428,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Division */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">Division *</label>
                   <select
@@ -429,7 +441,6 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* District */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-navy">District *</label>
                   <select
@@ -443,7 +454,6 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* Thana / Upazila */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Thana / Upazila *</label>
                   <select
@@ -457,7 +467,6 @@ export default function Checkout() {
                   </select>
                 </div>
 
-                {/* Full Address */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Full Street Address *</label>
                   <textarea
@@ -470,7 +479,6 @@ export default function Checkout() {
                   />
                 </div>
 
-                {/* Delivery Notes */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-navy">Delivery Notes (Optional)</label>
                   <input
@@ -485,7 +493,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Payment Method Card: ২টি পরিষ্কার অপশন */}
+            {/* Payment Method Card */}
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-5">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green font-bold">
@@ -499,7 +507,6 @@ export default function Checkout() {
 
               <div className="space-y-3">
                 
-                {/* 1. Cash On Delivery */}
                 <label 
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'cod' 
@@ -530,7 +537,6 @@ export default function Checkout() {
                   )}
                 </label>
 
-                {/* 2. Official bKash Gateway */}
                 <label 
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'bkash' 
@@ -569,7 +575,7 @@ export default function Checkout() {
 
           </div>
 
-          {/* Right Column: Order Summary (Zero Weight Label) */}
+          {/* Right Column: Order Summary */}
           <div className="space-y-6">
             
             <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-6 sticky top-24">
@@ -622,7 +628,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Order Button (Clean Order Now) */}
+              {/* Order Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -635,7 +641,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock className="w-4 h-4" /> 
-                    <span>Order Now ({total.toLocaleString()} BDT)</span>
+                    <span>{paymentMethod === 'bkash' ? `Pay ${total.toLocaleString()} BDT with bKash` : `Order Now (${total.toLocaleString()} BDT)`}</span>
                   </>
                 )}
               </button>
