@@ -23,10 +23,8 @@ export interface SettingsState {
   instagramUrl: string;
   isLoaded: boolean;
 
-  // গ্লোবাল ল্যাঙ্গুয়েজ স্টেট (ডিফল্ট: ইংরেজি 'en')
   language: 'en' | 'bn';
 
-  // অ্যাকশনসমূহ
   setLanguage: (lang: 'en' | 'bn') => void;
   setSettings: (newSettings: Partial<SettingsState>) => void;
   fetchSettings: () => Promise<void>;
@@ -35,14 +33,14 @@ export interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      // ডিফল্ট ক্যাশ স্টেট (English by default)
+      // আপনার আসল স্টোর সেটিংস ডিফল্ট করা হলো
       logoType: 'text',
       logoUrl: '',
       siteName: 'ISAR',
-      siteTagline: "Bangladesh's Premier E-commerce Marketplace",
-      contactEmail: 'support@isar.com.bd',
-      contactPhone: '+880 1234 567890',
-      whatsappNumber: '+880 1234 567890',
+      siteTagline: 'Premium Bags, Smart Accessories & Lifestyle Gear',
+      contactEmail: 'isar.store.bd@gmail.com',
+      contactPhone: '+880 1624789764',
+      whatsappNumber: '+880 1624789764',
       officeAddress: 'Dhaka, Bangladesh',
       feeInsideDhaka: 60,
       feeOutsideDhaka: 150,
@@ -53,13 +51,13 @@ export const useSettingsStore = create<SettingsState>()(
       flashSaleEndTime: '2026-12-31T23:59',
       facebookUrl: 'https://facebook.com',
       instagramUrl: 'https://instagram.com',
-      isLoaded: false,
-      language: 'en', // ডিফল্ট ইংরেজি
+      isLoaded: true,
+      language: 'en',
 
       setLanguage: (lang: 'en' | 'bn') => set({ language: lang }),
       setSettings: (newSettings) => set((state) => ({ ...state, ...newSettings })),
 
-      // ফায়ারস্টোর থেকে সেটিংস ফেচ
+      // ফায়ারস্টোর থেকে ফেচ করলেও যাতে পুরোনো ডামি নম্বর ফিরে না আসে
       fetchSettings: async () => {
         try {
           const docRef = doc(db, 'settings', 'general');
@@ -71,10 +69,16 @@ export const useSettingsStore = create<SettingsState>()(
               logoType: data.logoType || 'text',
               logoUrl: data.logoUrl || '',
               siteName: data.siteName || 'ISAR',
-              siteTagline: data.siteTagline || "Bangladesh's Premier E-commerce Marketplace",
-              contactEmail: data.contactEmail || 'support@isar.com.bd',
-              contactPhone: data.contactPhone || '+880 1234 567890',
-              whatsappNumber: data.whatsappNumber || data.contactPhone || '+880 1234 567890',
+              siteTagline: data.siteTagline || 'Premium Bags, Smart Accessories & Lifestyle Gear',
+              contactEmail: data.contactEmail && !data.contactEmail.includes('support@isar.com.bd') 
+                ? data.contactEmail 
+                : 'isar.store.bd@gmail.com',
+              contactPhone: data.contactPhone && !data.contactPhone.includes('1234 567890') 
+                ? data.contactPhone 
+                : '+880 1624789764',
+              whatsappNumber: data.whatsappNumber && !data.whatsappNumber.includes('1234 567890') 
+                ? data.whatsappNumber 
+                : '+880 1624789764',
               officeAddress: data.officeAddress || 'Dhaka, Bangladesh',
               feeInsideDhaka: data.feeInsideDhaka !== undefined ? Number(data.feeInsideDhaka) : 60,
               feeOutsideDhaka: data.feeOutsideDhaka !== undefined ? Number(data.feeOutsideDhaka) : 150,
