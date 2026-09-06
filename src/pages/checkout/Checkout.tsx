@@ -60,11 +60,11 @@ export default function Checkout() {
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
 
-  // পেমেন্ট মেথড: শুধুমাত্র 'cod' অথবা 'bkash'
+  // শুধুমাত্র ২টি পরিষ্কার অপশন: 'cod' অথবা 'bkash'
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // বিকাশ কলব্যাক লিসেনার
+  // অফিশিয়াল বিকাশ কলব্যাক লিসেনার
   useEffect(() => {
     const paymentID = searchParams.get('paymentID');
     const status = searchParams.get('status');
@@ -134,7 +134,6 @@ export default function Checkout() {
     }
   }, [searchParams, navigate, clearCart]);
 
-  // মোট ওজনের হিসাব (কাস্টমার থেকে স্ক্রিনে গোপন থাকবে)
   const totalWeight = useMemo(() => {
     return items.reduce((sum, item) => {
       const weightPerItem = (item.product as { weightInKg?: number })?.weightInKg || 0.5;
@@ -221,7 +220,7 @@ export default function Checkout() {
         deliveryNotes: deliveryNotes.trim() || undefined,
       };
 
-      // ১. যদি কাস্টমার bKash সিলেক্ট করে ➔ সরাসরি বিকাশের অফিশিয়াল পোর্টালে যাবে
+      // ১. বিকাশ অনলাইন পেমেন্ট সিলেক্ট করলে
       if (paymentMethod === 'bkash') {
         sessionStorage.setItem('isar_pending_order', JSON.stringify({
           userId: user?.uid || 'guest-user',
@@ -265,7 +264,7 @@ export default function Checkout() {
         }
       }
 
-      // ২. যদি কাস্টমার Cash on Delivery সিলেক্ট করে ➔ ১০০% অগ্রিম ছাড়া অর্ডার কনফার্ম হবে
+      // ২. ক্যাশ অন ডেলিভারি (COD): ০ অগ্রিম, ১০০% ডেলিভারির সময় ক্যাশ
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -283,7 +282,7 @@ export default function Checkout() {
         paymentMethod: 'cod',
         paymentStatus: 'pending',
         paidAmount: 0,
-        dueAmount: total, // কুরিয়ার ম্যান কাস্টমার থেকে পুরো বিল তুলবে
+        dueAmount: total,
       });
 
       sendOrderConfirmationSMS(phone.trim(), order.orderNumber, total);
@@ -336,7 +335,7 @@ export default function Checkout() {
 
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column: Delivery Address & Payment Method */}
+          {/* Left Column: Delivery Address & Clean Payment Options */}
           <div className="lg:col-span-2 space-y-6">
             
             {/* Delivery Address Card */}
@@ -486,7 +485,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Payment Method Card (হুবহু স্ক্রিনশট ৪ অনুযায়ী ২টি পরিষ্কার অপশন) */}
+            {/* Payment Method Card: ২টি পরিষ্কার অপশন */}
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-5">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green font-bold">
@@ -570,7 +569,7 @@ export default function Checkout() {
 
           </div>
 
-          {/* Right Column: Order Summary (Weight Hidden) */}
+          {/* Right Column: Order Summary (Zero Weight Label) */}
           <div className="space-y-6">
             
             <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-6 sticky top-24">
@@ -623,7 +622,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Order Button */}
+              {/* Order Button (Clean Order Now) */}
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -636,14 +635,14 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock className="w-4 h-4" /> 
-                    <span>{paymentMethod === 'bkash' ? `Pay ${total.toLocaleString()} BDT with bKash` : `Confirm Order (${total.toLocaleString()} BDT)`}</span>
+                    <span>Order Now ({total.toLocaleString()} BDT)</span>
                   </>
                 )}
               </button>
 
               <div className="flex items-center justify-center gap-2 text-[11px] text-gray-400 font-medium">
                 <ShieldCheck className="w-4 h-4 text-brand-green" />
-                <span>Encrypted & Safe Bangladeshi Checkout</span>
+                <span>Encrypted & Safe Checkout</span>
               </div>
 
             </div>

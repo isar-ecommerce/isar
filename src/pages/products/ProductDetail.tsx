@@ -82,7 +82,6 @@ export default function ProductDetail() {
     toast.success(`Added ${quantity} item(s) to Cart!`);
   };
 
-  // Order Now: সরাসরি আইটেম সেট করে /checkout পেজে নিয়ে যাবে
   const handleOrderNow = () => {
     if (!product) return;
     addItemToCart(product, quantity);
@@ -122,9 +121,11 @@ export default function ProductDetail() {
     );
   }
 
-  // ক্যাটাগরির বিদঘুটে আইডি রোধ: নাম থাকলে নাম দেখাবে, না থাকলে Authentic Gear
+  // ফায়ারবেসের বিদঘুটে আইডি রোধ: সুন্দর নাম থাকলে নাম দেখাবে, না থাকলে AUTHENTIC ITEM দেখাবে
   const rawCat = (product as { categoryName?: string }).categoryName || product.categoryId || '';
-  const categoryTag = (rawCat.length > 20 || rawCat.includes('1') || rawCat.includes('2')) ? 'AUTHENTIC ITEM' : rawCat.toUpperCase();
+  const categoryTag = (rawCat.length > 18 || rawCat.includes('1') || rawCat.includes('2') || rawCat.includes('Z')) 
+    ? 'AUTHENTIC ITEM' 
+    : rawCat.toUpperCase();
 
   return (
     <div className="bg-secondary min-h-screen py-6 md:py-10">
@@ -143,7 +144,7 @@ export default function ProductDetail() {
           <span className="text-navy font-semibold truncate max-w-50 md:max-w-none">{product.name}</span>
         </nav>
 
-        {/* Main Product Showcase Card */}
+        {/* Main Product Card */}
         <div className="bg-white rounded-3xl shadow-modern-lg p-5 sm:p-8 md:p-10 border border-gray-100 mb-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
             
@@ -264,7 +265,7 @@ export default function ProductDetail() {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  {/* Order Now (Direct to /checkout) */}
+                  {/* Order Now (Direct Checkout) */}
                   <button
                     onClick={handleOrderNow}
                     disabled={product.stock === 0}

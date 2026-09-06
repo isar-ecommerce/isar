@@ -45,7 +45,7 @@ export default function Cart() {
           </div>
           <h2 className="text-2xl font-black text-navy mb-2">Your Cart is Empty</h2>
           <p className="text-gray-500 text-xs sm:text-sm mb-8 leading-relaxed">
-            Looks like you have not added anything to your cart yet. Explore our bags and smart accessories collection!
+            Looks like you have not added anything to your cart yet. Explore our authentic bags and smart accessories!
           </p>
           <Link
             to="/products"
@@ -176,8 +176,9 @@ export default function Cart() {
                   <span className="font-bold text-navy font-mono">{subtotal.toLocaleString()} BDT</span>
                 </div>
 
+                {/* ক্লিন ডেলিভারি নোট (কোনো weight শব্দ নেই) */}
                 <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 border border-gray-100 leading-relaxed">
-                  Shipping fee will be calculated at checkout based on your delivery district and weight.
+                  Delivery fee is calculated at checkout based on your delivery district.
                 </div>
 
                 <div className="flex justify-between text-base font-black text-navy pt-3 border-t border-gray-100">
