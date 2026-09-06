@@ -2,14 +2,8 @@ import {
   collection, 
   getDocs, 
   getDoc, 
-  doc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  Query
+  doc 
 } from 'firebase/firestore';
-import type { DocumentData } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { Product, Category } from '../types/product';
 
@@ -18,25 +12,29 @@ const productsRef = collection(db, 'products');
 const categoriesRef = collection(db, 'categories');
 
 /**
- * সব ক্যাটাগরি ফায়ারস্টোর থেকে নিয়ে আসার ফাংশন
+ * ফায়ারস্টোর থেকে সব ক্যাটাগরি নিরাপদে লোড করার ফাংশন (Zero-Index Crash Protection)
  */
 export const getCategories = async (): Promise<Category[]> => {
   try {
-    const q = query(categoriesRef, where('status', '==', 'active'), orderBy('order', 'asc'));
-    const snapshot = await getDocs(q);
-    
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    // কোনো কম্পোজিট ইনডেক্স ছাড়াই সরাসরি সব ক্যাটাগরি লোড
+    const snapshot = await getDocs(categoriesRef);
+    const list = snapshot.docs.map(docSnap => ({
+      id: docSnap.id,
+      ...docSnap.data()
     })) as Category[];
+
+    // জাভাস্ক্রিপ্ট মেমোরিতে নিখুঁত ফিল্টার ও সাজানো
+    return list
+      .filter(cat => cat.status === 'active')
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
   } catch (error) {
-    console.error("Error fetching categories:", error);
+    console.error("Error fetching categories from Firestore:", error);
     throw error;
   }
 };
 
 /**
- * ফিল্টার অপশন দিয়ে প্রোডাক্ট আনার ফাংশন (Search, Category etc.)
+ * ফিল্টার অপশন দিয়ে প্রোডাক্ট আনার ফাংশন
  */
 export interface ProductFilters {
   categoryId?: string;
@@ -48,34 +46,45 @@ export interface ProductFilters {
 
 export const getProducts = async (filters?: ProductFilters): Promise<Product[]> => {
   try {
-    // শুধুমাত্র 'active' স্ট্যাটাসের প্রোডাক্টগুলো দেখাবে
-    let q: Query<DocumentData> = query(productsRef, where('status', '==', 'active'));
+    const snapshot = await getDocs(productsRef);
+    let list = snapshot.docs.map(docSnap => ({
+      id: docSnap.id,
+      ...docSnap.data()
+    })) as Product[];
 
-    // ক্যাটাগরি ফিল্টার
-    if (filters?.categoryId) {
-      q = query(q, where('categoryId', '==', filters.categoryId));
+    // ১. একটিভ প্রোডাক্ট ফিল্টার
+    list = list.filter(p => !p.status || p.status === 'active');
+
+    // ২. ক্যাটাগরি ফিল্টার
+    if (filters?.categoryId && filters.categoryId !== 'all') {
+      const catId = filters.categoryId.toLowerCase();
+      list = list.filter(p => 
+        p.categoryId?.toLowerCase() === catId || 
+        (p as { categoryName?: string }).categoryName?.toLowerCase() === catId
+      );
     }
     
-    // ফিচারড প্রোডাক্ট ফিল্টার
+    // ৩. ফিচারড প্রোডাক্ট ফিল্টার
     if (filters?.isFeatured) {
-      q = query(q, where('isFeatured', '==', true));
+      list = list.filter(p => p.isFeatured === true);
     }
 
-    // ট্রেন্ডিং ফিল্টার
+    // ৪. ট্রেন্ডিং ফিল্টার
     if (filters?.isTrending) {
-      q = query(q, where('isTrending', '==', true));
+      list = list.filter(p => p.isTrending === true);
     }
 
-    // লিমিট (যেমন: হোম পেজে শুধু ৮টা প্রোডাক্ট দেখানোর জন্য)
-    if (filters?.maxLimit) {
-      q = query(q, limit(filters.maxLimit));
+    // ৫. নিউ অ্যারাইভাল ফিল্টার
+    if (filters?.isNewArrival) {
+      list = list.filter(p => p.isNewArrival === true);
     }
 
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Product[];
+    // ৬. ম্যাক্সিমাম লিমিট
+    if (filters?.maxLimit && filters.maxLimit > 0) {
+      list = list.slice(0, filters.maxLimit);
+    }
+
+    return list;
   } catch (error) {
     console.error("Error fetching products:", error);
     throw error;
@@ -83,7 +92,7 @@ export const getProducts = async (filters?: ProductFilters): Promise<Product[]> 
 };
 
 /**
- * প্রোডাক্টের আইডি দিয়ে একটি নির্দিষ্ট প্রোডাক্টের বিস্তারিত আনার ফাংশন
+ * প্রোডাক্টের আইডি দিয়ে বিস্তারিত তথ্য পাওয়ার ফাংশন
  */
 export const getProductById = async (productId: string): Promise<Product | null> => {
   try {
@@ -101,16 +110,15 @@ export const getProductById = async (productId: string): Promise<Product | null>
 };
 
 /**
- * প্রোডাক্টের স্লাগ (URL) দিয়ে প্রোডাক্ট আনার ফাংশন (SEO ফ্রেন্ডলি রাউটিং এর জন্য)
+ * প্রোডাক্টের স্লাগ (URL) দিয়ে প্রোডাক্ট খোঁজার ফাংশন
  */
 export const getProductBySlug = async (slug: string): Promise<Product | null> => {
   try {
-    const q = query(productsRef, where('slug', '==', slug), where('status', '==', 'active'), limit(1));
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(productsRef);
+    const foundDoc = snapshot.docs.find(d => d.data().slug === slug && d.data().status === 'active');
 
-    if (!snapshot.empty) {
-      const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() } as Product;
+    if (foundDoc) {
+      return { id: foundDoc.id, ...foundDoc.data() } as Product;
     }
     return null;
   } catch (error) {
