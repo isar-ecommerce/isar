@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, 
   ChevronLeft, 
@@ -11,7 +11,8 @@ import {
   CreditCard, 
   Clock, 
   Star, 
-  Loader2 
+  Loader2,
+  Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,91 +22,15 @@ import { getCategoryIconConfig } from '../../utils/categoryIcons';
 import FlashSaleTimer from '../../components/home/FlashSaleTimer';
 import type { Product, Category } from '../../types/product';
 
-// কোনো হার্ডকোডেড ক্যাটাগরি নেই - শুধুমাত্র ফায়ারস্টোর অ্যাডমিনের ক্যাটাগরি লোড হবে
-const INITIAL_CATEGORIES: Category[] = [];
-
-// ফলব্যাক প্রোডাক্ট (Bags & Phone Accessories)
-const FALLBACK_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    name: 'Premium Waterproof Travel Laptop Backpack',
-    slug: 'travel-laptop-backpack',
-    shortDescription: 'Ergonomic water-resistant backpack for daily commute and travel.',
-    description: 'Durable waterproof material with padded laptop compartment and USB charging port.',
-    price: 2450,
-    originalPrice: 3200,
-    rating: 4.9,
-    reviewCount: 88,
-    stock: 25,
-    lowStockAlert: 3,
-    sku: 'BAG-01',
-    categoryId: 'backpacks',
-    images: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    name: 'Fast Charging Magnetic Wireless Power Bank 10000mAh',
-    slug: 'magnetic-power-bank',
-    shortDescription: 'Compact high-speed charging for all smartphones.',
-    description: 'MagSafe compatible ultra-slim power bank with digital battery indicator.',
-    price: 1850,
-    originalPrice: 2400,
-    rating: 4.8,
-    reviewCount: 64,
-    stock: 18,
-    lowStockAlert: 2,
-    sku: 'ACC-01',
-    categoryId: 'phone-accessories',
-    images: ['https://images.unsplash.com/photo-1609592424364-a6902264560b?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    name: 'Water-Resistant Anti-Theft Crossbody Sling Bag',
-    slug: 'anti-theft-sling-bag',
-    shortDescription: 'Compact multi-pocket shoulder chest bag for daily essentials.',
-    description: 'Ultra-lightweight durable fabric with secure hidden zipper pockets.',
-    price: 1450,
-    originalPrice: 1950,
-    rating: 4.8,
-    reviewCount: 52,
-    stock: 20,
-    lowStockAlert: 2,
-    sku: 'BAG-02',
-    categoryId: 'backpacks',
-    images: ['https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-];
-
 export default function Home() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   
   const sliderRef = useRef<HTMLDivElement>(null);
   const addItemToCart = useCartStore((state) => state.addItem);
 
-  // ফায়ারস্টোর থেকে অ্যাডমিনের আসল ক্যাটাগরি ও প্রোডাক্ট লোড করা
   useEffect(() => {
     let isMounted = true;
 
@@ -119,8 +44,6 @@ export default function Home() {
         if (isMounted) {
           if (fetchedProducts && fetchedProducts.length > 0) {
             setProducts(fetchedProducts);
-          } else {
-            setProducts(FALLBACK_PRODUCTS);
           }
 
           if (fetchedCategories && fetchedCategories.length > 0) {
@@ -132,9 +55,6 @@ export default function Home() {
         }
       } catch (error) {
         console.error("Error loading homepage live data:", error);
-        if (isMounted) {
-          setProducts(FALLBACK_PRODUCTS);
-        }
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -156,7 +76,21 @@ export default function Home() {
     }
   };
 
-  const handleQuickAddToCart = (product: Product) => {
+  // Buy Now: সরাসরি কার্টে আইটেম যুক্ত করে /checkout পেজে নিয়ে যাবে
+  const handleBuyNow = (product: Product) => {
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
+      return;
+    }
+    addItemToCart(product, 1);
+    navigate('/checkout');
+  };
+
+  const handleAddToCart = (product: Product) => {
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
+      return;
+    }
     addItemToCart(product, 1);
     toast.success(`Added ${product.name} to Cart!`);
   };
@@ -237,8 +171,8 @@ export default function Home() {
                 <CreditCard className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy whitespace-nowrap">Verified Delivery</h4>
-                <p className="text-[10px] text-gray-400 whitespace-nowrap">bKash & COD</p>
+                <h4 className="text-xs font-bold text-navy whitespace-nowrap">Cash on Delivery</h4>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">Pay on Delivery</p>
               </div>
             </div>
 
@@ -261,7 +195,7 @@ export default function Home() {
         <FlashSaleTimer />
       </section>
 
-      {/* Dynamic Categories Section (Shows ONLY if categories exist in Admin) */}
+      {/* Dynamic Categories Section */}
       {categories.length > 0 && (
         <section className="pt-5 pb-4 container mx-auto px-3 sm:px-4">
           <div className="flex items-center justify-between mb-4">
@@ -292,7 +226,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* Trending Products Section */}
+      {/* Trending Products Section with Buy Now & Add to Cart */}
       <section className="py-6 container mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -332,61 +266,101 @@ export default function Home() {
             ref={sliderRef}
             className="flex gap-3 sm:gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth no-scrollbar"
           >
-            {products.map((product) => (
-              <div 
-                key={product.id} 
-                className="w-44 sm:w-56 md:w-64 bg-white rounded-2xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col shrink-0"
-              >
-                <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2 sm:p-3 flex items-center justify-center">
-                  {product.isNewArrival && (
-                    <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      New
-                    </span>
-                  )}
-                  {product.originalPrice && product.originalPrice > product.price && (
-                    <span className="absolute top-2 right-2 z-10 bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md">
-                      -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
-                    </span>
-                  )}
-                  <img 
-                    src={product.images[0] || 'https://via.placeholder.com/400'} 
-                    alt={product.name} 
-                    className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
-                  />
-                </Link>
+            {products.map((product) => {
+              const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
+              const discountPercent = (product.originalPrice && product.originalPrice > product.price)
+                ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+                : 0;
 
-                <div className="p-3 sm:p-4 flex flex-col grow">
-                  {product.rating ? (
-                    <div className="flex items-center gap-1 mb-1 text-amber-500">
-                      <Star className="w-3 h-3 fill-current" />
-                      <span className="text-[11px] font-bold text-navy">{product.rating}</span>
-                      <span className="text-[9px] text-gray-400">({product.reviewCount || 0})</span>
-                    </div>
-                  ) : null}
+              return (
+                <div 
+                  key={product.id} 
+                  className="w-44 sm:w-56 md:w-64 bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col shrink-0"
+                >
+                  <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-3 flex items-center justify-center">
+                    
+                    {/* Sold Out Watermark */}
+                    {isOutOfStock && (
+                      <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
+                        <span className="text-red-500 font-black text-base sm:text-xl tracking-widest uppercase border-2 border-red-500 py-1 px-3 rounded-xl rotate-[-15deg] shadow-2xl bg-white/95">
+                          SOLD OUT
+                        </span>
+                      </div>
+                    )}
 
-                  <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-bold text-navy mb-2 grow">
-                    {product.name}
+                    {!isOutOfStock && product.isNewArrival && (
+                      <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        New
+                      </span>
+                    )}
+
+                    {!isOutOfStock && discountPercent > 0 && (
+                      <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                        SAVE {discountPercent}%
+                      </span>
+                    )}
+
+                    <img 
+                      src={product.images[0] || 'https://via.placeholder.com/400'} 
+                      alt={product.name} 
+                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                    />
                   </Link>
-                  
-                  <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100">
-                    <div>
-                      <span className="text-sm sm:text-base font-black text-primary font-mono">{product.price.toLocaleString()} BDT</span>
+
+                  <div className="p-3 sm:p-4 flex flex-col grow">
+                    {product.rating ? (
+                      <div className="flex items-center gap-1 mb-1 text-amber-500">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span className="text-[11px] font-bold text-navy">{product.rating}</span>
+                        <span className="text-[9px] text-gray-400">({product.reviewCount || 0})</span>
+                      </div>
+                    ) : null}
+
+                    <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-black text-navy mb-2 grow">
+                      {product.name}
+                    </Link>
+                    
+                    <div className="flex items-baseline gap-1.5 mb-3">
+                      <span className="text-xs sm:text-sm font-black text-primary font-mono">{product.price.toLocaleString()} BDT</span>
                       {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="text-[10px] text-gray-400 line-through ml-1 block sm:inline font-mono">{product.originalPrice.toLocaleString()} BDT</span>
+                        <span className="text-[9px] text-gray-400 line-through font-mono">{product.originalPrice.toLocaleString()} BDT</span>
                       )}
                     </div>
                     
-                    <button 
-                      onClick={() => handleQuickAddToCart(product)}
-                      className="bg-primary/10 hover:bg-primary text-primary hover:text-white p-1.5 sm:p-2 rounded-full transition-colors shrink-0 cursor-pointer"
-                      title="Add to Cart"
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </button>
+                    {/* Buy Now & Add to Cart Dual Buttons */}
+                    <div className="mt-auto pt-2 border-t border-gray-100">
+                      {isOutOfStock ? (
+                        <button 
+                          disabled
+                          className="w-full py-2 px-2 rounded-xl border-2 border-red-500 text-red-500 font-black text-[11px] uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
+                        >
+                          STOCK OUT
+                        </button>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
+                          <button 
+                            onClick={() => handleBuyNow(product)}
+                            className="py-1.5 sm:py-2 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[9px] sm:text-[10px] rounded-lg shadow-xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
+                          >
+                            <Zap className="w-2.5 h-2.5 fill-brand-gold text-brand-gold" />
+                            <span>Buy Now</span>
+                          </button>
+
+                          <button 
+                            onClick={() => handleAddToCart(product)}
+                            className="py-1.5 sm:py-2 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[9px] sm:text-[10px] rounded-lg transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
+                          >
+                            <ShoppingBag className="w-2.5 h-2.5 text-primary" />
+                            <span>Add to Cart</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

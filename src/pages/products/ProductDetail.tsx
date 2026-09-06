@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
   Star, 
   ShoppingBag, 
-  Heart, 
   Truck, 
   ShieldCheck, 
   Check, 
@@ -22,26 +21,21 @@ import toast from 'react-hot-toast';
 
 import { getProductById } from '../../services/productService';
 import { useCartStore } from '../../store/cartStore';
-import { useWishlistStore } from '../../store/wishlistStore';
 import type { Product } from '../../types/product';
-import ExpressOrderModal from '../../components/product/ExpressOrderModal';
 import ProductReviews from '../../components/product/ProductReviews';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
-  
-  const [isExpressModalOpen, setIsExpressModalOpen] = useState<boolean>(false);
 
   const addItemToCart = useCartStore((state) => state.addItem);
-  const { toggleWishlist, isInWishlist } = useWishlistStore();
 
-  // স্ক্রোলিং বাগ ফিক্স: পেজ ওপেন হওয়ামাত্রই একদম ওপর থেকে লোড হবে
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
@@ -73,8 +67,6 @@ export default function ProductDetail() {
     };
   }, [id]);
 
-  const isWishlisted = product ? isInWishlist(product.id) : false;
-
   const handleQuantityChange = (type: 'increase' | 'decrease') => {
     if (!product) return;
     if (type === 'increase' && quantity < product.stock) {
@@ -90,14 +82,11 @@ export default function ProductDetail() {
     toast.success(`Added ${quantity} item(s) to Cart!`);
   };
 
-  const handleToggleWishlist = () => {
+  // Order Now: সরাসরি আইটেম সেট করে /checkout পেজে নিয়ে যাবে
+  const handleOrderNow = () => {
     if (!product) return;
-    const added = toggleWishlist(product);
-    if (added) {
-      toast.success('Added to Wishlist!');
-    } else {
-      toast.success('Removed from Wishlist!');
-    }
+    addItemToCart(product, quantity);
+    navigate('/checkout');
   };
 
   const handleShare = () => {
@@ -133,7 +122,9 @@ export default function ProductDetail() {
     );
   }
 
-  const categoryTag = ((product as { categoryName?: string }).categoryName || product.categoryId || 'Authentic Gear').toUpperCase();
+  // ক্যাটাগরির বিদঘুটে আইডি রোধ: নাম থাকলে নাম দেখাবে, না থাকলে Authentic Gear
+  const rawCat = (product as { categoryName?: string }).categoryName || product.categoryId || '';
+  const categoryTag = (rawCat.length > 20 || rawCat.includes('1') || rawCat.includes('2')) ? 'AUTHENTIC ITEM' : rawCat.toUpperCase();
 
   return (
     <div className="bg-secondary min-h-screen py-6 md:py-10">
@@ -144,7 +135,6 @@ export default function ProductDetail() {
 
       <div className="container mx-auto px-4 max-w-6xl pb-12">
         
-        {/* Breadcrumb Navigation */}
         <nav className="flex items-center gap-2 text-xs md:text-sm text-gray-500 mb-6 flex-wrap">
           <Link to="/" className="hover:text-primary transition-colors">Home</Link>
           <span>/</span>
@@ -194,7 +184,7 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Right Column: Product Information & Order Actions */}
+            {/* Right Column: Product Information */}
             <div className="flex flex-col space-y-5">
               
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -226,7 +216,7 @@ export default function ProductDetail() {
                 <span className="text-xs text-gray-500 font-medium">{product.reviewCount || 1} Verified Customer Review(s)</span>
               </div>
 
-              {/* Price Box in Clean BDT */}
+              {/* Price */}
               <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-baseline gap-3 flex-wrap shadow-inner">
                 <span className="text-3xl sm:text-4xl font-black text-primary font-mono">
                   {product.price.toLocaleString()} BDT
@@ -274,9 +264,9 @@ export default function ProductDetail() {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  {/* High-Converting Order Now Button */}
+                  {/* Order Now (Direct to /checkout) */}
                   <button
-                    onClick={() => setIsExpressModalOpen(true)}
+                    onClick={handleOrderNow}
                     disabled={product.stock === 0}
                     className="w-full flex items-center justify-center gap-2.5 bg-linear-to-r from-primary via-primary-dark to-navy hover:from-blue-700 hover:to-slate-900 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95 cursor-pointer"
                   >
@@ -284,28 +274,14 @@ export default function ProductDetail() {
                     <span>Order Now</span>
                   </button>
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleAddToCart}
-                      disabled={product.stock === 0}
-                      className="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-navy border-2 border-gray-200 hover:border-primary/50 py-3.5 px-6 rounded-2xl font-extrabold text-xs sm:text-sm shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      <ShoppingBag className="w-4 h-4 text-primary" />
-                      Add to Cart
-                    </button>
-
-                    <button
-                      onClick={handleToggleWishlist}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                        isWishlisted 
-                          ? 'border-red-200 bg-red-50 text-red-500 shadow-xs' 
-                          : 'border-gray-200 bg-white text-gray-600 hover:text-red-500 hover:bg-gray-50'
-                      }`}
-                      aria-label="Wishlist"
-                    >
-                      <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-current' : ''}`} />
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={product.stock === 0}
+                    className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-navy border-2 border-gray-200 hover:border-primary/50 py-3.5 px-6 rounded-2xl font-extrabold text-xs sm:text-sm shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <ShoppingBag className="w-4 h-4 text-primary" />
+                    Add to Cart
+                  </button>
                 </div>
               </div>
 
@@ -384,22 +360,12 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* 2-Column Responsive Verified Reviews */}
         <ProductReviews 
           productId={product.id} 
           productName={product.name} 
         />
 
       </div>
-
-      {product && (
-        <ExpressOrderModal 
-          product={product} 
-          isOpen={isExpressModalOpen} 
-          onClose={() => setIsExpressModalOpen(false)} 
-        />
-      )}
-
     </div>
   );
 }
