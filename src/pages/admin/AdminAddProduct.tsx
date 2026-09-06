@@ -11,7 +11,8 @@ import {
   Layers, 
   Tag, 
   ImageIcon,
-  Edit
+  Edit,
+  Scale
 } from 'lucide-react';
 import { 
   collection, 
@@ -29,16 +30,6 @@ import { useAuthStore } from '../../store/authStore';
 import { uploadImageToCloudinary } from '../../cloudinary/upload';
 import type { Category } from '../../types/product';
 
-// প্রাথমিক ৬টি ডিফল্ট ক্যাটাগরি
-const INITIAL_CATEGORIES: Category[] = [
-  { id: 'smartphones', name: 'Smartphones & Mobile', slug: 'smartphones', status: 'active', order: 1 },
-  { id: 'laptops', name: 'Laptops & Computers', slug: 'laptops', status: 'active', order: 2 },
-  { id: 'watches', name: 'Smart Watches & Bands', slug: 'watches', status: 'active', order: 3 },
-  { id: 'audio', name: 'Headphones & Audio', slug: 'audio', status: 'active', order: 4 },
-  { id: 'cameras', name: 'Cameras & Photography', slug: 'cameras', status: 'active', order: 5 },
-  { id: 'fashion', name: 'Men & Women Fashion', slug: 'fashion', status: 'active', order: 6 },
-];
-
 export default function AdminAddProduct() {
   const { id } = useParams<{ id?: string }>();
   const isEditMode = Boolean(id);
@@ -46,8 +37,8 @@ export default function AdminAddProduct() {
   const { user } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ক্যাটাগরি তালিকা স্টেট
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  // ক্যাটাগরি তালিকা স্টেট (কোনো ফেক ক্যাটাগরি থাকবে না)
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isFetchingProduct, setIsFetchingProduct] = useState<boolean>(false);
   
   // প্রোডাক্ট ফর্ম স্টেট
@@ -58,10 +49,11 @@ export default function AdminAddProduct() {
   
   const [price, setPrice] = useState<number | ''>('');
   const [originalPrice, setOriginalPrice] = useState<number | ''>('');
+  const [weightInKg, setWeightInKg] = useState<number | ''>(0.5); // স্টেডফাস্ট ডেলিভারি হিসাবের জন্য
   const [stock, setStock] = useState<number | ''>(10);
   const [lowStockAlert, setLowStockAlert] = useState<number | ''>(2);
   const [sku, setSku] = useState<string>('');
-  const [categoryId, setCategoryId] = useState<string>('smartphones');
+  const [categoryId, setCategoryId] = useState<string>('');
 
   // ইমেজেস স্টেট (Cloudinary URLs)
   const [images, setImages] = useState<string[]>([]);
@@ -75,7 +67,7 @@ export default function AdminAddProduct() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // ১. ফায়ারস্টোর থেকে কাস্টম ক্যাটাগরি লোড করা
+  // ১. ফায়ারস্টোর থেকে শুধুমাত্র অ্যাডমিনের তৈরি করা আসল ক্যাটাগরি লোড করা
   useEffect(() => {
     let isMounted = true;
 
@@ -83,35 +75,27 @@ export default function AdminAddProduct() {
       try {
         const snapshot = await getDocs(collection(db, 'categories'));
         const firestoreList = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Category[];
-        const activeCustom = firestoreList.filter(c => c.status === 'active');
-
-        const mergedCategories = [
-          ...INITIAL_CATEGORIES.filter(ic => !activeCustom.some(ac => ac.slug === ic.slug)),
-          ...activeCustom
-        ].sort((a, b) => (a.order || 0) - (b.order || 0));
+        const activeCustom = firestoreList
+          .filter(c => c.status === 'active')
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
 
         if (isMounted) {
-          setCategories(mergedCategories);
-          if (mergedCategories.length > 0 && !isEditMode) {
-            setCategoryId(mergedCategories[0].id);
+          setCategories(activeCustom);
+          if (activeCustom.length > 0 && !isEditMode && !categoryId) {
+            setCategoryId(activeCustom[0].id);
           }
         }
       } catch (error) {
         console.error("Error fetching categories:", error);
-        if (isMounted) {
-          setCategories(INITIAL_CATEGORIES);
-        }
       }
     };
 
-    Promise.resolve().then(() => {
-      fetchCategories();
-    });
+    fetchCategories();
 
     return () => {
       isMounted = false;
     };
-  }, [isEditMode]);
+  }, [isEditMode, categoryId]);
 
   // ২. Edit Mode হলে ফায়ারস্টোর থেকে প্রোডাক্টের আগের ডেটা লোড করা
   useEffect(() => {
@@ -132,10 +116,11 @@ export default function AdminAddProduct() {
           setDescription(data.description || '');
           setPrice(data.price ?? '');
           setOriginalPrice(data.originalPrice ?? '');
+          setWeightInKg(data.weightInKg ?? 0.5);
           setStock(data.stock ?? 10);
           setLowStockAlert(data.lowStockAlert ?? 2);
           setSku(data.sku || '');
-          setCategoryId(data.categoryId || 'smartphones');
+          setCategoryId(data.categoryId || '');
           setImages(data.images || []);
           setStatus(data.status || 'active');
           setIsFeatured(data.isFeatured || false);
@@ -155,16 +140,14 @@ export default function AdminAddProduct() {
       }
     };
 
-    Promise.resolve().then(() => {
-      fetchProductDetails();
-    });
+    fetchProductDetails();
 
     return () => {
       isMounted = false;
     };
   }, [id, navigate]);
 
-  // প্রোডাক্টের নাম লিখলে অটোমেটিক স্লাগ ও SKU জেনারেট করা (শুধুমাত্র Add Mode এ)
+  // প্রোডাক্টের নাম লিখলে অটোমেটিক স্লাগ ও SKU জেনারেট করা
   const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setName(val);
@@ -198,7 +181,7 @@ export default function AdminAddProduct() {
 
       const uploadedUrl = await uploadImageToCloudinary(file);
       setImages((prev) => [...prev, uploadedUrl]);
-      toast.success('Image ready & attached!');
+      toast.success('Image processed to 1:1 HD & uploaded!');
     } catch (error: unknown) {
       console.error('Image upload failed:', error);
       const err = error as Error;
@@ -238,6 +221,9 @@ export default function AdminAddProduct() {
     try {
       setIsSubmitting(true);
 
+      const selectedCat = categories.find(c => c.id === categoryId);
+      const categoryName = selectedCat ? selectedCat.name : 'General';
+
       const productPayload = {
         name: name.trim(),
         slug: slug.trim() || name.toLowerCase().replace(/\s+/g, '-'),
@@ -245,10 +231,12 @@ export default function AdminAddProduct() {
         description: description.trim() || `<p>${name.trim()}</p>`,
         price: Number(price),
         originalPrice: originalPrice !== '' ? Number(originalPrice) : null,
+        weightInKg: weightInKg !== '' ? Number(weightInKg) : 0.5,
         stock: Number(stock) || 0,
         lowStockAlert: Number(lowStockAlert) || 2,
         sku: sku.trim() || `ISAR-${Date.now().toString().slice(-6)}`,
-        categoryId: categoryId || 'smartphones',
+        categoryId: categoryId || (categories[0]?.id || 'general'),
+        categoryName: categoryName,
         images: images,
         status: status,
         isFeatured: isFeatured,
@@ -338,7 +326,7 @@ export default function AdminAddProduct() {
                 required
                 value={name}
                 onChange={handleNameChange}
-                placeholder="e.g. Wireless Noise Cancelling Headphones"
+                placeholder="e.g. Premium Travel Backpack"
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
               />
             </div>
@@ -350,22 +338,27 @@ export default function AdminAddProduct() {
                 type="text"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
-                placeholder="wireless-headphones"
+                placeholder="premium-travel-backpack"
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
               />
             </div>
 
-            {/* Category Dropdown */}
+            {/* Dynamic Category Dropdown (Only Admin Created Categories) */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-navy">Category</label>
+              <label className="text-xs font-bold text-navy">Category *</label>
               <select
+                required
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
               >
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
+                {categories.length === 0 ? (
+                  <option value="">No categories found (Create one in Category Manager)</option>
+                ) : (
+                  categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -396,17 +389,17 @@ export default function AdminAddProduct() {
           </div>
         </div>
 
-        {/* Pricing & Inventory Card */}
+        {/* Pricing & Inventory Card in Pure BDT with Weight */}
         <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
           <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-brand-green" /> Pricing & Inventory
+            <DollarSign className="w-4 h-4 text-brand-green" /> Pricing, Weight & Inventory
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
             
-            {/* Price */}
+            {/* Price in BDT */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-navy">Selling Price (৳) *</label>
+              <label className="text-xs font-bold text-navy">Selling Price (BDT) *</label>
               <input
                 type="number"
                 required
@@ -418,9 +411,9 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Original Price */}
+            {/* Original Price in BDT */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-navy">Original Price (৳)</label>
+              <label className="text-xs font-bold text-navy">Original Price (BDT)</label>
               <input
                 type="number"
                 min="1"
@@ -428,6 +421,23 @@ export default function AdminAddProduct() {
                 onChange={(e) => setOriginalPrice(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="6000"
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors font-mono"
+              />
+            </div>
+
+            {/* Weight in Kg (For Steadfast dynamic calculation) */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-navy flex items-center gap-1">
+                <Scale className="w-3 h-3 text-indigo-600" /> Weight (kg) *
+              </label>
+              <input
+                type="number"
+                required
+                step="0.1"
+                min="0.1"
+                value={weightInKg}
+                onChange={(e) => setWeightInKg(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="0.5"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm font-bold text-indigo-600 focus:bg-white focus:outline-none focus:border-primary transition-colors font-mono"
               />
             </div>
 
@@ -465,7 +475,7 @@ export default function AdminAddProduct() {
                 type="text"
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
-                placeholder="ISAR-HEAD-01"
+                placeholder="ISAR-BAG-01"
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors uppercase font-mono"
               />
             </div>
@@ -527,7 +537,7 @@ export default function AdminAddProduct() {
               {uploadingImage ? (
                 <>
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  <span className="text-xs font-bold text-navy">Processing & Attaching Image...</span>
+                  <span className="text-xs font-bold text-navy">Processing 1:1 HD Canvas & Uploading...</span>
                 </>
               ) : (
                 <>
@@ -535,7 +545,7 @@ export default function AdminAddProduct() {
                     <Upload className="w-5 h-5" />
                   </div>
                   <span className="text-xs font-bold text-navy">Click to upload product image</span>
-                  <span className="text-[11px] text-gray-400">PNG, JPG or WEBP up to 5MB (Auto-compressed to HD)</span>
+                  <span className="text-[11px] text-gray-400">PNG, JPG or WEBP (Auto-centered into 1:1 Square Ultra-HD)</span>
                 </>
               )}
             </button>

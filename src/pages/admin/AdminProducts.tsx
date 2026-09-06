@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -27,13 +27,14 @@ export default function AdminProducts() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ফায়ারস্টোর থেকে সব প্রোডাক্ট লোড করার ফাংশন
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
+      setLoading(true);
       const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      const list = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const list = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
       })) as Product[];
 
       setProducts(list);
@@ -43,14 +44,19 @@ export default function AdminProducts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    
+    let isMounted = true;
     Promise.resolve().then(() => {
-      fetchProducts();
+      if (isMounted) {
+        fetchProducts();
+      }
     });
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchProducts]);
 
   // প্রোডাক্ট ডিলিট হ্যান্ডলার
   const handleDeleteProduct = async (id: string, name: string) => {
@@ -119,14 +125,14 @@ export default function AdminProducts() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setLoading(true); fetchProducts(); }}
-            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2"
+            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
 
           <Link
             to="/admin/products/add"
-            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2"
+            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add New Product
           </Link>
@@ -137,7 +143,7 @@ export default function AdminProducts() {
       <div className="bg-white rounded-2xl p-4 shadow-modern border border-gray-100 flex flex-wrap items-center justify-between gap-4">
         
         {/* Search Input */}
-       <div className="relative flex-1 min-w-60">
+        <div className="relative flex-1 min-w-60">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -182,7 +188,7 @@ export default function AdminProducts() {
             </p>
             <Link
               to="/admin/products/add"
-              className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-dark transition-colors inline-flex items-center gap-2"
+              className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-dark transition-colors inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add Product
             </Link>
@@ -210,7 +216,7 @@ export default function AdminProducts() {
                         <img
                           src={product.images[0] || 'https://via.placeholder.com/80'}
                           alt={product.name}
-                         className="w-10 h-10 rounded-lg object-cover bg-gray-50 border border-gray-100 shrink-0"
+                          className="w-10 h-10 rounded-lg object-cover bg-gray-50 border border-gray-100 shrink-0"
                         />
                         <div className="min-w-0">
                           <Link
@@ -232,14 +238,14 @@ export default function AdminProducts() {
                       {product.sku || 'N/A'}
                     </td>
 
-                    {/* Price */}
+                    {/* Price in BDT */}
                     <td className="py-3 px-4">
-                      <span className="font-extrabold text-navy block">
-                        ৳{product.price.toLocaleString()}
+                      <span className="font-extrabold text-navy font-mono block">
+                        {product.price.toLocaleString()} BDT
                       </span>
                       {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="text-[10px] text-gray-400 line-through">
-                          ৳{product.originalPrice.toLocaleString()}
+                        <span className="text-[10px] text-gray-400 line-through font-mono">
+                          {product.originalPrice.toLocaleString()} BDT
                         </span>
                       )}
                     </td>
@@ -265,7 +271,7 @@ export default function AdminProducts() {
                     <td className="py-3 px-4">
                       <button
                         onClick={() => handleToggleStatus(product)}
-                        className="focus:outline-none"
+                        className="focus:outline-none cursor-pointer"
                         title="Click to toggle status"
                       >
                         {product.status === 'active' ? (
@@ -285,7 +291,7 @@ export default function AdminProducts() {
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           to={`/admin/products/edit/${product.id}`}
-                          className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
                           title="Edit Product"
                         >
                           <Edit className="w-4 h-4" />
@@ -294,7 +300,7 @@ export default function AdminProducts() {
                         <button
                           onClick={() => handleDeleteProduct(product.id, product.name)}
                           disabled={deletingId === product.id}
-                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                           title="Delete Product"
                         >
                           {deletingId === product.id ? (
