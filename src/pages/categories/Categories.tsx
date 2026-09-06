@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -8,13 +8,15 @@ import {
   ShoppingBag, 
   Star, 
   Sparkles,
-  Layers
+  Layers,
+  Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useCartStore } from '../../store/cartStore';
 import { getCategories, getProducts } from '../../services/productService';
 import { getCategoryIconConfig } from '../../utils/categoryIcons';
+import ExpressOrderModal from '../../components/product/ExpressOrderModal';
 import type { Category, Product } from '../../types/product';
 
 export default function Categories() {
@@ -26,9 +28,11 @@ export default function Categories() {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // 1-Click Buy Now Modal State
+  const [selectedProductForBuyNow, setSelectedProductForBuyNow] = useState<Product | null>(null);
+
   const addItemToCart = useCartStore((state) => state.addItem);
 
-  // শুধুমাত্র অ্যাডমিনের তৈরি করা আসল ক্যাটাগরি লোড হবে (কোনো ডামি ক্যাটাগরি থাকবে না)
   useEffect(() => {
     let isMounted = true;
 
@@ -69,7 +73,6 @@ export default function Categories() {
     };
   }, []);
 
-  // সিলেক্টেড ক্যাটাগরি ও সার্চ ফিল্টারিং
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const customCategoryName = (product as { categoryName?: string }).categoryName || '';
@@ -89,7 +92,23 @@ export default function Categories() {
     });
   }, [products, selectedCategoryId, searchQuery]);
 
-  const handleQuickAddToCart = (product: Product) => {
+  const handleBuyNow = (e: MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
+      return;
+    }
+    setSelectedProductForBuyNow(product);
+  };
+
+  const handleAddToCart = (e: MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
+      return;
+    }
     addItemToCart(product, 1);
     toast.success(`Added ${product.name} to Cart!`);
   };
@@ -117,7 +136,6 @@ export default function Categories() {
             </div>
           </div>
 
-          {/* Search Input */}
           <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -130,7 +148,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* 1. Category Tab Bar (Only Admin Created Categories) */}
+        {/* Horizontal Category Tab Bar */}
         <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-modern border border-gray-100">
           <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
             {categories.map((cat) => {
@@ -157,7 +175,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* 2. Active Category Title & Live Item Count */}
+        {/* Active Category Header */}
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
             <span className="text-base sm:text-lg font-black text-navy">
@@ -174,7 +192,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* 3. Products Responsive Grid */}
+        {/* Products Grid (Urbaland-Style) */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
@@ -195,68 +213,120 @@ export default function Categories() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-            {filteredProducts.map((product) => (
-              <div 
-                key={product.id}
-                className="bg-white rounded-2xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col"
-              >
-                {/* Product Image Frame */}
-                <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 sm:p-3 flex items-center justify-center">
-                  {product.isNewArrival && (
-                    <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      New
-                    </span>
-                  )}
-                  {product.originalPrice && product.originalPrice > product.price && (
-                    <span className="absolute top-2 right-2 z-10 bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md">
-                      -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
-                    </span>
-                  )}
-                  <img 
-                    src={product.images[0] || 'https://via.placeholder.com/400'} 
-                    alt={product.name} 
-                    className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
-                  />
-                </Link>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            {filteredProducts.map((product) => {
+              const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
+              const discountPercent = (product.originalPrice && product.originalPrice > product.price)
+                ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+                : 0;
 
-                {/* Product Info */}
-                <div className="p-3 sm:p-3.5 flex flex-col grow">
-                  {product.rating ? (
-                    <div className="flex items-center gap-1 mb-1 text-amber-500">
-                      <Star className="w-3 h-3 fill-current" />
-                      <span className="text-[11px] font-bold text-navy">{product.rating}</span>
-                      <span className="text-[9px] text-gray-400">({product.reviewCount || 0})</span>
-                    </div>
-                  ) : null}
+              return (
+                <div 
+                  key={product.id}
+                  className="bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col"
+                >
+                  {/* Product Image Frame */}
+                  <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 sm:p-3 flex items-center justify-center">
+                    
+                    {/* Sold Out Red Watermark Stamp */}
+                    {isOutOfStock && (
+                      <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
+                        <span className="text-red-500 font-black text-lg sm:text-xl tracking-widest uppercase border-3 border-red-500 py-1 px-3 rounded-xl rotate-[-15deg] shadow-2xl bg-white/95">
+                          SOLD OUT
+                        </span>
+                      </div>
+                    )}
 
-                  <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-bold text-navy mb-2 grow">
-                    {product.name}
+                    {/* New Badge */}
+                    {!isOutOfStock && product.isNewArrival && (
+                      <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                        New
+                      </span>
+                    )}
+
+                    {/* Save Discount Badge */}
+                    {!isOutOfStock && discountPercent > 0 && (
+                      <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                        SAVE {discountPercent}%
+                      </span>
+                    )}
+
+                    <img 
+                      src={product.images[0] || 'https://via.placeholder.com/400'} 
+                      alt={product.name} 
+                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                    />
                   </Link>
-                  
-                  <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100">
-                    <div>
+
+                  {/* Product Info & Action Buttons */}
+                  <div className="p-3 sm:p-3.5 flex flex-col grow">
+                    {product.rating ? (
+                      <div className="flex items-center gap-1 mb-1 text-amber-500">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span className="text-[11px] font-bold text-navy">{product.rating}</span>
+                        <span className="text-[9px] text-gray-400">({product.reviewCount || 0})</span>
+                      </div>
+                    ) : null}
+
+                    <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow">
+                      {product.name}
+                    </Link>
+                    
+                    <div className="flex items-baseline gap-1.5 mb-2.5">
                       <span className="text-xs sm:text-sm font-black text-primary font-mono">{product.price.toLocaleString()} BDT</span>
                       {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="text-[9px] text-gray-400 line-through ml-1 block sm:inline font-mono">{product.originalPrice.toLocaleString()} BDT</span>
+                        <span className="text-[9px] text-gray-400 line-through font-mono">{product.originalPrice.toLocaleString()} BDT</span>
                       )}
                     </div>
-                    
-                    <button 
-                      onClick={() => handleQuickAddToCart(product)}
-                      className="bg-primary/10 hover:bg-primary text-primary hover:text-white p-1.5 rounded-xl transition-colors shrink-0 cursor-pointer"
-                      title="Add to Cart"
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                    </button>
+
+                    {/* Urbaland-Style Action Buttons */}
+                    <div className="mt-auto pt-2 border-t border-gray-100">
+                      {isOutOfStock ? (
+                        <button 
+                          disabled
+                          className="w-full py-2 px-2 rounded-xl border-2 border-red-500 text-red-500 font-black text-[11px] uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
+                        >
+                          STOCK OUT
+                        </button>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
+                          <button 
+                            onClick={(e) => handleBuyNow(e, product)}
+                            className="py-1.5 sm:py-2 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[9px] sm:text-[10px] rounded-lg shadow-xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
+                          >
+                            <Zap className="w-2.5 h-2.5 fill-brand-gold text-brand-gold" />
+                            <span>Buy Now</span>
+                          </button>
+
+                          <button 
+                            onClick={(e) => handleAddToCart(e, product)}
+                            className="py-1.5 sm:py-2 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[9px] sm:text-[10px] rounded-lg transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
+                          >
+                            <ShoppingBag className="w-2.5 h-2.5 text-primary" />
+                            <span>Add to Cart</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
       </div>
+
+      {/* 1-Click Buy Now Modal */}
+      {selectedProductForBuyNow && (
+        <ExpressOrderModal 
+          product={selectedProductForBuyNow}
+          isOpen={Boolean(selectedProductForBuyNow)}
+          onClose={() => setSelectedProductForBuyNow(null)}
+        />
+      )}
+
     </div>
   );
 }

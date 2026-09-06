@@ -11,63 +11,16 @@ import {
   RefreshCw,
   Heart,
   Check,
-  Filter
+  Filter,
+  Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { getProducts, getCategories } from '../../services/productService';
 import { useCartStore } from '../../store/cartStore';
 import { useWishlistStore } from '../../store/wishlistStore';
+import ExpressOrderModal from '../../components/product/ExpressOrderModal';
 import type { Product, Category } from '../../types/product';
-
-const FALLBACK_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    name: 'Premium Waterproof Travel Laptop Backpack',
-    slug: 'travel-laptop-backpack',
-    shortDescription: 'Ergonomic water-resistant backpack for daily commute and travel.',
-    description: 'Durable waterproof material with padded laptop compartment and USB charging port.',
-    price: 2450,
-    originalPrice: 3200,
-    stock: 25,
-    lowStockAlert: 3,
-    sku: 'BAG-01',
-    categoryId: 'backpacks',
-    images: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    rating: 4.9,
-    reviewCount: 88,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    name: 'Fast Charging Magnetic Wireless Power Bank 10000mAh',
-    slug: 'magnetic-power-bank',
-    shortDescription: 'Compact high-speed charging for all smartphones.',
-    description: 'MagSafe compatible ultra-slim power bank with digital battery indicator.',
-    price: 1850,
-    originalPrice: 2400,
-    stock: 18,
-    lowStockAlert: 2,
-    sku: 'ACC-01',
-    categoryId: 'phone-accessories',
-    images: ['https://images.unsplash.com/photo-1609592424364-a6902264560b?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: true,
-    rating: 4.8,
-    reviewCount: 64,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-];
 
 export default function Products() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,6 +28,9 @@ export default function Products() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState<boolean>(false);
+
+  // 1-Click Buy Now Modal State
+  const [selectedProductForBuyNow, setSelectedProductForBuyNow] = useState<Product | null>(null);
 
   const selectedCategory = searchParams.get('category') || '';
   const searchQuery = searchParams.get('search') || '';
@@ -107,7 +63,6 @@ export default function Products() {
     return 0;
   };
 
-  // ফায়ারস্টোর থেকে লাইভ ক্যাটাগরি ও প্রোডাক্ট ফেচ করা (কোনো ডামি ক্যাটাগরি মার্জ হবে না)
   useEffect(() => {
     let isMounted = true;
 
@@ -122,8 +77,6 @@ export default function Products() {
         if (isMounted) {
           if (fetchedProducts.length > 0) {
             setProducts(fetchedProducts);
-          } else {
-            setProducts(FALLBACK_PRODUCTS);
           }
 
           if (fetchedCategories.length > 0) {
@@ -135,10 +88,6 @@ export default function Products() {
         }
       } catch (error) {
         console.error("Error loading shop data:", error);
-        if (isMounted) {
-          setProducts(FALLBACK_PRODUCTS);
-          setCategories([]);
-        }
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -153,21 +102,43 @@ export default function Products() {
     };
   }, []);
 
-  const getCategoryCount = (categoryId: string) => {
-    if (!categoryId) return products.length;
-    return products.filter(
-      p => p.categoryId === categoryId || p.categoryId?.toLowerCase() === categoryId.toLowerCase()
-    ).length;
+  // স্মার্ট ক্যাটাগরি ম্যাচিং হেল্পার
+  const isProductInCategory = (product: Product, cat: Category | string) => {
+    const pCatId = (product.categoryId || '').toLowerCase().trim();
+    const pCatName = ((product as { categoryName?: string }).categoryName || '').toLowerCase().trim();
+
+    if (typeof cat === 'string') {
+      const target = cat.toLowerCase().trim();
+      return pCatId === target || pCatName === target || pCatName.includes(target);
+    }
+
+    const targetId = cat.id.toLowerCase().trim();
+    const targetSlug = (cat.slug || '').toLowerCase().trim();
+    const targetName = cat.name.toLowerCase().trim();
+
+    return (
+      pCatId === targetId ||
+      pCatId === targetSlug ||
+      pCatId.includes(targetSlug) ||
+      pCatName === targetName ||
+      pCatName.includes(targetName)
+    );
+  };
+
+  const getCategoryCount = (category: Category) => {
+    return products.filter(p => isProductInCategory(p, category)).length;
   };
 
   const filteredProducts = useMemo(() => {
+    const selectedCatObj = categories.find(c => c.id === selectedCategory || c.slug === selectedCategory);
+
     return products
       .filter((product) => {
         if (selectedCategory && selectedCategory !== 'all') {
-          const matchCategory = 
-            product.categoryId === selectedCategory ||
-            product.categoryId?.toLowerCase() === selectedCategory.toLowerCase();
-          if (!matchCategory) return false;
+          const matched = selectedCatObj 
+            ? isProductInCategory(product, selectedCatObj)
+            : isProductInCategory(product, selectedCategory);
+          if (!matched) return false;
         }
 
         if (searchQuery) {
@@ -192,7 +163,7 @@ export default function Products() {
         if (sortBy === 'newest') return getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt);
         return 0;
       });
-  }, [products, selectedCategory, searchQuery, minPrice, maxPrice, inStockOnly, selectedRating, sortBy]);
+  }, [products, selectedCategory, categories, searchQuery, minPrice, maxPrice, inStockOnly, selectedRating, sortBy]);
 
   const handleCategorySelect = (categoryId: string) => {
     if (selectedCategory === categoryId || !categoryId) {
@@ -214,11 +185,21 @@ export default function Products() {
     setIsFilterDrawerOpen(false);
   };
 
-  const handleQuickAddToCart = (e: MouseEvent, product: Product) => {
+  const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
-    if (product.stock === 0) {
-      toast.error('This product is currently out of stock');
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
+      return;
+    }
+    setSelectedProductForBuyNow(product);
+  };
+
+  const handleAddToCart = (e: MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
       return;
     }
     addItemToCart(product, 1);
@@ -282,7 +263,7 @@ export default function Products() {
           <div className="hidden lg:flex items-center gap-2 flex-wrap">
             {selectedCategory && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
-                Category: {categories.find(c => c.id === selectedCategory)?.name || selectedCategory}
+                Category: {categories.find(c => c.id === selectedCategory || c.slug === selectedCategory)?.name || selectedCategory}
                 <button onClick={() => handleCategorySelect('')} className="hover:text-red-500 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -365,7 +346,7 @@ export default function Products() {
                 )}
               </div>
 
-              {/* 1. Category Filter Section (Only Admin Created Categories) */}
+              {/* Category Filter */}
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Categories</h4>
                 <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
@@ -382,17 +363,19 @@ export default function Products() {
                   </button>
 
                   {categories.map((cat) => {
-                    const count = getCategoryCount(cat.id);
+                    const count = getCategoryCount(cat);
+                    const isSelected = selectedCategory === cat.id || selectedCategory === cat.slug;
+
                     return (
                       <button
                         key={cat.id}
                         onClick={() => handleCategorySelect(cat.id)}
                         className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                          selectedCategory === cat.id ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
+                          isSelected ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
                         }`}
                       >
                         <span className="truncate pr-2">{cat.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md shrink-0 ${selectedCategory === cat.id ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md shrink-0 ${isSelected ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>
                           {count}
                         </span>
                       </button>
@@ -401,7 +384,7 @@ export default function Products() {
                 </div>
               </div>
 
-              {/* 2. Price Range Filter in Pure BDT */}
+              {/* Price Range Filter */}
               <div className="space-y-3 pt-4 border-t border-gray-100">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Price Range (BDT)</h4>
                 
@@ -444,7 +427,7 @@ export default function Products() {
                 </div>
               </div>
 
-              {/* 3. Availability Filter */}
+              {/* Availability Filter */}
               <div className="pt-4 border-t border-gray-100">
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input
@@ -457,7 +440,7 @@ export default function Products() {
                 </label>
               </div>
 
-              {/* 4. Rating Filter */}
+              {/* Rating Filter */}
               <div className="space-y-2 pt-4 border-t border-gray-100">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Customer Rating</h4>
                 <div className="space-y-1">
@@ -489,7 +472,7 @@ export default function Products() {
             </div>
           </aside>
 
-          {/* Product Grid Area in Pure BDT */}
+          {/* Product Grid Area with Buy Now & Add to Cart */}
           <main className="lg:col-span-3">
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-100 bg-white rounded-3xl p-12 border border-gray-100 shadow-modern">
@@ -501,7 +484,7 @@ export default function Products() {
                 <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto" />
                 <h3 className="text-xl font-black text-navy">No Matching Products Found</h3>
                 <p className="text-xs sm:text-sm text-gray-500 max-w-md mx-auto leading-relaxed">
-                  We couldn't find any products matching your current filters. Try adjusting price or clearing filters.
+                  We couldn't find any products matching your current filters. Try selecting another category or clearing filters.
                 </p>
                 <button 
                   onClick={clearFilters}
@@ -511,9 +494,13 @@ export default function Products() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-6">
                 {filteredProducts.map((product) => {
                   const wishlisted = isInWishlist(product.id);
+                  const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
+                  const discountPercent = (product.originalPrice && product.originalPrice > product.price)
+                    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+                    : 0;
 
                   return (
                     <div 
@@ -523,18 +510,30 @@ export default function Products() {
                       {/* Product Image Box */}
                       <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-3 flex items-center justify-center">
                         
-                        {product.isNewArrival && (
-                          <span className="absolute top-3 left-3 z-10 bg-brand-green text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                        {/* Sold Out Red Watermark Stamp */}
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
+                            <span className="text-red-500 font-black text-xl sm:text-2xl tracking-widest uppercase border-3 border-red-500 py-1 px-3.5 rounded-xl rotate-[-15deg] shadow-2xl bg-white/95">
+                              SOLD OUT
+                            </span>
+                          </div>
+                        )}
+
+                        {/* New Badge */}
+                        {!isOutOfStock && product.isNewArrival && (
+                          <span className="absolute top-3 left-3 z-10 bg-brand-green text-white text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
                             New
                           </span>
                         )}
 
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <span className="absolute top-3 right-3 z-10 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
-                            -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
+                        {/* Save Discount Badge */}
+                        {!isOutOfStock && discountPercent > 0 && (
+                          <span className="absolute top-3 right-3 z-10 bg-red-600 text-white text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                            SAVE {discountPercent}%
                           </span>
                         )}
 
+                        {/* Wishlist Button */}
                         <button
                           onClick={(e) => handleToggleWishlist(e, product)}
                           className={`absolute bottom-3 right-3 z-10 p-2 rounded-full shadow-md backdrop-blur-xs transition-all cursor-pointer ${
@@ -554,9 +553,10 @@ export default function Products() {
                         />
                       </Link>
 
-                      {/* Product Info Box */}
-                      <div className="p-4 sm:p-5 flex flex-col grow">
+                      {/* Product Info & Action Buttons */}
+                      <div className="p-3.5 sm:p-5 flex flex-col grow">
                         
+                        {/* Rating */}
                         {product.rating ? (
                           <div className="flex items-center gap-1 mb-1 text-amber-500">
                             <Star className="w-3.5 h-3.5 fill-current" />
@@ -565,34 +565,56 @@ export default function Products() {
                           </div>
                         ) : null}
 
+                        {/* Title */}
                         <Link 
                           to={`/products/${product.id}`} 
-                          className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-extrabold text-navy mb-2 grow"
+                          className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-black text-navy mb-2 grow"
                         >
                           {product.name}
                         </Link>
 
-                        {/* Price in BDT */}
-                        <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
-                          <div>
-                            <span className="text-base sm:text-lg font-black text-primary font-mono block">
-                              {product.price.toLocaleString()} BDT
+                        {/* Price */}
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="text-sm sm:text-base font-black text-primary font-mono block">
+                            {product.price.toLocaleString()} BDT
+                          </span>
+                          {product.originalPrice && product.originalPrice > product.price && (
+                            <span className="text-[10px] sm:text-[11px] text-gray-400 line-through font-semibold font-mono">
+                              {product.originalPrice.toLocaleString()} BDT
                             </span>
-                            {product.originalPrice && product.originalPrice > product.price && (
-                              <span className="text-[11px] text-gray-400 line-through font-semibold font-mono">
-                                {product.originalPrice.toLocaleString()} BDT
-                              </span>
-                            )}
-                          </div>
-                          
-                          <button 
-                            onClick={(e) => handleQuickAddToCart(e, product)}
-                            disabled={product.stock === 0}
-                            className="bg-primary/10 hover:bg-primary text-primary hover:text-white p-2.5 sm:p-3 rounded-2xl transition-all shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105"
-                            title={product.stock === 0 ? "Out of Stock" : "Add to Cart"}
-                          >
-                            <ShoppingBag className="w-4 h-4" />
-                          </button>
+                          )}
+                        </div>
+
+                        {/* Urbaland-Style Action Buttons */}
+                        <div className="mt-auto pt-2 border-t border-gray-100">
+                          {isOutOfStock ? (
+                            <button 
+                              disabled
+                              className="w-full py-2.5 px-3 rounded-xl border-2 border-red-500 text-red-500 font-black text-xs uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
+                            >
+                              STOCK OUT
+                            </button>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                              {/* 1-Click Buy Now */}
+                              <button 
+                                onClick={(e) => handleBuyNow(e, product)}
+                                className="py-2 sm:py-2.5 px-2 bg-navy hover:bg-slate-800 text-white font-black text-[10px] sm:text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                              >
+                                <Zap className="w-3 h-3 fill-brand-gold text-brand-gold" />
+                                <span>Buy Now</span>
+                              </button>
+
+                              {/* Add to Cart */}
+                              <button 
+                                onClick={(e) => handleAddToCart(e, product)}
+                                className="py-2 sm:py-2.5 px-2 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] sm:text-xs rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                              >
+                                <ShoppingBag className="w-3 h-3 text-primary" />
+                                <span>Add to Cart</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                       </div>
@@ -607,7 +629,7 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Mobile Filter Drawer */}
+      {/* Mobile Filter Drawer Modal */}
       {isFilterDrawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div className="fixed inset-0 bg-navy/60 backdrop-blur-xs" onClick={() => setIsFilterDrawerOpen(false)} />
@@ -639,11 +661,11 @@ export default function Products() {
                     key={cat.id}
                     onClick={() => handleCategorySelect(cat.id)}
                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                      selectedCategory === cat.id ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
+                      selectedCategory === cat.id || selectedCategory === cat.slug ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     <span className="truncate pr-2">{cat.name}</span>
-                    <span className="text-[10px]">{getCategoryCount(cat.id)}</span>
+                    <span className="text-[10px]">{getCategoryCount(cat)}</span>
                   </button>
                 ))}
               </div>
@@ -698,6 +720,15 @@ export default function Products() {
 
           </div>
         </div>
+      )}
+
+      {/* 1-Click Buy Now Modal */}
+      {selectedProductForBuyNow && (
+        <ExpressOrderModal 
+          product={selectedProductForBuyNow}
+          isOpen={Boolean(selectedProductForBuyNow)}
+          onClose={() => setSelectedProductForBuyNow(null)}
+        />
       )}
 
     </div>
