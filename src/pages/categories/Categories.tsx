@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, type MouseEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
   Search, 
@@ -16,10 +16,10 @@ import toast from 'react-hot-toast';
 import { useCartStore } from '../../store/cartStore';
 import { getCategories, getProducts } from '../../services/productService';
 import { getCategoryIconConfig } from '../../utils/categoryIcons';
-import ExpressOrderModal from '../../components/product/ExpressOrderModal';
 import type { Category, Product } from '../../types/product';
 
 export default function Categories() {
+  const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([
     { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 }
   ]);
@@ -27,9 +27,6 @@ export default function Categories() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
-
-  // 1-Click Buy Now Modal State
-  const [selectedProductForBuyNow, setSelectedProductForBuyNow] = useState<Product | null>(null);
 
   const addItemToCart = useCartStore((state) => state.addItem);
 
@@ -73,15 +70,33 @@ export default function Categories() {
     };
   }, []);
 
+  // স্মার্ট ক্যাটাগরি ম্যাচিং
+  const isProductInCategory = (product: Product, targetCatId: string) => {
+    if (targetCatId === 'all') return true;
+
+    const clean = (str?: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const pCatId = clean(product.categoryId);
+    const pCatName = clean((product as { categoryName?: string }).categoryName);
+    const pName = clean(product.name);
+
+    const targetCatObj = categories.find(c => c.id === targetCatId);
+    const targetId = clean(targetCatId);
+    const targetSlug = clean(targetCatObj?.slug);
+    const targetName = clean(targetCatObj?.name);
+
+    if (pCatId && (pCatId === targetId || pCatId === targetSlug)) return true;
+    if (targetSlug && pCatId && (pCatId.includes(targetSlug) || targetSlug.includes(pCatId))) return true;
+    if (targetName && pCatName && (pCatName.includes(targetName) || targetName.includes(pCatName))) return true;
+    if (targetName.length >= 4 && pName.includes(targetName)) return true;
+    if (targetSlug.length >= 4 && pName.includes(targetSlug)) return true;
+
+    return false;
+  };
+
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const customCategoryName = (product as { categoryName?: string }).categoryName || '';
-      
-      const matchesCategory = 
-        selectedCategoryId === 'all' || 
-        product.categoryId === selectedCategoryId || 
-        product.categoryId?.toLowerCase() === selectedCategoryId.toLowerCase() ||
-        customCategoryName.toLowerCase() === selectedCategoryId.toLowerCase();
+      const matchesCategory = isProductInCategory(product, selectedCategoryId);
 
       const matchesSearch = 
         !searchQuery.trim() || 
@@ -90,8 +105,9 @@ export default function Categories() {
 
       return matchesCategory && matchesSearch;
     });
-  }, [products, selectedCategoryId, searchQuery]);
+  }, [products, selectedCategoryId, categories, searchQuery]);
 
+  // Buy Now: সরাসরি কার্টে নিয়ে /checkout পেজে নিয়ে যাবে
   const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -99,7 +115,8 @@ export default function Categories() {
       toast.error('This item is currently sold out');
       return;
     }
-    setSelectedProductForBuyNow(product);
+    addItemToCart(product, 1);
+    navigate('/checkout');
   };
 
   const handleAddToCart = (e: MouseEvent, product: Product) => {
@@ -192,7 +209,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Products Grid (Urbaland-Style) */}
+        {/* Products Grid (Pure BDT & No Wishlist) */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
@@ -228,7 +245,7 @@ export default function Categories() {
                   {/* Product Image Frame */}
                   <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 sm:p-3 flex items-center justify-center">
                     
-                    {/* Sold Out Red Watermark Stamp */}
+                    {/* Sold Out Stamp */}
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
                         <span className="text-red-500 font-black text-lg sm:text-xl tracking-widest uppercase border-3 border-red-500 py-1 px-3 rounded-xl rotate-[-15deg] shadow-2xl bg-white/95">
@@ -237,14 +254,12 @@ export default function Categories() {
                       </div>
                     )}
 
-                    {/* New Badge */}
                     {!isOutOfStock && product.isNewArrival && (
                       <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
                         New
                       </span>
                     )}
 
-                    {/* Save Discount Badge */}
                     {!isOutOfStock && discountPercent > 0 && (
                       <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">
                         SAVE {discountPercent}%
@@ -279,7 +294,7 @@ export default function Categories() {
                       )}
                     </div>
 
-                    {/* Urbaland-Style Action Buttons */}
+                    {/* Action Buttons */}
                     <div className="mt-auto pt-2 border-t border-gray-100">
                       {isOutOfStock ? (
                         <button 
@@ -317,16 +332,6 @@ export default function Categories() {
         )}
 
       </div>
-
-      {/* 1-Click Buy Now Modal */}
-      {selectedProductForBuyNow && (
-        <ExpressOrderModal 
-          product={selectedProductForBuyNow}
-          isOpen={Boolean(selectedProductForBuyNow)}
-          onClose={() => setSelectedProductForBuyNow(null)}
-        />
-      )}
-
     </div>
   );
 }

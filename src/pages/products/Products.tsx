@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, type MouseEvent } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
   SlidersHorizontal, 
@@ -8,29 +8,24 @@ import {
   Loader2, 
   ChevronDown, 
   Star, 
-  RefreshCw,
-  Heart,
-  Check,
-  Filter,
-  Zap
+  RefreshCw, 
+  Check, 
+  Filter, 
+  Zap 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { getProducts, getCategories } from '../../services/productService';
 import { useCartStore } from '../../store/cartStore';
-import { useWishlistStore } from '../../store/wishlistStore';
-import ExpressOrderModal from '../../components/product/ExpressOrderModal';
 import type { Product, Category } from '../../types/product';
 
 export default function Products() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState<boolean>(false);
-
-  // 1-Click Buy Now Modal State
-  const [selectedProductForBuyNow, setSelectedProductForBuyNow] = useState<Product | null>(null);
 
   const selectedCategory = searchParams.get('category') || '';
   const searchQuery = searchParams.get('search') || '';
@@ -42,7 +37,6 @@ export default function Products() {
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
 
   const addItemToCart = useCartStore((state) => state.addItem);
-  const { toggleWishlist, isInWishlist } = useWishlistStore();
 
   const getTimestampMs = (val: unknown): number => {
     if (!val) return 0;
@@ -102,27 +96,30 @@ export default function Products() {
     };
   }, []);
 
-  // স্মার্ট ক্যাটাগরি ম্যাচিং হেল্পার
+  // আল্ট্রা-স্মার্ট সেলফ-হিলিং ক্যাটাগরি ম্যাচিং ইঞ্জিন (হাইফেন ও স্পেস সহনশীল)
   const isProductInCategory = (product: Product, cat: Category | string) => {
-    const pCatId = (product.categoryId || '').toLowerCase().trim();
-    const pCatName = ((product as { categoryName?: string }).categoryName || '').toLowerCase().trim();
+    const clean = (str?: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    if (typeof cat === 'string') {
-      const target = cat.toLowerCase().trim();
-      return pCatId === target || pCatName === target || pCatName.includes(target);
-    }
+    const pCatId = clean(product.categoryId);
+    const pCatName = clean((product as { categoryName?: string }).categoryName);
+    const pName = clean(product.name);
 
-    const targetId = cat.id.toLowerCase().trim();
-    const targetSlug = (cat.slug || '').toLowerCase().trim();
-    const targetName = cat.name.toLowerCase().trim();
+    const targetId = typeof cat === 'string' ? clean(cat) : clean(cat.id);
+    const targetSlug = typeof cat === 'string' ? clean(cat) : clean(cat.slug);
+    const targetName = typeof cat === 'string' ? clean(cat) : clean(cat.name);
 
-    return (
-      pCatId === targetId ||
-      pCatId === targetSlug ||
-      pCatId.includes(targetSlug) ||
-      pCatName === targetName ||
-      pCatName.includes(targetName)
-    );
+    // ১. ডিরেক্ট আইডি বা স্লাগ ম্যাচ
+    if (pCatId && (pCatId === targetId || pCatId === targetSlug)) return true;
+
+    // ২. স্লাগ বা নামের সাথে পার্শিয়াল ম্যাচিং
+    if (targetSlug && pCatId && (pCatId.includes(targetSlug) || targetSlug.includes(pCatId))) return true;
+    if (targetName && pCatName && (pCatName.includes(targetName) || targetName.includes(pCatName))) return true;
+
+    // ৩. টাইটেল কি-ওয়ার্ড ম্যাচ (যেমন: "Emon Bhai smartphone"-এর সাথে "Smart Phone")
+    if (targetName.length >= 4 && pName.includes(targetName)) return true;
+    if (targetSlug.length >= 4 && pName.includes(targetSlug)) return true;
+
+    return false;
   };
 
   const getCategoryCount = (category: Category) => {
@@ -185,6 +182,7 @@ export default function Products() {
     setIsFilterDrawerOpen(false);
   };
 
+  // Buy Now: সরাসরি কার্টে নিয়ে /checkout পেজে নিয়ে যাবে
   const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -192,7 +190,8 @@ export default function Products() {
       toast.error('This item is currently sold out');
       return;
     }
-    setSelectedProductForBuyNow(product);
+    addItemToCart(product, 1);
+    navigate('/checkout');
   };
 
   const handleAddToCart = (e: MouseEvent, product: Product) => {
@@ -204,17 +203,6 @@ export default function Products() {
     }
     addItemToCart(product, 1);
     toast.success(`Added ${product.name} to Cart!`);
-  };
-
-  const handleToggleWishlist = (e: MouseEvent, product: Product) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const added = toggleWishlist(product);
-    if (added) {
-      toast.success('Added to Wishlist!');
-    } else {
-      toast.success('Removed from Wishlist!');
-    }
   };
 
   const hasActiveFilters = Boolean(
@@ -346,7 +334,7 @@ export default function Products() {
                 )}
               </div>
 
-              {/* Category Filter */}
+              {/* 1. Category Filter Section */}
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Categories</h4>
                 <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
@@ -384,7 +372,7 @@ export default function Products() {
                 </div>
               </div>
 
-              {/* Price Range Filter */}
+              {/* 2. Price Range in BDT */}
               <div className="space-y-3 pt-4 border-t border-gray-100">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Price Range (BDT)</h4>
                 
@@ -427,7 +415,7 @@ export default function Products() {
                 </div>
               </div>
 
-              {/* Availability Filter */}
+              {/* 3. Availability Filter */}
               <div className="pt-4 border-t border-gray-100">
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input
@@ -440,7 +428,7 @@ export default function Products() {
                 </label>
               </div>
 
-              {/* Rating Filter */}
+              {/* 4. Rating Filter */}
               <div className="space-y-2 pt-4 border-t border-gray-100">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Customer Rating</h4>
                 <div className="space-y-1">
@@ -472,7 +460,7 @@ export default function Products() {
             </div>
           </aside>
 
-          {/* Product Grid Area with Buy Now & Add to Cart */}
+          {/* Product Grid Area with Buy Now & Add to Cart (NO Wishlist Heart) */}
           <main className="lg:col-span-3">
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-100 bg-white rounded-3xl p-12 border border-gray-100 shadow-modern">
@@ -496,7 +484,6 @@ export default function Products() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-6">
                 {filteredProducts.map((product) => {
-                  const wishlisted = isInWishlist(product.id);
                   const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
                   const discountPercent = (product.originalPrice && product.originalPrice > product.price)
                     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -532,19 +519,6 @@ export default function Products() {
                             SAVE {discountPercent}%
                           </span>
                         )}
-
-                        {/* Wishlist Button */}
-                        <button
-                          onClick={(e) => handleToggleWishlist(e, product)}
-                          className={`absolute bottom-3 right-3 z-10 p-2 rounded-full shadow-md backdrop-blur-xs transition-all cursor-pointer ${
-                            wishlisted 
-                              ? 'bg-red-50 text-red-500 scale-105' 
-                              : 'bg-white/90 text-gray-400 hover:text-red-500 hover:bg-white hover:scale-110'
-                          }`}
-                          aria-label="Wishlist"
-                        >
-                          <Heart className={`w-4 h-4 ${wishlisted ? 'fill-current' : ''}`} />
-                        </button>
 
                         <img 
                           src={product.images[0] || 'https://via.placeholder.com/400'} 
@@ -585,7 +559,7 @@ export default function Products() {
                           )}
                         </div>
 
-                        {/* Urbaland-Style Action Buttons */}
+                        {/* Action Buttons */}
                         <div className="mt-auto pt-2 border-t border-gray-100">
                           {isOutOfStock ? (
                             <button 
@@ -596,7 +570,7 @@ export default function Products() {
                             </button>
                           ) : (
                             <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                              {/* 1-Click Buy Now */}
+                              {/* 1-Click Buy Now (Goes directly to /checkout) */}
                               <button 
                                 onClick={(e) => handleBuyNow(e, product)}
                                 className="py-2 sm:py-2.5 px-2 bg-navy hover:bg-slate-800 text-white font-black text-[10px] sm:text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
@@ -629,7 +603,7 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Mobile Filter Drawer Modal */}
+      {/* Mobile Filter Drawer */}
       {isFilterDrawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div className="fixed inset-0 bg-navy/60 backdrop-blur-xs" onClick={() => setIsFilterDrawerOpen(false)} />
@@ -720,15 +694,6 @@ export default function Products() {
 
           </div>
         </div>
-      )}
-
-      {/* 1-Click Buy Now Modal */}
-      {selectedProductForBuyNow && (
-        <ExpressOrderModal 
-          product={selectedProductForBuyNow}
-          isOpen={Boolean(selectedProductForBuyNow)}
-          onClose={() => setSelectedProductForBuyNow(null)}
-        />
       )}
 
     </div>
