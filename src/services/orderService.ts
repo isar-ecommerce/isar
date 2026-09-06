@@ -6,7 +6,6 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy, 
   serverTimestamp,
   updateDoc
 } from 'firebase/firestore';
@@ -24,10 +23,10 @@ import type { CartItem } from '../store/cartStore';
 const ordersRef = collection(db, 'orders');
 
 /**
- * স্টেডফাস্ট কুরিয়ারের অফিশিয়াল রেট অনুযায়ী স্বয়ংক্রিয় ডায়নামিক ডেলিভারি চার্জ ক্যালকুলেটর
- * ঢাকা সিটি: ৬০ টাকা (প্রথম ১ কেজি), অতিরিক্ত প্রতি কেজিতে +২০ টাকা
- * ঢাকা উপশহর (সাভার, গাজীপুর, কেরানীগঞ্জ, নারায়ণগঞ্জ): ১০০ টাকা (প্রথম ১ কেজি), অতিরিক্ত প্রতি কেজিতে +২০ টাকা
- * ঢাকার বাইরে: ১৩০ টাকা (প্রথম ১ কেজি), অতিরিক্ত প্রতি কেজিতে +২৫ টাকা
+ * Steadfast Official Dynamic Delivery Fee Calculator
+ * Dhaka City: 70 BDT base (up to 1kg), +20 BDT per additional kg
+ * Dhaka Suburbs (Savar, Gazipur, Keraniganj, Narayanganj): 100 BDT base, +20 BDT per additional kg
+ * Outside Dhaka: 130 BDT base, +25 BDT per additional kg
  */
 export const calculateDynamicDeliveryFee = (
   district: string,
@@ -47,7 +46,7 @@ export const calculateDynamicDeliveryFee = (
 
   if (normalizedDistrict === 'dhaka' && !isSubUrban) {
     return {
-      fee: 60 + extraWeight * 20,
+      fee: 70 + extraWeight * 20,
       zone: 'inside_dhaka'
     };
   } else if (isSubUrban) {
@@ -77,16 +76,16 @@ export interface CreateOrderParams {
   totalAmount: number;
   paymentMethod: PaymentMethod;
   paymentStatus?: PaymentStatus;
-  paidAmount?: number;           // বিকাশে অগ্রিম দেওয়া টাকা
-  dueAmount?: number;            // কুরিয়ার ম্যান কাস্টমারের থেকে ক্যাশ নেবে
-  paymentId?: string;            // বিকাশ পেমেন্ট আইডি
-  transactionId?: string;        // বিকাশ ট্রানজেকশন আইডি (trxID)
-  totalWeight?: number;          // মোট পার্সেল ওজন (কেজিতে)
-  deliveryZone?: DeliveryZone;   // ডেলিভারি জোন
+  paidAmount?: number;
+  dueAmount?: number;
+  paymentId?: string;
+  transactionId?: string;
+  totalWeight?: number;
+  deliveryZone?: DeliveryZone;
 }
 
 /**
- * ফায়ারস্টোরে নিখুঁত অগ্রিম পেমেন্ট ও ডেলিভারি হিসাবসহ নতুন অর্ডার তৈরির ফাংশন
+ * Create Order in Firestore with Complete Financial Accounting
  */
 export const createOrder = async (params: CreateOrderParams): Promise<Order> => {
   try {
@@ -94,10 +93,9 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
     const orderId = orderDocRef.id;
     const orderNumber = `ISAR-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    // পণ্যের ওজন সহ অর্ডার আইটেম প্রসেসিং
     let calculatedWeight = 0;
     const orderItems: OrderItem[] = params.cartItems.map((item) => {
-      const itemWeight = 0.5; // ডিফল্ট প্রতি আইটেমে ০.৫ কেজি
+      const itemWeight = 0.5;
       calculatedWeight += itemWeight * item.quantity;
 
       return {
@@ -116,7 +114,6 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
       ? params.totalWeight 
       : Math.max(calculatedWeight, 0.5);
 
-    // পেমেন্ট স্ট্যাটাস ও টাকার নিখুঁত ব্যালেন্সিং
     let finalPaymentStatus: PaymentStatus = params.paymentStatus || 'pending';
     let finalPaidAmount = Number(params.paidAmount) || 0;
     let finalDueAmount = Number(params.dueAmount);
@@ -134,7 +131,6 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
           finalDueAmount = params.totalAmount;
         }
       } else {
-        // ফুল অনলাইন পেমেন্ট (bKash/Nagad/Card)
         finalPaymentStatus = 'paid';
         finalPaidAmount = params.totalAmount;
         finalDueAmount = 0;
@@ -171,7 +167,7 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
           status: 'pending',
           updatedAt: new Date().toISOString(),
           note: finalPaidAmount > 0 
-            ? `Order confirmed with advance payment of ৳${finalPaidAmount}. Due COD: ৳${finalDueAmount}`
+            ? `Order confirmed with advance payment of ${finalPaidAmount} BDT. Due COD: ${finalDueAmount} BDT`
             : 'Order placed successfully (Pending Payment).',
         },
       ],
@@ -193,25 +189,41 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
 };
 
 /**
- * ইউজারের পূর্ববর্তী সব অর্ডার ফেচ করার ফাংশন
+ * Fetch User Orders Safely (Zero-Index Crash Protection)
  */
 export const getUserOrders = async (userId: string): Promise<Order[]> => {
   try {
-    const q = query(ordersRef, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    // কোনো কম্পোজিট ইনডেক্স ছাড়াই সরাসরি ইউজারের সব অর্ডার লোড
+    const q = query(ordersRef, where('userId', '==', userId));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((docSnap) => ({
+    const list = snapshot.docs.map((docSnap) => ({
       id: docSnap.id,
       ...docSnap.data(),
     })) as unknown as Order[];
+
+    // মেমোরিতে নিরাপদে নতুন থেকে পুরোনো তারিখে সাজানো
+    return list.sort((a, b) => {
+      const getTime = (val: unknown): number => {
+        if (!val) return 0;
+        if (val instanceof Date) return val.getTime();
+        if (typeof val === 'object' && val !== null && 'toDate' in (val as Record<string, unknown>)) {
+          return ((val as { toDate: () => Date }).toDate()).getTime();
+        }
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') return new Date(val).getTime();
+        return 0;
+      };
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    });
   } catch (error) {
-    console.error("Error fetching user orders:", error);
+    console.error("Error fetching user orders safely:", error);
     throw error;
   }
 };
 
 /**
- * অর্ডার আইডি দিয়ে বিস্তারিত তথ্য পাওয়ার ফাংশন
+ * Fetch Order Details by ID
  */
 export const getOrderById = async (orderId: string): Promise<Order | null> => {
   try {
@@ -229,7 +241,7 @@ export const getOrderById = async (orderId: string): Promise<Order | null> => {
 };
 
 /**
- * অর্ডার ক্যান্সেল করার ফাংশন
+ * Cancel Order
  */
 export const cancelOrder = async (orderId: string, reason?: string): Promise<void> => {
   try {
