@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { 
   FolderTree, 
@@ -18,58 +18,51 @@ import toast from 'react-hot-toast';
 import { db } from '../../firebase/config';
 import type { Category } from '../../types/product';
 
-// প্রাথমিক ৬টি ডিফল্ট ক্যাটাগরি
-const INITIAL_CATEGORIES: Category[] = [
-  { id: 'smartphones', name: 'Smartphones & Mobile', slug: 'smartphones', status: 'active', order: 1 },
-  { id: 'laptops', name: 'Laptops & Computers', slug: 'laptops', status: 'active', order: 2 },
-  { id: 'watches', name: 'Smart Watches & Bands', slug: 'watches', status: 'active', order: 3 },
-  { id: 'audio', name: 'Headphones & Audio', slug: 'audio', status: 'active', order: 4 },
-  { id: 'cameras', name: 'Cameras & Photography', slug: 'cameras', status: 'active', order: 5 },
-  { id: 'fashion', name: 'Men & Women Fashion', slug: 'fashion', status: 'active', order: 6 },
-];
-
 export default function AdminCategories() {
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   
-  // মডাল স্টেট
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [name, setName] = useState<string>('');
   const [slug, setSlug] = useState<string>('');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
-  const [orderNum, setOrderNum] = useState<number>(7);
+  const [orderNum, setOrderNum] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // ক্যাটাগরি লোড করা ও ইন-মেমোরি স্মার্ট মার্জ
-  const fetchCategories = async () => {
+  // ফায়ারস্টোর থেকে সরাসরি আসল ক্যাটাগরি ফেচ (কোনো ফেক ক্যাটাগরি রি-ইঞ্জেক্ট হবে না)
+  const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
       const snapshot = await getDocs(collection(db, 'categories'));
-      const firestoreList = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Category[];
+      const firestoreList = snapshot.docs.map(d => ({ 
+        id: d.id, 
+        ...d.data() 
+      })) as Category[];
 
-      // ডিফল্ট ক্যাটাগরি এবং আপনার তৈরি করা কাস্টম ক্যাটাগরি (যেমন: Bag) একসাথে মার্জ করা
-      const merged = [
-        ...INITIAL_CATEGORIES.filter(ic => !firestoreList.some(fc => fc.slug === ic.slug)),
-        ...firestoreList
-      ].sort((a, b) => (a.order || 0) - (b.order || 0));
-
-      setCategories(merged);
+      setCategories(firestoreList.sort((a, b) => (a.order || 0) - (b.order || 0)));
     } catch (error) {
       console.error("Error fetching categories:", error);
-      setCategories(INITIAL_CATEGORIES);
+      toast.error("Failed to load categories from database");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    let isMounted = true;
     Promise.resolve().then(() => {
-      fetchCategories();
+      if (isMounted) {
+        fetchCategories();
+      }
     });
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchCategories]);
 
   const handleOpenAddModal = () => {
     setEditingCategory(null);
@@ -116,7 +109,7 @@ export default function AdminCategories() {
         order: Number(orderNum) || (categories.length + 1),
       };
 
-      if (editingCategory && !editingCategory.id.startsWith('smartphones') && !editingCategory.id.startsWith('laptops') && !editingCategory.id.startsWith('watches') && !editingCategory.id.startsWith('audio') && !editingCategory.id.startsWith('cameras') && !editingCategory.id.startsWith('fashion')) {
+      if (editingCategory) {
         // ফায়ারস্টোরে আপডেট
         await updateDoc(doc(db, 'categories', editingCategory.id), categoryData);
         setCategories(prev => prev.map(c => c.id === editingCategory.id ? { ...c, ...categoryData } : c));
@@ -124,7 +117,7 @@ export default function AdminCategories() {
       } else {
         // ফায়ারস্টোরে নতুন তৈরি
         const docRef = await addDoc(collection(db, 'categories'), categoryData);
-        setCategories(prev => [...prev.filter(c => c.slug !== categoryData.slug), { id: docRef.id, ...categoryData }].sort((a, b) => (a.order || 0) - (b.order || 0)));
+        setCategories(prev => [...prev, { id: docRef.id, ...categoryData }].sort((a, b) => (a.order || 0) - (b.order || 0)));
         toast.success('New category created successfully!');
       }
 
@@ -137,22 +130,18 @@ export default function AdminCategories() {
     }
   };
 
-  // ক্যাটাগরি ডিলিট
+  // ক্যাটাগরি ডিলিট (ফায়ারস্টোর থেকে চিরতরে ডিলিট)
   const handleDeleteCategory = async (id: string, catName: string) => {
-    if (!window.confirm(`Are you sure you want to delete "${catName}" category?`)) return;
+    if (!window.confirm(`Are you sure you want to permanently delete "${catName}" category?`)) return;
 
     try {
       setDeletingId(id);
-      // ফায়ারস্টোর আইডি হলে ফায়ারস্টোর থেকে মুছবে
-      if (!INITIAL_CATEGORIES.some(ic => ic.id === id)) {
-        await deleteDoc(doc(db, 'categories', id));
-      }
+      await deleteDoc(doc(db, 'categories', id));
       setCategories(prev => prev.filter(c => c.id !== id));
-      toast.success('Category deleted successfully');
+      toast.success(`Category "${catName}" deleted permanently`);
     } catch (error) {
       console.error("Error deleting category:", error);
-      setCategories(prev => prev.filter(c => c.id !== id));
-      toast.success('Category deleted');
+      toast.error("Failed to delete category from database");
     } finally {
       setDeletingId(null);
     }
@@ -178,7 +167,7 @@ export default function AdminCategories() {
           <div>
             <h1 className="text-2xl font-extrabold text-navy">Category Management</h1>
             <p className="text-xs text-gray-500 mt-0.5">
-              Create and manage product categories for your store
+              Create, edit, and manage product categories for your store
             </p>
           </div>
         </div>
@@ -186,14 +175,14 @@ export default function AdminCategories() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setLoading(true); fetchCategories(); }}
-            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2"
+            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
 
           <button
             onClick={handleOpenAddModal}
-            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2"
+            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add Category
           </button>
@@ -228,7 +217,7 @@ export default function AdminCategories() {
             <p className="text-xs text-gray-500 mb-6">Create a new category to organize your products.</p>
             <button
               onClick={handleOpenAddModal}
-              className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-dark transition-colors inline-flex items-center gap-2"
+              className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-dark transition-colors inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add Category
             </button>
@@ -266,7 +255,7 @@ export default function AdminCategories() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenEditModal(cat)}
-                          className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
                           title="Edit Category"
                         >
                           <Edit className="w-4 h-4" />
@@ -274,7 +263,7 @@ export default function AdminCategories() {
                         <button
                           onClick={() => handleDeleteCategory(cat.id, cat.name)}
                           disabled={deletingId === cat.id}
-                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                           title="Delete Category"
                         >
                           {deletingId === cat.id ? (
@@ -301,7 +290,7 @@ export default function AdminCategories() {
               <h3 className="text-base font-extrabold text-navy">
                 {editingCategory ? 'Edit Category' : 'Add New Category'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-navy">
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-navy cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -314,7 +303,7 @@ export default function AdminCategories() {
                   required
                   value={name}
                   onChange={handleNameChange}
-                  placeholder="e.g. Smart Watches"
+                  placeholder="e.g. Travel Bags"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -325,7 +314,7 @@ export default function AdminCategories() {
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="smart-watches"
+                  placeholder="travel-bags"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -359,14 +348,14 @@ export default function AdminCategories() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 text-navy font-bold text-xs rounded-xl hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 border border-gray-300 text-navy font-bold text-xs rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-6 py-2 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>

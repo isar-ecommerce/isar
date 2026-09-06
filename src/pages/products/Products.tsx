@@ -20,106 +20,49 @@ import { useCartStore } from '../../store/cartStore';
 import { useWishlistStore } from '../../store/wishlistStore';
 import type { Product, Category } from '../../types/product';
 
-// প্রাথমিক সবকটি ক্যাটাগরি তালিকা (Category Management এর সাথে সিঙ্কড)
-const INITIAL_CATEGORIES: Category[] = [
-  { id: 'smartphones', name: 'Smartphones & Mobile', slug: 'smartphones', status: 'active', order: 1 },
-  { id: 'laptops', name: 'Laptops & Computers', slug: 'laptops', status: 'active', order: 2 },
-  { id: 'watches', name: 'Smart Watches & Bands', slug: 'watches', status: 'active', order: 3 },
-  { id: 'audio', name: 'Headphones & Audio', slug: 'audio', status: 'active', order: 4 },
-  { id: 'cameras', name: 'Cameras & Photography', slug: 'cameras', status: 'active', order: 5 },
-  { id: 'fashion', name: 'Men & Women Fashion', slug: 'fashion', status: 'active', order: 6 },
-];
-
-// ফলব্যাক প্রোডাক্টস
 const FALLBACK_PRODUCTS: Product[] = [
   {
     id: '1',
-    name: 'Premium Wireless Headphones with Active Noise Cancelling',
-    slug: 'wireless-headphones',
-    shortDescription: 'High quality audio with crystal clear bass.',
-    description: 'Enjoy high-fidelity sound with deep bass and active noise cancellation.',
-    price: 4500,
-    originalPrice: 6000,
-    stock: 15,
-    lowStockAlert: 2,
-    sku: 'AUDIO-01',
-    categoryId: 'audio',
-    images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=500&q=80'],
+    name: 'Premium Waterproof Travel Laptop Backpack',
+    slug: 'travel-laptop-backpack',
+    shortDescription: 'Ergonomic water-resistant backpack for daily commute and travel.',
+    description: 'Durable waterproof material with padded laptop compartment and USB charging port.',
+    price: 2450,
+    originalPrice: 3200,
+    stock: 25,
+    lowStockAlert: 3,
+    sku: 'BAG-01',
+    categoryId: 'backpacks',
+    images: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=500&q=80'],
     status: 'active',
     isFeatured: true,
     isTrending: true,
     isNewArrival: true,
-    rating: 4.8,
-    reviewCount: 124,
+    rating: 4.9,
+    reviewCount: 88,
     sellerId: 'admin',
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     id: '2',
-    name: 'Smart Watch Series 8 - Midnight Aluminum Case',
-    slug: 'smart-watch',
-    shortDescription: 'Track your health in real-time.',
-    description: 'Monitors heart rate, steps, sleep, and blood oxygen levels.',
-    price: 3200,
-    originalPrice: 4000,
-    stock: 8,
+    name: 'Fast Charging Magnetic Wireless Power Bank 10000mAh',
+    slug: 'magnetic-power-bank',
+    shortDescription: 'Compact high-speed charging for all smartphones.',
+    description: 'MagSafe compatible ultra-slim power bank with digital battery indicator.',
+    price: 1850,
+    originalPrice: 2400,
+    stock: 18,
     lowStockAlert: 2,
-    sku: 'WATCH-01',
-    categoryId: 'gadgets',
-    images: ['https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: true,
-    isTrending: true,
-    isNewArrival: false,
-    rating: 4.5,
-    reviewCount: 89,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    name: 'Ultra HD 4K Action Camera with Waterproof Case',
-    slug: 'action-camera',
-    shortDescription: 'Waterproof 4K recording camera.',
-    description: 'Capture your adventure moments with ultra-smooth 4K stabilization.',
-    price: 8500,
-    originalPrice: 9500,
-    stock: 5,
-    lowStockAlert: 1,
-    sku: 'CAM-01',
-    categoryId: 'cameras',
-    images: ['https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=500&q=80'],
+    sku: 'ACC-01',
+    categoryId: 'phone-accessories',
+    images: ['https://images.unsplash.com/photo-1609592424364-a6902264560b?auto=format&fit=crop&w=500&q=80'],
     status: 'active',
     isFeatured: true,
     isTrending: true,
     isNewArrival: true,
-    rating: 4.9,
-    reviewCount: 210,
-    sellerId: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '4',
-    name: 'Minimalist Leather Backpack for Men & Women',
-    slug: 'leather-backpack',
-    shortDescription: 'Water-resistant premium leather backpack.',
-    description: 'Designed for daily commute and carrying 15.6 inch laptops safely.',
-    price: 2100,
-    originalPrice: 2500,
-    stock: 20,
-    lowStockAlert: 5,
-    sku: 'BAG-01',
-    categoryId: 'fashion',
-    images: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=500&q=80'],
-    status: 'active',
-    isFeatured: false,
-    isTrending: false,
-    isNewArrival: true,
-    rating: 4.6,
-    reviewCount: 56,
+    rating: 4.8,
+    reviewCount: 64,
     sellerId: 'admin',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -129,16 +72,14 @@ const FALLBACK_PRODUCTS: Product[] = [
 export default function Products() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState<boolean>(false);
 
-  // ফিল্টারিং স্টেট
   const selectedCategory = searchParams.get('category') || '';
   const searchQuery = searchParams.get('search') || '';
   const [sortBy, setSortBy] = useState<string>('default');
 
-  // অ্যাডভান্সড ফিল্টার স্টেট
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
@@ -147,7 +88,6 @@ export default function Products() {
   const addItemToCart = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
-  // ফায়ারস্টোর টাইমস্ট্যাম্প মিলি-সেকেন্ড কনভার্টার (Type Safe)
   const getTimestampMs = (val: unknown): number => {
     if (!val) return 0;
     if (val instanceof Date) return val.getTime();
@@ -167,7 +107,7 @@ export default function Products() {
     return 0;
   };
 
-  // ফায়ারস্টোর থেকে ডেটা লোড করা (React 19 সেফ)
+  // ফায়ারস্টোর থেকে লাইভ ক্যাটাগরি ও প্রোডাক্ট ফেচ করা (কোনো ডামি ক্যাটাগরি মার্জ হবে না)
   useEffect(() => {
     let isMounted = true;
 
@@ -186,18 +126,18 @@ export default function Products() {
             setProducts(FALLBACK_PRODUCTS);
           }
 
-          const merged = [
-            ...INITIAL_CATEGORIES.filter(ic => !fetchedCategories.some(fc => fc.slug === ic.slug)),
-            ...fetchedCategories
-          ].sort((a, b) => (a.order || 0) - (b.order || 0));
-
-          setCategories(merged);
+          if (fetchedCategories.length > 0) {
+            const activeOnly = fetchedCategories.filter(c => c.status === 'active');
+            setCategories(activeOnly.sort((a, b) => (a.order || 0) - (b.order || 0)));
+          } else {
+            setCategories([]);
+          }
         }
       } catch (error) {
         console.error("Error loading shop data:", error);
         if (isMounted) {
           setProducts(FALLBACK_PRODUCTS);
-          setCategories(INITIAL_CATEGORIES);
+          setCategories([]);
         }
       } finally {
         if (isMounted) {
@@ -206,16 +146,13 @@ export default function Products() {
       }
     };
 
-    Promise.resolve().then(() => {
-      fetchData();
-    });
+    fetchData();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // প্রতিটি ক্যাটাগরির প্রোডাক্ট সংখ্যা গণনা
   const getCategoryCount = (categoryId: string) => {
     if (!categoryId) return products.length;
     return products.filter(
@@ -223,11 +160,9 @@ export default function Products() {
     ).length;
   };
 
-  // ফিল্টার এবং সার্চ লজিক
   const filteredProducts = useMemo(() => {
     return products
       .filter((product) => {
-        // ১. ক্যাটাগরি ফিল্টার
         if (selectedCategory && selectedCategory !== 'all') {
           const matchCategory = 
             product.categoryId === selectedCategory ||
@@ -235,7 +170,6 @@ export default function Products() {
           if (!matchCategory) return false;
         }
 
-        // ২. সার্চ কুয়েরি ফিল্টার
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
           const matches = 
@@ -244,23 +178,10 @@ export default function Products() {
           if (!matches) return false;
         }
 
-        // ৩. প্রাইস ফিল্টার
-        if (minPrice && product.price < Number(minPrice)) {
-          return false;
-        }
-        if (maxPrice && product.price > Number(maxPrice)) {
-          return false;
-        }
-
-        // ৪. ইন-স্টক ফিল্টার
-        if (inStockOnly && product.stock <= 0) {
-          return false;
-        }
-
-        // ৫. রেটিং ফিল্টার
-        if (selectedRating !== null && (product.rating || 0) < selectedRating) {
-          return false;
-        }
+        if (minPrice && product.price < Number(minPrice)) return false;
+        if (maxPrice && product.price > Number(maxPrice)) return false;
+        if (inStockOnly && product.stock <= 0) return false;
+        if (selectedRating !== null && (product.rating || 0) < selectedRating) return false;
 
         return true;
       })
@@ -322,8 +243,8 @@ export default function Products() {
   return (
     <div className="bg-secondary min-h-screen py-8 md:py-12">
       <Helmet>
-        <title>Shop Products | ISAR Marketplace</title>
-        <meta name="description" content="Browse and shop high-quality electronics, fashion, and lifestyle products at ISAR." />
+        <title>Shop Products | ISAR</title>
+        <meta name="description" content="Browse authentic bags, smartphone accessories, and lifestyle gear at ISAR." />
       </Helmet>
 
       <div className="container mx-auto px-4 max-w-7xl space-y-6">
@@ -347,10 +268,9 @@ export default function Products() {
           )}
         </div>
 
-        {/* Top Control Bar */}
+        {/* Top Controls */}
         <div className="bg-white rounded-2xl shadow-modern p-4 flex flex-wrap items-center justify-between gap-4 border border-gray-100">
           
-          {/* Mobile Filter Button */}
           <button 
             onClick={() => setIsFilterDrawerOpen(true)}
             className="lg:hidden flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
@@ -359,7 +279,6 @@ export default function Products() {
             Filters {hasActiveFilters && '(Active)'}
           </button>
 
-          {/* Active Tags Strip */}
           <div className="hidden lg:flex items-center gap-2 flex-wrap">
             {selectedCategory && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
@@ -387,7 +306,7 @@ export default function Products() {
             )}
             {(minPrice || maxPrice) && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 text-xs font-bold border border-amber-500/20">
-                ৳{minPrice || '0'} - ৳{maxPrice || 'Any'}
+                {minPrice || '0'} BDT - {maxPrice ? `${maxPrice} BDT` : 'Any'}
                 <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="hover:text-red-500 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -403,7 +322,6 @@ export default function Products() {
             )}
           </div>
 
-          {/* Sort Dropdown */}
           <div className="flex items-center gap-2 ml-auto">
             <label htmlFor="sortBy" className="text-xs font-bold text-gray-500 hidden sm:block">Sort By:</label>
             <div className="relative">
@@ -447,7 +365,7 @@ export default function Products() {
                 )}
               </div>
 
-              {/* 1. Category Filter Section */}
+              {/* 1. Category Filter Section (Only Admin Created Categories) */}
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Categories</h4>
                 <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
@@ -483,9 +401,9 @@ export default function Products() {
                 </div>
               </div>
 
-              {/* 2. Price Range Filter */}
+              {/* 2. Price Range Filter in Pure BDT */}
               <div className="space-y-3 pt-4 border-t border-gray-100">
-                <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Price Range (৳)</h4>
+                <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Price Range (BDT)</h4>
                 
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -504,30 +422,29 @@ export default function Products() {
                   />
                 </div>
 
-                {/* Quick Price Buttons */}
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <button
                     onClick={() => { setMinPrice('0'); setMaxPrice('1500'); }}
                     className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
                   >
-                    Under ৳1.5K
+                    Under 1.5K BDT
                   </button>
                   <button
                     onClick={() => { setMinPrice('1500'); setMaxPrice('5000'); }}
                     className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
                   >
-                    ৳1.5K - ৳5K
+                    1.5K - 5K BDT
                   </button>
                   <button
                     onClick={() => { setMinPrice('5000'); setMaxPrice(''); }}
                     className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
                   >
-                    ৳5K+
+                    5K+ BDT
                   </button>
                 </div>
               </div>
 
-              {/* 3. Availability Filter (In-Stock Only) */}
+              {/* 3. Availability Filter */}
               <div className="pt-4 border-t border-gray-100">
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input
@@ -572,7 +489,7 @@ export default function Products() {
             </div>
           </aside>
 
-          {/* Product Grid Area */}
+          {/* Product Grid Area in Pure BDT */}
           <main className="lg:col-span-3">
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-100 bg-white rounded-3xl p-12 border border-gray-100 shadow-modern">
@@ -606,21 +523,18 @@ export default function Products() {
                       {/* Product Image Box */}
                       <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-3 flex items-center justify-center">
                         
-                        {/* New Badge */}
                         {product.isNewArrival && (
                           <span className="absolute top-3 left-3 z-10 bg-brand-green text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
                             New
                           </span>
                         )}
 
-                        {/* Discount Badge */}
                         {product.originalPrice && product.originalPrice > product.price && (
                           <span className="absolute top-3 right-3 z-10 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
                             -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
                           </span>
                         )}
 
-                        {/* Wishlist Button */}
                         <button
                           onClick={(e) => handleToggleWishlist(e, product)}
                           className={`absolute bottom-3 right-3 z-10 p-2 rounded-full shadow-md backdrop-blur-xs transition-all cursor-pointer ${
@@ -643,7 +557,6 @@ export default function Products() {
                       {/* Product Info Box */}
                       <div className="p-4 sm:p-5 flex flex-col grow">
                         
-                        {/* Rating */}
                         {product.rating ? (
                           <div className="flex items-center gap-1 mb-1 text-amber-500">
                             <Star className="w-3.5 h-3.5 fill-current" />
@@ -652,7 +565,6 @@ export default function Products() {
                           </div>
                         ) : null}
 
-                        {/* Title */}
                         <Link 
                           to={`/products/${product.id}`} 
                           className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-extrabold text-navy mb-2 grow"
@@ -660,15 +572,15 @@ export default function Products() {
                           {product.name}
                         </Link>
 
-                        {/* Price & Action */}
+                        {/* Price in BDT */}
                         <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
                           <div>
                             <span className="text-base sm:text-lg font-black text-primary font-mono block">
-                              ৳{product.price.toLocaleString()}
+                              {product.price.toLocaleString()} BDT
                             </span>
                             {product.originalPrice && product.originalPrice > product.price && (
                               <span className="text-[11px] text-gray-400 line-through font-semibold font-mono">
-                                ৳{product.originalPrice.toLocaleString()}
+                                {product.originalPrice.toLocaleString()} BDT
                               </span>
                             )}
                           </div>
@@ -695,7 +607,7 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Mobile Filter Drawer Modal */}
+      {/* Mobile Filter Drawer */}
       {isFilterDrawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div className="fixed inset-0 bg-navy/60 backdrop-blur-xs" onClick={() => setIsFilterDrawerOpen(false)} />
@@ -710,7 +622,6 @@ export default function Products() {
               </button>
             </div>
 
-            {/* Mobile Categories */}
             <div className="space-y-2">
               <h4 className="text-xs font-black text-navy uppercase tracking-wider">Categories</h4>
               <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -738,9 +649,8 @@ export default function Products() {
               </div>
             </div>
 
-            {/* Mobile Price */}
             <div className="space-y-2 pt-3 border-t border-gray-100">
-              <h4 className="text-xs font-black text-navy uppercase tracking-wider">Price Range (৳)</h4>
+              <h4 className="text-xs font-black text-navy uppercase tracking-wider">Price Range (BDT)</h4>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
@@ -759,7 +669,6 @@ export default function Products() {
               </div>
             </div>
 
-            {/* Mobile Availability */}
             <div className="pt-3 border-t border-gray-100">
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input
@@ -772,7 +681,6 @@ export default function Products() {
               </label>
             </div>
 
-            {/* Bottom Actions */}
             <div className="pt-4 border-t border-gray-100 mt-auto flex gap-3">
               <button
                 onClick={clearFilters}
