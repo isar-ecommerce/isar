@@ -82,7 +82,9 @@ export default function Cart() {
       toast.error('Your cart is empty!');
       return;
     }
-    navigate('/checkout');
+    navigate('/checkout', {
+      state: { from: 'Shopping Cart', path: '/cart' },
+    });
   };
 
   if (items.length === 0) {
@@ -98,7 +100,7 @@ export default function Cart() {
           </div>
           <h2 className="text-2xl font-black text-navy mb-2">Your Cart is Empty</h2>
           <p className="text-gray-500 text-xs sm:text-sm mb-8 leading-relaxed">
-            Looks like you have not added anything to your cart yet. Explore our authentic bags and smart accessories!
+            Looks like you have not added anything to your cart yet. Explore our authentic products!
           </p>
           <Link
             to="/products"
@@ -134,72 +136,96 @@ export default function Cart() {
           {/* Left Side: Cart Items List */}
           <div className="lg:col-span-2 space-y-4">
             
-            {items.map((item, index) => (
-              <div 
-                key={`${item.product.id}-${item.selectedVariantId || index}`}
-                className="bg-white rounded-3xl p-4 md:p-6 shadow-modern border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:shadow-modern-lg"
-              >
-                {/* Product Thumbnail */}
-                <Link to={`/products/${item.product.id}`} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden bg-gray-50 shrink-0 border border-gray-100 p-1 flex items-center justify-center">
-                  <img
-                    src={item.product.images[0] || 'https://via.placeholder.com/150'}
-                    alt={item.product.name}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </Link>
+            {items.map((item, index) => {
+              const maxStock = Math.max(1, item.product.stock || 1);
+              const isAtMin = item.quantity <= 1;
+              const isAtMax = item.quantity >= maxStock;
 
-                {/* Product Information */}
-                <div className="flex-1 min-w-0">
-                  <Link 
-                    to={`/products/${item.product.id}`}
-                    className="text-sm md:text-base font-black text-navy hover:text-primary transition-colors line-clamp-1 mb-1"
+              return (
+                <div 
+                  key={`${item.product.id}-${item.selectedVariantId || index}`}
+                  className="bg-white rounded-3xl p-4 md:p-6 shadow-modern border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:shadow-modern-lg relative group"
+                >
+                  {/* Point 11: Prominent Cross (X) Delete Button on Top Right */}
+                  <button
+                    type="button"
+                    onClick={() => removeItem(item.product.id, item.selectedVariantId)}
+                    className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                    title="Remove product from cart"
+                    aria-label="Remove product"
                   >
-                    {item.product.name}
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  {/* Product Thumbnail */}
+                  <Link to={`/products/${item.product.id}`} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden bg-gray-50 shrink-0 border border-gray-100 p-1 flex items-center justify-center">
+                    <img
+                      src={item.product.images[0] || 'https://via.placeholder.com/150'}
+                      alt={item.product.name}
+                      className="max-h-full max-w-full object-contain"
+                    />
                   </Link>
 
-                  <p className="text-xs text-gray-500 mb-2">
-                    Unit Price: <span className="font-bold text-navy font-mono">{item.product.price.toLocaleString()} BDT</span>
-                  </p>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50">
-                      <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.selectedVariantId)}
-                        className="p-1.5 text-navy hover:text-primary transition-colors cursor-pointer"
-                        aria-label="Decrease quantity"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="w-8 text-center text-xs font-black text-navy font-mono">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.selectedVariantId)}
-                        disabled={item.quantity >= item.product.stock}
-                        className="p-1.5 text-navy hover:text-primary disabled:opacity-40 transition-colors cursor-pointer"
-                        aria-label="Increase quantity"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => removeItem(item.product.id, item.selectedVariantId)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                      aria-label="Remove item"
-                      title="Remove Item"
+                  {/* Product Information */}
+                  <div className="flex-1 min-w-0 pr-6 sm:pr-8">
+                    <Link 
+                      to={`/products/${item.product.id}`}
+                      className="text-sm md:text-base font-black text-navy hover:text-primary transition-colors line-clamp-1 mb-1 block"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      {item.product.name}
+                    </Link>
+
+                    <p className="text-xs text-gray-500 mb-2">
+                      Unit Price: <span className="font-bold text-navy font-mono">{item.product.price.toLocaleString()} BDT</span>
+                    </p>
+
+                    {/* Point 5: Quantity Lock (Min 1, Max stock) */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.selectedVariantId)}
+                          disabled={isAtMin}
+                          className="p-1.5 text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          aria-label="Decrease quantity"
+                          title={isAtMin ? "Minimum quantity is 1" : "Decrease quantity"}
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="w-8 text-center text-xs font-black text-navy font-mono">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isAtMax) {
+                              toast.error(`Maximum available stock is ${maxStock}`);
+                            } else {
+                              updateQuantity(item.product.id, item.quantity + 1, item.selectedVariantId);
+                            }
+                          }}
+                          disabled={isAtMax}
+                          className="p-1.5 text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          aria-label="Increase quantity"
+                          title={isAtMax ? `Maximum stock is ${maxStock}` : "Increase quantity"}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <span className="text-[11px] text-gray-400 font-medium">
+                        {isAtMax ? `Max stock (${maxStock})` : `In stock: ${maxStock}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Item Total Price */}
+                  <div className="text-right sm:self-center ml-auto">
+                    <span className="text-base md:text-lg font-black text-primary font-mono">
+                      {(item.product.price * item.quantity).toLocaleString()} BDT
+                    </span>
                   </div>
                 </div>
-
-                {/* Item Total Price */}
-                <div className="text-right sm:self-center ml-auto">
-                  <span className="text-base md:text-lg font-black text-primary font-mono">
-                    {(item.product.price * item.quantity).toLocaleString()} BDT
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             <div className="pt-2">
               <Link
@@ -266,7 +292,7 @@ export default function Cart() {
               {/* Breakdown */}
               <div className="space-y-3 pt-3 border-t border-gray-100 text-xs sm:text-sm">
                 <div className="flex justify-between text-gray-600 font-medium">
-                  <span>Selected Items ({items.length}):</span>
+                  <span>Selected Items:</span>
                   <span className="font-bold text-navy font-mono">{items.reduce((s, i) => s + i.quantity, 0)} Pcs</span>
                 </div>
 
@@ -283,11 +309,11 @@ export default function Cart() {
                 )}
 
                 <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 border border-gray-100 leading-relaxed">
-                  Steadfast delivery fee (70 / 100 / 130 BDT) is calculated dynamically at checkout based on your district.
+                  Delivery fee is calculated at checkout based on location & parcel weight.
                 </div>
 
                 <div className="flex justify-between text-base font-black text-navy pt-3 border-t border-gray-100">
-                  <span>Estimated Items Total:</span>
+                  <span>Estimated Total:</span>
                   <span className="text-primary font-mono text-lg font-black">{total.toLocaleString()} BDT</span>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -42,6 +42,8 @@ export default function Checkout() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
+  const formRef = useRef<HTMLFormElement>(null);
+
   const { 
     items, 
     getSubtotal, 
@@ -69,17 +71,24 @@ export default function Checkout() {
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
 
-  // Strict 2 Payment Methods: Cash on Delivery or bKash
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Coupon Input State
   const [couponCodeInput, setCouponCodeInput] = useState<string>('');
   const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // Point 12: Dynamic Back button showing where the customer actually came from
+  const originState = location.state as { from?: string; path?: string } | null;
+  const backButtonLabel = originState?.from ? `Back to ${originState.from}` : 'Back to Cart';
+  const backButtonPath = originState?.path || '/cart';
+
+  const handleBackNavigation = () => {
+    navigate(backButtonPath);
+  };
 
   // Auto-fill address from User Profile if logged in
   useEffect(() => {
@@ -109,10 +118,9 @@ export default function Checkout() {
             }
             if (addr.upazila) setUpazila(addr.upazila);
             if (addr.fullAddress) setFullAddress(addr.fullAddress);
-          // পরিবর্তন করে লিখুন:
-} else if (data.displayName) {
-  setFullName((prev) => (prev.trim() ? prev : data.displayName));
-}
+          } else if (data.displayName) {
+            setFullName((prev) => (prev.trim() ? prev : data.displayName));
+          }
         }
       } catch (err) {
         console.warn('Could not auto-fill profile address:', err);
@@ -125,14 +133,6 @@ export default function Checkout() {
       isMounted = false;
     };
   }, [user?.uid]);
-
-  const originState = location.state as { from?: string; path?: string } | null;
-  const backButtonLabel = originState?.from ? `Back to ${originState.from}` : 'Back to Cart';
-  const backButtonPath = originState?.path || '/cart';
-
-  const handleBackNavigation = () => {
-    navigate(backButtonPath);
-  };
 
   // Official bKash Tokenized Callback Listener
   useEffect(() => {
@@ -174,9 +174,11 @@ export default function Checkout() {
               incrementCouponUsage(pendingOrder.couponId);
             }
 
-            sendOrderConfirmationSMS(order.customerPhone, order.orderNumber, order.totalAmount);
-            sendOrderConfirmationEmail(order);
-            sendAdminOrderAlert(order);
+            await Promise.allSettled([
+              sendOrderConfirmationSMS(order.customerPhone, order.orderNumber, order.totalAmount),
+              sendOrderConfirmationEmail(order),
+              sendAdminOrderAlert(order),
+            ]);
 
             clearCart();
             toast.success(`bKash payment successful! TrxID: ${execData.trxID}`);
@@ -255,7 +257,6 @@ export default function Checkout() {
     setUpazila(upazilas[0] || '');
   };
 
-  // Coupon Code Validation Handler
   const handleApplyCoupon = async (e: FormEvent) => {
     e.preventDefault();
     if (!couponCodeInput.trim()) {
@@ -293,21 +294,37 @@ export default function Checkout() {
     toast.success('Coupon removed successfully');
   };
 
+  // Point 1: Smooth validation & input focus
   const validateForm = () => {
-    if (!fullName.trim() || !phone.trim() || !email.trim() || !district.trim() || !upazila.trim() || !fullAddress.trim()) {
-      toast.error('Please fill in all required shipping fields');
+    if (!fullName.trim()) {
+      toast.error('Please enter your full name');
+      document.getElementById('checkout-fullName')?.focus();
+      return false;
+    }
+
+    if (!email.trim()) {
+      toast.error('Please enter your email address for the invoice');
+      document.getElementById('checkout-email')?.focus();
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       toast.error('Please enter a valid email address');
+      document.getElementById('checkout-email')?.focus();
       return false;
     }
 
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     if (cleanPhone.length < 11) {
       toast.error('Please enter a valid 11-digit mobile number (01XXXXXXXXX)');
+      document.getElementById('checkout-phone')?.focus();
+      return false;
+    }
+
+    if (!fullAddress.trim()) {
+      toast.error('Please enter your street address');
+      document.getElementById('checkout-fullAddress')?.focus();
       return false;
     }
 
@@ -333,7 +350,6 @@ export default function Checkout() {
         deliveryNotes: deliveryNotes.trim() || undefined,
       };
 
-      // 1. Full bKash Payment Flow (100% Upfront Online)
       if (paymentMethod === 'bkash') {
         sessionStorage.setItem('isar_pending_order', JSON.stringify({
           userId: user?.uid || 'guest-user',
@@ -378,7 +394,6 @@ export default function Checkout() {
         }
       }
 
-      // 2. Pure Cash on Delivery (COD) Flow (0 BDT in advance, 100% due on delivery)
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -403,9 +418,11 @@ export default function Checkout() {
         incrementCouponUsage((appliedCoupon as { id?: string }).id!);
       }
 
-      sendOrderConfirmationSMS(phone.trim(), order.orderNumber, total);
-      sendOrderConfirmationEmail(order);
-      sendAdminOrderAlert(order);
+      await Promise.allSettled([
+        sendOrderConfirmationSMS(phone.trim(), order.orderNumber, total),
+        sendOrderConfirmationEmail(order),
+        sendAdminOrderAlert(order),
+      ]);
 
       clearCart();
       toast.success(`Order placed successfully! Order ID: ${order.orderNumber}`);
@@ -444,7 +461,7 @@ export default function Checkout() {
 
       <div className="container mx-auto px-4 max-w-6xl">
         
-        {/* Dynamic Back Button */}
+        {/* Point 12: Dynamic Back Button */}
         <div className="mb-6">
           <button
             type="button"
@@ -457,7 +474,7 @@ export default function Checkout() {
           <h1 className="text-2xl md:text-3xl font-extrabold text-navy mt-2">Checkout</h1>
         </div>
 
-        <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <form ref={formRef} onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Left Column: Shipping & Payment */}
           <div className="lg:col-span-2 space-y-6">
@@ -476,10 +493,11 @@ export default function Checkout() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Full Name *</label>
+                  <label htmlFor="checkout-fullName" className="text-xs font-bold text-navy">Full Name *</label>
                   <div className="relative">
                     <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      id="checkout-fullName"
                       type="text"
                       required
                       value={fullName}
@@ -491,10 +509,11 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Email *</label>
+                  <label htmlFor="checkout-email" className="text-xs font-bold text-navy">Email *</label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      id="checkout-email"
                       type="email"
                       required
                       value={email}
@@ -506,10 +525,11 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-navy">Mobile Number (11 Digits) *</label>
+                  <label htmlFor="checkout-phone" className="text-xs font-bold text-navy">Mobile Number (11 Digits) *</label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      id="checkout-phone"
                       type="tel"
                       required
                       value={phone}
@@ -521,10 +541,11 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-navy">Alternative Phone (Optional)</label>
+                  <label htmlFor="checkout-altPhone" className="text-xs font-bold text-navy">Alternative Phone (Optional)</label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      id="checkout-altPhone"
                       type="tel"
                       value={alternatePhone}
                       onChange={(e) => setAlternatePhone(e.target.value)}
@@ -535,8 +556,9 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-navy">Division *</label>
+                  <label htmlFor="checkout-division" className="text-xs font-bold text-navy">Division *</label>
                   <select
+                    id="checkout-division"
                     value={division}
                     onChange={(e) => handleDivisionChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
@@ -548,8 +570,9 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-navy">District *</label>
+                  <label htmlFor="checkout-district" className="text-xs font-bold text-navy">District *</label>
                   <select
+                    id="checkout-district"
                     value={district}
                     onChange={(e) => handleDistrictChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
@@ -561,8 +584,9 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Thana / Upazila *</label>
+                  <label htmlFor="checkout-upazila" className="text-xs font-bold text-navy">Thana / Upazila *</label>
                   <select
+                    id="checkout-upazila"
                     value={upazila}
                     onChange={(e) => setUpazila(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
@@ -574,8 +598,9 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Full Street Address *</label>
+                  <label htmlFor="checkout-fullAddress" className="text-xs font-bold text-navy">Full Street Address *</label>
                   <textarea
+                    id="checkout-fullAddress"
                     required
                     rows={2}
                     value={fullAddress}
@@ -586,8 +611,9 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-navy">Delivery Notes (Optional)</label>
+                  <label htmlFor="checkout-deliveryNotes" className="text-xs font-bold text-navy">Delivery Notes (Optional)</label>
                   <input
+                    id="checkout-deliveryNotes"
                     type="text"
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
@@ -714,11 +740,12 @@ export default function Checkout() {
               <div className="pt-2">
                 {!appliedCoupon ? (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-navy flex items-center gap-1.5">
+                    <label htmlFor="checkout-couponInput" className="text-xs font-bold text-navy flex items-center gap-1.5">
                       <Tag className="w-3.5 h-3.5 text-primary" /> Promo Coupon
                     </label>
                     <div className="flex gap-2">
                       <input
+                        id="checkout-couponInput"
                         type="text"
                         value={couponCodeInput}
                         onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
@@ -763,10 +790,13 @@ export default function Checkout() {
                   <span className="font-bold text-navy font-mono">{subtotal.toLocaleString()} BDT</span>
                 </div>
 
+                {/* Point 10: Clear weight specification under Delivery Charge */}
                 <div className="flex justify-between text-gray-600 font-medium">
                   <div>
                     <span className="block">Delivery Charge</span>
-                    <span className="text-[10px] text-gray-400">{getZoneLabel()}</span>
+                    <span className="text-[10px] text-gray-400 block font-mono">
+                      {getZoneLabel()} • Based on {totalWeight.toFixed(1)} kg weight
+                    </span>
                   </div>
                   <span className="font-bold text-navy font-mono">{deliveryFee.toLocaleString()} BDT</span>
                 </div>

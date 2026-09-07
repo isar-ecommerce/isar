@@ -7,25 +7,27 @@ import FloatingContact from '../components/common/FloatingContact';
 export default function MainLayout() {
   const location = useLocation();
 
-  // ফুটার শুধুমাত্র এবং শুধুমাত্র হোমপেজে (/) লোড হবে
   const isHomePage = location.pathname === '/';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
   return (
     <div className="flex flex-col min-h-screen bg-secondary print:bg-white">
-      {/* Global Header (Hidden during print) */}
+      {/* Global Header */}
       <div className="print:hidden">
         <Header />
       </div>
 
-      {/* Main Content Area */}
-      <main className="grow pb-16 md:pb-0 print:pb-0 print:m-0">
+      {/* Main Content: Removes bottom padding on auth pages for perfect centering */}
+      <main className={`grow ${isAuthPage ? 'pb-0' : 'pb-16 md:pb-0'} print:pb-0 print:m-0`}>
         <Outlet />
       </main>
 
-      {/* Floating WhatsApp & Call Widget */}
-      <div className="print:hidden">
-        <FloatingContact />
-      </div>
+      {/* Floating WhatsApp Widget: Strictly hidden on Login & Register */}
+      {!isAuthPage && (
+        <div className="print:hidden">
+          <FloatingContact />
+        </div>
+      )}
 
       {/* Footer strictly on Homepage ONLY */}
       {isHomePage && (
@@ -34,10 +36,12 @@ export default function MainLayout() {
         </div>
       )}
       
-      {/* Mobile Bottom Navigation */}
-      <div className="print:hidden">
-        <MobileNav />
-      </div>
+      {/* Mobile Bottom Navigation: Hidden on Login & Register */}
+      {!isAuthPage && (
+        <div className="print:hidden">
+          <MobileNav />
+        </div>
+      )}
     </div>
   );
 }
