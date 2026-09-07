@@ -97,16 +97,17 @@ export const sendCourierTrackingSMS = async (
  */
 export const sendOrderConfirmationEmail = async (order: Order): Promise<boolean> => {
   try {
-    // ১. Vercel Serverless Email Proxy কল করা
-    const res = await fetch('/api/email', {
+    const response = await fetch('/api/email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         type: 'order_confirmation',
         order: {
           orderNumber: order.orderNumber,
           customerName: order.customerName,
-          customerEmail: order.customerEmail || 'customer@gmail.com',
+          customerEmail: order.customerEmail || 'customer@isar.com.bd',
           customerPhone: order.customerPhone,
           shippingAddress: {
             fullAddress: order.shippingAddress.fullAddress,
@@ -124,31 +125,29 @@ export const sendOrderConfirmationEmail = async (order: Order): Promise<boolean>
           deliveryFee: order.deliveryFee,
           discount: order.discount || 0,
           totalAmount: order.totalAmount,
-          paidAmount: order.paidAmount,
-          dueAmount: order.dueAmount,
+          paidAmount: order.paidAmount || 0,
+          dueAmount: order.dueAmount || 0,
           transactionId: order.transactionId,
+          createdAt: new Date().toISOString(),
         },
       }),
     });
 
-    const result = await res.json();
-    if (!res.ok) {
-      console.warn('Email proxy response warning:', result.message);
-    }
+    const data = await response.json();
 
-    // ২. ফায়ারস্টোরে নোটিফিকেশন লগ সংরক্ষণ
     await addDoc(notificationsRef, {
       type: 'email',
-      recipient: order.customerEmail || 'customer@gmail.com',
+      recipient: order.customerEmail || 'customer@isar.com.bd',
       orderNumber: order.orderNumber,
-      subject: `Order Confirmation #${order.orderNumber} - ISAR`,
-      status: res.ok ? 'sent' : 'failed',
+      subject: `Order Confirmation - #${order.orderNumber}`,
+      status: response.ok ? 'sent' : 'failed',
+      responseNote: data.message || null,
       createdAt: serverTimestamp(),
     });
 
-    return res.ok;
+    return response.ok;
   } catch (error) {
-    console.warn('Email dispatch network warning:', error);
+    console.warn('Customer email invoice dispatch warning:', error);
     return false;
   }
 };
@@ -158,12 +157,40 @@ export const sendOrderConfirmationEmail = async (order: Order): Promise<boolean>
  */
 export const sendAdminOrderAlert = async (order: Order): Promise<boolean> => {
   try {
+    // Vercel Serverless Email Proxy দিয়ে অ্যাডমিনের কাছেও অ্যালার্ট কপি পাঠানো
     await fetch('/api/email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         type: 'admin_alert',
-        order,
+        order: {
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail || 'customer@isar.com.bd',
+          customerPhone: order.customerPhone,
+          shippingAddress: {
+            fullAddress: order.shippingAddress.fullAddress,
+            upazila: order.shippingAddress.upazila,
+            district: order.shippingAddress.district,
+            division: order.shippingAddress.division,
+          },
+          items: order.items.map((item) => ({
+            productName: item.productName,
+            price: item.price,
+            quantity: item.quantity,
+            image: item.image,
+          })),
+          subtotal: order.subtotal,
+          deliveryFee: order.deliveryFee,
+          discount: order.discount || 0,
+          totalAmount: order.totalAmount,
+          paidAmount: order.paidAmount || 0,
+          dueAmount: order.dueAmount || 0,
+          transactionId: order.transactionId,
+          createdAt: new Date().toISOString(),
+        },
       }),
     }).catch(() => {});
 
@@ -171,7 +198,7 @@ export const sendAdminOrderAlert = async (order: Order): Promise<boolean> => {
       type: 'admin_alert',
       recipient: 'admin@isar.com.bd',
       orderNumber: order.orderNumber,
-      message: `New Order Received #${order.orderNumber} from ${order.customerName} (Total: ${order.totalAmount} BDT)`,
+      message: `New Order Received! #${order.orderNumber} by ${order.customerName} (Total: ${order.totalAmount} BDT)`,
       status: 'unread',
       createdAt: serverTimestamp(),
     });

@@ -6,8 +6,9 @@ import {
   getDocs, 
   query, 
   where, 
-  serverTimestamp,
-  updateDoc
+  serverTimestamp, 
+  updateDoc, 
+  increment 
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { 
@@ -24,9 +25,6 @@ const ordersRef = collection(db, 'orders');
 
 /**
  * Steadfast Official Dynamic Delivery Fee Calculator
- * Dhaka City: 70 BDT base (up to 1kg), +20 BDT per additional kg
- * Dhaka Suburbs (Savar, Gazipur, Keraniganj, Narayanganj): 100 BDT base, +20 BDT per additional kg
- * Outside Dhaka: 130 BDT base, +25 BDT per additional kg
  */
 export const calculateDynamicDeliveryFee = (
   district: string,
@@ -73,6 +71,7 @@ export interface CreateOrderParams {
   deliveryFee: number;
   discount: number;
   couponCode?: string;
+  couponId?: string;
   totalAmount: number;
   paymentMethod: PaymentMethod;
   paymentStatus?: PaymentStatus;
@@ -85,7 +84,7 @@ export interface CreateOrderParams {
 }
 
 /**
- * Create Order in Firestore with Complete Financial Accounting
+ * অর্ডার তৈরি এবং সাথে সাথে ইনভেন্টরি থেকে স্বয়ংক্রিয় স্টক কাটার ইঞ্জিন
  */
 export const createOrder = async (params: CreateOrderParams): Promise<Order> => {
   try {
@@ -114,22 +113,16 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
       ? params.totalWeight 
       : Math.max(calculatedWeight, 0.5);
 
+    // ২ মেথড পেমেন্ট হিসাব: COD তে পেইড ০, বাকি total। বিকাশে পেইড total, বাকি ০।
     let finalPaymentStatus: PaymentStatus = params.paymentStatus || 'pending';
     let finalPaidAmount = Number(params.paidAmount) || 0;
     let finalDueAmount = Number(params.dueAmount);
 
     if (isNaN(finalDueAmount)) {
       if (params.paymentMethod === 'cod') {
-        if (finalPaidAmount > 0 && finalPaidAmount < params.totalAmount) {
-          finalPaymentStatus = 'partial_paid';
-          finalDueAmount = Math.max(0, params.totalAmount - finalPaidAmount);
-        } else if (finalPaidAmount >= params.totalAmount) {
-          finalPaymentStatus = 'paid';
-          finalDueAmount = 0;
-        } else {
-          finalPaymentStatus = 'pending';
-          finalDueAmount = params.totalAmount;
-        }
+        finalPaymentStatus = 'pending';
+        finalPaidAmount = 0;
+        finalDueAmount = params.totalAmount;
       } else {
         finalPaymentStatus = 'paid';
         finalPaidAmount = params.totalAmount;
@@ -166,34 +159,50 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
         {
           status: 'pending',
           updatedAt: new Date().toISOString(),
-          note: finalPaidAmount > 0 
-            ? `Order confirmed with advance payment of ${finalPaidAmount} BDT. Due COD: ${finalDueAmount} BDT`
-            : 'Order placed successfully (Pending Payment).',
+          note: params.paymentMethod === 'cod' 
+            ? `Order placed via Cash on Delivery. Total due: ${finalDueAmount} BDT.`
+            : `Order confirmed with full bKash payment: ${finalPaidAmount} BDT.`,
         },
       ],
       createdAt: now,
       updatedAt: now,
     };
 
+    // ১. ফায়ারস্টোরে অর্ডার সংরক্ষণ
     await setDoc(orderDocRef, newOrderData);
+
+    // ২. ফায়ারস্টোরের আসল প্রোডাক্ট স্টক থেকে পরিমাণ মাইনাস করা
+    for (const item of orderItems) {
+      if (item.productId) {
+        try {
+          const productRef = doc(db, 'products', item.productId);
+          await updateDoc(productRef, {
+            stock: increment(-item.quantity),
+            updatedAt: serverTimestamp(),
+          });
+        } catch (stockErr) {
+          console.warn(`Could not decrement stock for product ${item.productId}:`, stockErr);
+        }
+      }
+    }
 
     return {
       ...newOrderData,
       createdAt: new Date(),
       updatedAt: new Date(),
     } as unknown as Order;
-  } catch (error) {
-    console.error("Error creating order in Firestore:", error);
-    throw error;
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Error creating order in Firestore';
+    console.error("Error creating order in Firestore:", errorMsg);
+    throw new Error(errorMsg, { cause: error });
   }
 };
 
 /**
- * Fetch User Orders Safely (Zero-Index Crash Protection)
+ * Fetch User Orders Safely
  */
 export const getUserOrders = async (userId: string): Promise<Order[]> => {
   try {
-    // কোনো কম্পোজিট ইনডেক্স ছাড়াই সরাসরি ইউজারের সব অর্ডার লোড
     const q = query(ordersRef, where('userId', '==', userId));
     const snapshot = await getDocs(q);
 
@@ -202,23 +211,23 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
       ...docSnap.data(),
     })) as unknown as Order[];
 
-    // মেমোরিতে নিরাপদে নতুন থেকে পুরোনো তারিখে সাজানো
     return list.sort((a, b) => {
       const getTime = (val: unknown): number => {
         if (!val) return 0;
         if (val instanceof Date) return val.getTime();
-        if (typeof val === 'object' && val !== null && 'toDate' in (val as Record<string, unknown>)) {
-          return ((val as { toDate: () => Date }).toDate()).getTime();
-        }
         if (typeof val === 'number') return val;
         if (typeof val === 'string') return new Date(val).getTime();
+        if (typeof val === 'object' && val !== null && 'toDate' in val) {
+          return ((val as { toDate: () => Date }).toDate()).getTime();
+        }
         return 0;
       };
       return getTime(b.createdAt) - getTime(a.createdAt);
     });
-  } catch (error) {
-    console.error("Error fetching user orders safely:", error);
-    throw error;
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Error fetching user orders';
+    console.error("Error fetching user orders safely:", errorMsg);
+    throw new Error(errorMsg, { cause: error });
   }
 };
 
@@ -234,25 +243,51 @@ export const getOrderById = async (orderId: string): Promise<Order | null> => {
       return { id: snapshot.id, ...snapshot.data() } as unknown as Order;
     }
     return null;
-  } catch (error) {
-    console.error("Error fetching order by id:", error);
-    throw error;
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Error fetching order by id';
+    console.error("Error fetching order by id:", errorMsg);
+    throw new Error(errorMsg, { cause: error });
   }
 };
 
 /**
- * Cancel Order
+ * অর্ডার ক্যান্সেল হলে স্টক আবার স্টোরে ফেরত দেওয়া (Auto-Restock)
  */
 export const cancelOrder = async (orderId: string, reason?: string): Promise<void> => {
   try {
     const docRef = doc(db, 'orders', orderId);
-    await updateDoc(docRef, {
-      status: 'cancelled',
-      cancelReason: reason || 'Cancelled by customer',
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("Error cancelling order:", error);
-    throw error;
+    const orderSnap = await getDoc(docRef);
+
+    if (orderSnap.exists()) {
+      const orderData = orderSnap.data() as Order;
+
+      // ১. অর্ডার স্ট্যাটাস 'cancelled' করা
+      await updateDoc(docRef, {
+        status: 'cancelled',
+        cancelReason: reason || 'Cancelled by customer',
+        updatedAt: serverTimestamp(),
+      });
+
+      // ২. আইটেমগুলোর স্টক ফেরত দেওয়া (+quantity)
+      if (orderData.items && Array.isArray(orderData.items)) {
+        for (const item of orderData.items) {
+          if (item.productId) {
+            try {
+              const productRef = doc(db, 'products', item.productId);
+              await updateDoc(productRef, {
+                stock: increment(item.quantity),
+                updatedAt: serverTimestamp(),
+              });
+            } catch (restockErr) {
+              console.warn(`Could not restock product ${item.productId}:`, restockErr);
+            }
+          }
+        }
+      }
+    }
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Error cancelling order';
+    console.error("Error cancelling order:", errorMsg);
+    throw new Error(errorMsg, { cause: error });
   }
 };

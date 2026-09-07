@@ -24,17 +24,13 @@ import { sendOrderToCourier } from '../../services/courierService';
 import type { Order, OrderStatus } from '../../types/order';
 
 const getCollectableCOD = (order: Order): number => {
-  if (typeof order.dueAmount === 'number') {
-    return order.dueAmount;
-  }
-  if (order.paymentStatus === 'paid') {
+  if (order.paymentStatus === 'paid' || order.paymentMethod === 'bkash') {
     return 0;
   }
-  if (order.paymentStatus === 'partial_paid') {
-    const paid = order.paidAmount || order.deliveryFee || 0;
-    return Math.max(0, order.totalAmount - paid);
+  if (typeof order.dueAmount === 'number') {
+    return Math.max(0, order.dueAmount);
   }
-  return order.totalAmount || 0;
+  return Math.max(0, order.totalAmount || 0);
 };
 
 export default function AdminOrders() {
@@ -48,6 +44,7 @@ export default function AdminOrders() {
 
   const fetchOrders = useCallback(async () => {
     try {
+      setLoading(true);
       const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const list = snapshot.docs.map((d) => ({
@@ -106,15 +103,9 @@ export default function AdminOrders() {
   const handleDispatchCourier = async (order: Order) => {
     try {
       setDispatchingId(order.id);
-      const finalCodToCollect = getCollectableCOD(order);
+      const collectable = getCollectableCOD(order);
 
-      const orderToDispatch: Order = {
-        ...order,
-        totalAmount: finalCodToCollect,
-        dueAmount: finalCodToCollect,
-      };
-
-      const result = await sendOrderToCourier(orderToDispatch, 'Steadfast');
+      const result = await sendOrderToCourier(order, 'Steadfast');
 
       const updatedFields = {
         status: 'shipped' as OrderStatus,
@@ -138,7 +129,7 @@ export default function AdminOrders() {
         setSelectedOrder((prev) => (prev ? { ...prev, ...updatedFields } : null));
       }
 
-      toast.success(`Steadfast Booked! Collectable COD: ${finalCodToCollect} BDT`);
+      toast.success(`Steadfast Booked! Collectable COD: ${collectable} BDT`);
     } catch (error: unknown) {
       console.error('Courier dispatch error:', error);
       const err = error as Error;
@@ -185,30 +176,17 @@ export default function AdminOrders() {
   const getPaymentBadge = (order: Order) => {
     const codDue = getCollectableCOD(order);
 
-    if (order.paymentStatus === 'paid' || codDue === 0) {
+    if (order.paymentStatus === 'paid' || order.paymentMethod === 'bkash' || codDue === 0) {
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-brand-green bg-brand-green/10 border border-brand-green/20 px-2 py-0.5 rounded-md">
-          <CheckCircle2 className="w-3 h-3 shrink-0" /> Full Paid
+          <CheckCircle2 className="w-3 h-3 shrink-0" /> Full Paid (bKash)
         </span>
       );
     }
 
-    if (order.paymentStatus === 'partial_paid' || (order.paidAmount && order.paidAmount > 0)) {
-      return (
-        <div className="space-y-0.5">
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
-            Adv. {order.paidAmount || order.deliveryFee} BDT Paid
-          </span>
-          <span className="block text-[10px] font-bold text-[#E2136E]">
-            COD Due: {codDue} BDT
-          </span>
-        </div>
-      );
-    }
-
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
-        <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" /> Unpaid COD ({order.totalAmount} BDT)
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
+        <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" /> Due COD: {codDue} BDT
       </span>
     );
   };
@@ -224,12 +202,12 @@ export default function AdminOrders() {
         <div>
           <h1 className="text-2xl font-black text-navy">Order Management & Dispatch</h1>
           <p className="text-xs text-gray-500 mt-1">
-            Monitor advance payments, collectable COD dues, and 1-click dispatch to Steadfast Courier
+            Monitor cash on delivery collections and 1-click dispatch to Steadfast Courier
           </p>
         </div>
 
         <button
-          onClick={() => { setLoading(true); fetchOrders(); }}
+          onClick={() => { fetchOrders(); }}
           className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" /> Refresh Orders
@@ -506,7 +484,7 @@ export default function AdminOrders() {
 
                 {(selectedOrder.paidAmount && selectedOrder.paidAmount > 0) && (
                   <div className="flex justify-between text-[#E2136E] font-bold pt-1 border-t border-slate-800">
-                    <span>Advance Received (bKash):</span>
+                    <span>Paid Online (bKash):</span>
                     <span className="font-mono">-{selectedOrder.paidAmount?.toLocaleString()} BDT</span>
                   </div>
                 )}

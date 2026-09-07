@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -6,10 +7,16 @@ import {
   Plus, 
   Minus, 
   ArrowRight, 
-  ArrowLeft 
+  ArrowLeft,
+  Tag,
+  Sparkles,
+  Loader2,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
 import { useCartStore } from '../../store/cartStore';
+import { validateCouponCode } from '../../services/couponService';
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -20,9 +27,55 @@ export default function Cart() {
     updateQuantity,
     clearCart,
     getSubtotal,
+    getDiscount,
+    appliedCoupon,
+    applyCoupon,
+    removeCoupon,
   } = useCartStore();
 
+  const [couponInput, setCouponInput] = useState<string>('');
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
+
   const subtotal = getSubtotal();
+  const discount = getDiscount();
+  const total = Math.max(0, subtotal - discount);
+
+  const handleApplyCoupon = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!couponInput.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+
+    try {
+      setIsValidatingCoupon(true);
+      const result = await validateCouponCode(couponInput, subtotal);
+
+      if (result.isValid && result.coupon) {
+        applyCoupon({
+          code: result.coupon.code,
+          discountType: result.coupon.discountType,
+          discountValue: result.coupon.discountValue,
+          minOrderAmount: result.coupon.minOrderAmount,
+          maxDiscount: result.coupon.maxDiscountAmount || undefined,
+        });
+        toast.success(result.message);
+        setCouponInput('');
+      } else {
+        toast.error(result.message);
+      }
+    } catch (err) {
+      console.error('Coupon validation error:', err);
+      toast.error('Failed to validate coupon');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    removeCoupon();
+    toast.success('Coupon removed');
+  };
 
   const handleProceedToCheckout = () => {
     if (items.length === 0) {
@@ -159,13 +212,59 @@ export default function Cart() {
 
           </div>
 
-          {/* Right Side: Order Summary */}
+          {/* Right Side: Order Summary & Coupon */}
           <div className="space-y-6">
             
             <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-5 sticky top-24">
               <h2 className="text-lg font-black text-navy pb-3 border-b border-gray-100">Order Summary</h2>
 
-              <div className="space-y-3 text-xs sm:text-sm">
+              {/* Coupon Redemption Card */}
+              <div className="space-y-2">
+                {!appliedCoupon ? (
+                  <form onSubmit={handleApplyCoupon} className="space-y-2">
+                    <label className="text-xs font-bold text-navy flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-primary" /> Have a Promo Coupon?
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                        placeholder="e.g. EID2026"
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs font-mono font-bold text-navy uppercase focus:bg-white focus:outline-none focus:border-primary"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isValidatingCoupon || !couponInput.trim()}
+                        className="px-4 py-2 bg-navy hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {isValidatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="p-3 bg-brand-green/10 border border-brand-green/20 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-brand-green shrink-0" />
+                      <div>
+                        <span className="text-xs font-black text-navy font-mono">{appliedCoupon.code}</span>
+                        <span className="text-[10px] text-brand-green font-bold block">Coupon Applied</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="p-1 text-gray-400 hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                      title="Remove Coupon"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Breakdown */}
+              <div className="space-y-3 pt-3 border-t border-gray-100 text-xs sm:text-sm">
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Selected Items ({items.length}):</span>
                   <span className="font-bold text-navy font-mono">{items.reduce((s, i) => s + i.quantity, 0)} Pcs</span>
@@ -176,14 +275,20 @@ export default function Cart() {
                   <span className="font-bold text-navy font-mono">{subtotal.toLocaleString()} BDT</span>
                 </div>
 
-                {/* ক্লিন ডেলিভারি নোট (কোনো weight শব্দ নেই) */}
+                {discount > 0 && (
+                  <div className="flex justify-between text-brand-green font-bold">
+                    <span>Discount:</span>
+                    <span className="font-mono">-{discount.toLocaleString()} BDT</span>
+                  </div>
+                )}
+
                 <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 border border-gray-100 leading-relaxed">
-                  Delivery fee is calculated at checkout based on your delivery district.
+                  Steadfast delivery fee (70 / 100 / 130 BDT) is calculated dynamically at checkout based on your district.
                 </div>
 
                 <div className="flex justify-between text-base font-black text-navy pt-3 border-t border-gray-100">
-                  <span>Total Payable:</span>
-                  <span className="text-primary font-mono text-lg font-black">{subtotal.toLocaleString()} BDT</span>
+                  <span>Estimated Items Total:</span>
+                  <span className="text-primary font-mono text-lg font-black">{total.toLocaleString()} BDT</span>
                 </div>
               </div>
 
