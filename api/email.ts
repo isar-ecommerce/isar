@@ -55,17 +55,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
   }
 
-  const smtpUser = process.env.SMTP_USER?.trim();
-  const smtpPass = process.env.SMTP_PASS?.trim();
-  const adminEmail = process.env.ADMIN_EMAIL?.trim() || smtpUser;
-
-  if (!smtpUser || !smtpPass) {
-    return res.status(500).json({
-      success: false,
-      message: 'SMTP credentials (SMTP_USER / SMTP_PASS) not configured in environment.',
-    });
-  }
-
   const { order, type } = req.body || {};
 
   if (!order || !order.orderNumber) {
@@ -75,13 +64,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
+  const recipient = type === 'admin_alert' 
+    ? (process.env.ADMIN_EMAIL?.trim() || process.env.SMTP_USER?.trim() || 'isar.store.bd@gmail.com')
+    : (order.customerEmail?.trim() || 'customer@isar.com.bd');
 
   const itemsHtml = order.items.map((item) => `
     <tr style="border-bottom: 1px solid #f1f5f9;">
@@ -122,8 +107,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             <div style="display: flex; justify-content: space-between; font-size: 13px; color: #475569; margin-bottom: 4px;"><span>Delivery Fee:</span><span style="font-weight: 700;">৳${order.deliveryFee.toLocaleString()}</span></div>
             <div style="display: flex; justify-content: space-between; font-size: 15px; color: #0f172a; font-weight: 900; padding-top: 8px; border-top: 1px dashed #cbd5e1;"><span>Total:</span><span>৳${order.totalAmount.toLocaleString()}</span></div>
             <div style="background: #fdf2f8; border: 1px solid #fbcfe8; border-radius: 12px; padding: 12px; margin-top: 14px;">
-              <div style="display: flex; justify-content: space-between; font-size: 12px; color: #db2777; font-weight: 800;"><span>Advance Paid (bKash):</span><span>৳${order.paidAmount.toLocaleString()}</span></div>
-              <div style="display: flex; justify-content: space-between; font-size: 13px; color: #0f172a; font-weight: 900; margin-top: 4px;"><span>Due on Delivery (Cash):</span><span>৳${order.dueAmount.toLocaleString()}</span></div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; color: #db2777; font-weight: 800;"><span>Paid Amount:</span><span>৳${(order.paidAmount || 0).toLocaleString()}</span></div>
+              <div style="display: flex; justify-content: space-between; font-size: 13px; color: #0f172a; font-weight: 900; margin-top: 4px;"><span>Due on Delivery:</span><span>৳${(order.dueAmount || order.totalAmount).toLocaleString()}</span></div>
             </div>
           </div>
         </div>
@@ -132,17 +117,63 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     </html>
   `;
 
-  try {
-    const recipient = type === 'admin_alert' ? adminEmail : order.customerEmail;
-    await transporter.sendMail({
-      from: `"ISAR Orders" <${smtpUser}>`,
-      to: recipient,
-      subject: `Order Confirmation #${order.orderNumber} - ISAR`,
-      html: emailHtml,
-    });
-    return res.status(200).json({ success: true, message: 'Invoice delivered.' });
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    return res.status(500).json({ success: false, message: errorMsg });
+  // ১. প্রথমে Resend HTTPS API দিয়ে পাঠানোর চেষ্টা করবে (ভার্সেলে কস্মিনকালেও ব্লক খায় না)
+  const resendApiKey = process.env.RESEND_API_KEY?.trim();
+  if (resendApiKey) {
+    try {
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${resendApiKey}`,
+        },
+        body: JSON.stringify({
+          from: 'ISAR Orders <onboarding@resend.dev>',
+          to: [recipient],
+          subject: `Order Confirmation #${order.orderNumber} - ISAR`,
+          html: emailHtml,
+        }),
+      });
+
+      if (resendRes.ok) {
+        return res.status(200).json({ success: true, message: 'Invoice delivered via Resend API.' });
+      }
+    } catch (resendErr) {
+      console.warn('Resend API fallback note:', resendErr);
+    }
   }
+
+  // ২. Resend কি না থাকলে বা ফেল করলে Gmail SMTP দিয়ে চেষ্টা করবে
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+
+  if (smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"ISAR Orders" <${smtpUser}>`,
+        to: recipient,
+        subject: `Order Confirmation #${order.orderNumber} - ISAR`,
+        html: emailHtml,
+      });
+
+      return res.status(200).json({ success: true, message: 'Invoice delivered via Gmail SMTP.' });
+    } catch (smtpErr: unknown) {
+      const errorMsg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+      console.error('SMTP Error:', errorMsg);
+      return res.status(500).json({ success: false, message: `Email failed: ${errorMsg}` });
+    }
+  }
+
+  return res.status(500).json({
+    success: false,
+    message: 'No active email provider configured (Add RESEND_API_KEY or SMTP_USER/SMTP_PASS in env).',
+  });
 }
