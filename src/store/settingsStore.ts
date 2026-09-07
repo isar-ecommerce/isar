@@ -22,7 +22,6 @@ export interface SettingsState {
   facebookUrl: string;
   instagramUrl: string;
   isLoaded: boolean;
-
   language: 'en' | 'bn';
 
   setLanguage: (lang: 'en' | 'bn') => void;
@@ -33,7 +32,6 @@ export interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      // আপনার আসল স্টোর সেটিংস ডিফল্ট করা হলো
       logoType: 'text',
       logoUrl: '',
       siteName: 'ISAR',
@@ -42,8 +40,8 @@ export const useSettingsStore = create<SettingsState>()(
       contactPhone: '+880 1624789764',
       whatsappNumber: '+880 1624789764',
       officeAddress: 'Dhaka, Bangladesh',
-      feeInsideDhaka: 60,
-      feeOutsideDhaka: 150,
+      feeInsideDhaka: 70,
+      feeOutsideDhaka: 130,
       freeShippingMinAmount: 5000,
       flashSaleActive: true,
       flashSaleTitle: 'Flash Sale Offers',
@@ -57,7 +55,7 @@ export const useSettingsStore = create<SettingsState>()(
       setLanguage: (lang: 'en' | 'bn') => set({ language: lang }),
       setSettings: (newSettings) => set((state) => ({ ...state, ...newSettings })),
 
-      // ফায়ারস্টোর থেকে ফেচ করলেও যাতে পুরোনো ডামি নম্বর ফিরে না আসে
+      // ফায়ারস্টোর থেকে অ্যাডমিনের দেওয়া আসল সেটিংস সরাসরি লোড করা
       fetchSettings: async () => {
         try {
           const docRef = doc(db, 'settings', 'general');
@@ -70,18 +68,12 @@ export const useSettingsStore = create<SettingsState>()(
               logoUrl: data.logoUrl || '',
               siteName: data.siteName || 'ISAR',
               siteTagline: data.siteTagline || 'Premium Bags, Smart Accessories & Lifestyle Gear',
-              contactEmail: data.contactEmail && !data.contactEmail.includes('support@isar.com.bd') 
-                ? data.contactEmail 
-                : 'isar.store.bd@gmail.com',
-              contactPhone: data.contactPhone && !data.contactPhone.includes('1234 567890') 
-                ? data.contactPhone 
-                : '+880 1624789764',
-              whatsappNumber: data.whatsappNumber && !data.whatsappNumber.includes('1234 567890') 
-                ? data.whatsappNumber 
-                : '+880 1624789764',
+              contactEmail: data.contactEmail || 'isar.store.bd@gmail.com',
+              contactPhone: data.contactPhone || '+880 1624789764',
+              whatsappNumber: data.whatsappNumber || data.contactPhone || '+880 1624789764',
               officeAddress: data.officeAddress || 'Dhaka, Bangladesh',
-              feeInsideDhaka: data.feeInsideDhaka !== undefined ? Number(data.feeInsideDhaka) : 60,
-              feeOutsideDhaka: data.feeOutsideDhaka !== undefined ? Number(data.feeOutsideDhaka) : 150,
+              feeInsideDhaka: data.feeInsideDhaka !== undefined ? Number(data.feeInsideDhaka) : 70,
+              feeOutsideDhaka: data.feeOutsideDhaka !== undefined ? Number(data.feeOutsideDhaka) : 130,
               freeShippingMinAmount: data.freeShippingMinAmount !== undefined ? Number(data.freeShippingMinAmount) : 5000,
               flashSaleActive: data.flashSaleActive !== undefined ? data.flashSaleActive : true,
               flashSaleTitle: data.flashSaleTitle || 'Flash Sale Offers',
