@@ -36,7 +36,7 @@ export default function Products() {
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
 
-  const addItemToCart = useCartStore((state) => state.addItem);
+  const { addItem: addItemToCart, clearCart } = useCartStore();
 
   const getTimestampMs = (val: unknown): number => {
     if (!val) return 0;
@@ -91,7 +91,6 @@ export default function Products() {
     };
   }, []);
 
-  // আল্ট্রা-স্মার্ট সেলফ-হিলিং ক্যাটাগরি ম্যাচিং ইঞ্জিন (স্ল্যাগ ও আইডি উভয় সমর্থন করে)
   const isProductInCategory = (product: Product, cat: Category | string) => {
     const clean = (str?: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -155,7 +154,6 @@ export default function Products() {
       });
   }, [products, selectedCategory, categories, searchQuery, minPrice, maxPrice, inStockOnly, selectedRating, sortBy]);
 
-  // Point 7: ক্লিন Slug URL হ্যান্ডলার
   const handleCategorySelect = (categoryTarget: string) => {
     if (selectedCategory === categoryTarget || !categoryTarget) {
       searchParams.delete('category');
@@ -176,7 +174,6 @@ export default function Products() {
     setIsFilterDrawerOpen(false);
   };
 
-  // Point 12: Buy Now - চেকআউটে ডায়নামিক প্রোডাক্ট নাম সহ ব্যাক লিংক পাস করা
   const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -184,6 +181,7 @@ export default function Products() {
       toast.error('This item is currently sold out');
       return;
     }
+    clearCart();
     addItemToCart(product, 1);
     navigate('/checkout', {
       state: { from: product.name, path: `/products/${product.id}` },
@@ -209,7 +207,7 @@ export default function Products() {
     <div className="bg-secondary min-h-screen py-8 md:py-12">
       <Helmet>
         <title>Shop Products | ISAR</title>
-        <meta name="description" content="Browse authentic backpacks, smartphone accessories, and lifestyle gear at ISAR." />
+        <meta name="description" content="Browse authentic bags, smartphone accessories, and lifestyle gear at ISAR." />
       </Helmet>
 
       <div className="container mx-auto px-4 max-w-7xl space-y-6">
@@ -333,7 +331,7 @@ export default function Products() {
                 )}
               </div>
 
-              {/* 1. Category Filter Section (Point 7: Clean Slug Matching) */}
+              {/* 1. Category Filter Section */}
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Categories</h4>
                 <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
@@ -394,30 +392,6 @@ export default function Products() {
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-navy bg-gray-50 focus:bg-white focus:outline-none focus:border-primary"
                   />
                 </div>
-
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => { setMinPrice('0'); setMaxPrice('1500'); }}
-                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-                  >
-                    Under 1.5K BDT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setMinPrice('1500'); setMaxPrice('5000'); }}
-                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-                  >
-                    1.5K - 5K BDT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setMinPrice('5000'); setMaxPrice(''); }}
-                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-                  >
-                    5K+ BDT
-                  </button>
-                </div>
               </div>
 
               {/* 3. Availability Filter */}
@@ -466,7 +440,7 @@ export default function Products() {
             </div>
           </aside>
 
-          {/* Product Grid Area (Point 3 & Point 6 Polish Applied) */}
+          {/* Product Grid Area */}
           <main className="lg:col-span-3">
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-100 bg-white rounded-3xl p-12 border border-gray-100 shadow-modern">
@@ -496,7 +470,6 @@ export default function Products() {
                     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
                     : 0;
 
-                  // Point 3: Hide rating if zero reviews
                   const hasReviews = (product.reviewCount || 0) > 0;
 
                   return (
@@ -507,7 +480,6 @@ export default function Products() {
                       {/* Product Image Box */}
                       <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 flex items-center justify-center">
                         
-                        {/* Sold Out Red Watermark Stamp */}
                         {isOutOfStock && (
                           <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
                             <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white/95">
@@ -516,31 +488,28 @@ export default function Products() {
                           </div>
                         )}
 
-                        {/* New Badge */}
                         {!isOutOfStock && product.isNewArrival && (
-                          <span className="absolute top-2.5 left-2.5 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
+                          <span className="absolute top-2.5 left-2.5 z-10 bg-brand-green text-white text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
                             New
                           </span>
                         )}
 
-                        {/* Save Discount Badge */}
                         {!isOutOfStock && discountPercent > 0 && (
-                          <span className="absolute top-2.5 right-2.5 z-10 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-2xs">
-                            SAVE {discountPercent}%
+                          <span className="absolute top-2.5 right-2.5 z-10 bg-red-600 text-white text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-2xs">
+                            -{discountPercent}%
                           </span>
                         )}
 
                         <img 
                           src={product.images[0] || 'https://via.placeholder.com/400'} 
                           alt={product.name} 
-                          className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300 filter drop-shadow-2xs"
+                          className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500 filter drop-shadow-2xs"
                         />
                       </Link>
 
-                      {/* Product Info & Compact Action Buttons (Point 6) */}
+                      {/* Product Info & Compact Action Buttons */}
                       <div className="p-3 sm:p-4 flex flex-col grow">
                         
-                        {/* Point 3: Only display rating if reviewCount > 0 */}
                         {hasReviews ? (
                           <div className="flex items-center gap-1 mb-1 text-amber-500">
                             <Star className="w-3.5 h-3.5 fill-current" />
@@ -553,53 +522,48 @@ export default function Products() {
                           </div>
                         )}
 
-                        {/* Title */}
                         <Link 
                           to={`/products/${product.id}`} 
-                          className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-black text-navy mb-1.5 grow leading-snug"
+                          className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-black text-navy mb-2 grow"
                         >
                           {product.name}
                         </Link>
 
-                        {/* Price */}
-                        <div className="flex items-baseline gap-1.5 mb-3">
-                          <span className="text-xs sm:text-sm font-black text-primary font-mono block">
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="text-sm sm:text-base font-black text-primary font-mono block">
                             {product.price.toLocaleString()} BDT
                           </span>
                           {product.originalPrice && product.originalPrice > product.price && (
-                            <span className="text-[10px] text-gray-400 line-through font-semibold font-mono">
+                            <span className="text-[10px] sm:text-[11px] text-gray-400 line-through font-semibold font-mono">
                               {product.originalPrice.toLocaleString()} BDT
                             </span>
                           )}
                         </div>
 
-                        {/* Compact Action Buttons */}
                         <div className="mt-auto pt-2 border-t border-gray-100">
                           {isOutOfStock ? (
                             <button 
                               type="button"
                               disabled
-                              className="w-full py-2 px-2 rounded-xl border border-red-500 text-red-500 font-black text-[11px] uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
+                              className="w-full py-2.5 px-3 rounded-xl border-2 border-red-500 text-red-500 font-black text-xs uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
                             >
-                              Stock Out
+                              STOCK OUT
                             </button>
                           ) : (
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {/* 1-Click Buy Now (Point 12: Passes product title for dynamic back button) */}
+                            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                               <button 
                                 type="button"
                                 onClick={(e) => handleBuyNow(e, product)}
-                                className="py-2 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[10px] sm:text-xs rounded-xl shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                                className="py-2 sm:py-2.5 px-2 bg-navy hover:bg-slate-800 text-white font-black text-[10px] sm:text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                               >
                                 <Zap className="w-3 h-3 fill-brand-gold text-brand-gold" />
                                 <span>Buy Now</span>
                               </button>
 
-                              {/* Add to Cart */}
                               <button 
                                 type="button"
                                 onClick={(e) => handleAddToCart(e, product)}
-                                className="py-2 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] sm:text-xs rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                                className="py-2 sm:py-2.5 px-2 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] sm:text-xs rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                               >
                                 <ShoppingBag className="w-3 h-3 text-primary" />
                                 <span>Add to Cart</span>
@@ -684,7 +648,7 @@ export default function Products() {
                   placeholder="Max"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-navy bg-gray-50"
+                  className="w-full px-3 py-2 border border-gray-200, rounded-xl text-xs font-semibold text-navy bg-gray-50"
                 />
               </div>
             </div>

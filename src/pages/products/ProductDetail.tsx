@@ -35,7 +35,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
 
-  const addItemToCart = useCartStore((state) => state.addItem);
+  const { addItem: addItemToCart, clearCart } = useCartStore();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -87,13 +87,14 @@ export default function ProductDetail() {
     toast.success(`Added ${quantity} item(s) to Cart!`);
   };
 
-  // Point 12: Order Now - Passes product title and path to dynamic checkout back button
+  // Point 12 & Buy Now: clear cart and pass dynamic back state for checkout
   const handleOrderNow = () => {
     if (!product) return;
     if (product.stock <= 0 || product.status === 'out-of-stock') {
       toast.error('This item is currently sold out');
       return;
     }
+    clearCart();
     addItemToCart(product, quantity);
     navigate('/checkout', {
       state: { from: product.name, path: `/products/${product.id}` },
@@ -204,7 +205,7 @@ export default function ProductDetail() {
             <div className="flex flex-col space-y-5">
               
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                {/* Point 7: Clickable clean category tag */}
+                {/* Point 7: Clickable clean category slug link */}
                 <Link
                   to={`/products?category=${encodeURIComponent((product as { categorySlug?: string }).categorySlug || product.categoryId || 'all')}`}
                   className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20 hover:bg-primary hover:text-white transition-colors cursor-pointer"

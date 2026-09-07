@@ -72,7 +72,7 @@ export default function Home() {
   const banners = heroBanners && heroBanners.length > 0 ? heroBanners : DEFAULT_BANNERS;
 
   const trendingSliderRef = useRef<HTMLDivElement>(null);
-  const addItemToCart = useCartStore((state) => state.addItem);
+  const { addItem: addItemToCart, clearCart } = useCartStore();
 
   useEffect(() => {
     let isMounted = true;
@@ -142,6 +142,7 @@ export default function Home() {
       toast.error('This item is currently sold out');
       return;
     }
+    clearCart();
     addItemToCart(product, 1);
     navigate('/checkout', {
       state: { from: product.name, path: `/products/${product.id}` },
@@ -157,13 +158,11 @@ export default function Home() {
     toast.success(`Added ${product.name} to Cart!`);
   };
 
-  // Trending Products (Primary Catalog)
   const trendingProducts = useMemo(() => {
     const featured = products.filter(p => p.isTrending || p.isFeatured);
     return featured.length > 0 ? featured : products;
   }, [products]);
 
-  // Point 4: Group products by customSection dynamically created by Admin
   const dynamicCustomSections = useMemo(() => {
     const sectionMap: Record<string, Product[]> = {};
 
@@ -185,7 +184,6 @@ export default function Home() {
 
   const activeBanner = banners[currentBannerIndex] || DEFAULT_BANNERS[0];
 
-  // Reusable 100% Unified Product Card Component (Identical Design & Dual Buttons across all sections)
   const renderProductCard = (product: Product) => {
     const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
     const discountPercent = (product.originalPrice && product.originalPrice > product.price)
@@ -199,7 +197,6 @@ export default function Home() {
         key={product.id} 
         className="w-44 sm:w-52 md:w-60 bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col shrink-0"
       >
-        {/* Product Image */}
         <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 flex items-center justify-center">
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
@@ -228,11 +225,10 @@ export default function Home() {
           />
         </Link>
 
-        {/* Product Details */}
         <div className="p-3 flex flex-col grow">
           {hasReviews ? (
             <div className="flex items-center gap-1 mb-1 text-amber-500">
-              <Star className="w-3.5 h-3.5 fill-current" />
+              <Star className="w-3 h-3 fill-current" />
               <span className="text-[11px] font-bold text-navy">{product.rating}</span>
               <span className="text-[9px] text-gray-400 font-medium">({product.reviewCount})</span>
             </div>
@@ -253,7 +249,6 @@ export default function Home() {
             )}
           </div>
           
-          {/* 100% Unified Dual Action Buttons */}
           <div className="mt-auto pt-2 border-t border-gray-100">
             {isOutOfStock ? (
               <button 
@@ -480,7 +475,7 @@ export default function Home() {
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-2xs`}>
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <span className="text-[11px] sm:text-xs font-bold text-navy text-center line-clamp-1">{category.name}</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-navy text-center line-click-1">{category.name}</span>
                 </Link>
               );
             })}
@@ -537,7 +532,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* Point 4: Dynamic Custom Sections created by Admin (Appears ONLY when Admin tags products) */}
+      {/* Point 4: Dynamic Custom Sections created by Admin */}
       {dynamicCustomSections.map((section) => (
         <section key={section.title} className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">
