@@ -1,4 +1,5 @@
 import { useState, useMemo, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   X, 
   Truck, 
@@ -6,20 +7,25 @@ import {
   Loader2, 
   Phone, 
   User, 
-  Mail,
+  Mail, 
   Plus, 
   Minus, 
   Zap, 
-  CheckCircle2,
-  ChevronDown,
-  Building,
-  Banknote,
-  Scale
+  CheckCircle2, 
+  ChevronDown, 
+  Building, 
+  Banknote, 
+  Scale 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../../store/authStore';
-import { calculateDynamicDeliveryFee } from '../../services/orderService';
+import { createOrder, calculateDynamicDeliveryFee } from '../../services/orderService';
+import { 
+  sendOrderConfirmationSMS, 
+  sendOrderConfirmationEmail, 
+  sendAdminOrderAlert 
+} from '../../services/notificationService';
 import { 
   BANGLADESH_DIVISIONS, 
   getDistrictsByDivision, 
@@ -35,6 +41,7 @@ interface ExpressOrderModalProps {
 }
 
 export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressOrderModalProps) {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
 
   const [fullName, setFullName] = useState<string>('');
@@ -128,7 +135,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         fullAddress: fullAddress.trim(),
       };
 
-      // 1. Full bKash Online Payment
+      // 1. Full bKash Online Payment Flow
       if (paymentMode === 'bkash') {
         sessionStorage.setItem('isar_pending_order', JSON.stringify({
           userId: user?.uid || 'guest-user',
@@ -171,8 +178,8 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         }
       }
 
-      // 2. Pure Cash on Delivery (0 BDT in advance)
-      sessionStorage.setItem('isar_pending_order', JSON.stringify({
+      // 2. Direct 1-Click Cash on Delivery (COD) Flow
+      const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
         customerEmail: email.trim(),
@@ -189,14 +196,29 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         paymentStatus: 'pending',
         paidAmount: 0,
         dueAmount: totalAmount,
-        orderNumber: generatedOrderNumber,
-      }));
+      });
 
-      // Redirect to checkout to process final order creation and send SMS
-      window.location.assign('/checkout?direct_cod=true');
+      sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount);
+      sendOrderConfirmationEmail(order);
+      sendAdminOrderAlert(order);
+
+      toast.success(`Order placed successfully! Order ID: ${order.orderNumber}`);
+      onClose();
+
+      navigate('/order-success', {
+        state: {
+          order: {
+            ...order,
+            paymentStatus: 'pending',
+            paidAmount: 0,
+            dueAmount: totalAmount,
+            totalAmount: totalAmount,
+          },
+        },
+      });
     } catch (err) {
-      console.error('Order initiation error:', err);
-      toast.error('Unable to proceed with order.');
+      console.error('Express Order Error:', err);
+      toast.error('Failed to complete order. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
