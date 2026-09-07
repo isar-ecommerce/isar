@@ -9,6 +9,7 @@ export interface CartItem {
 }
 
 export interface Coupon {
+  id?: string;                  // 🔴 ফিক্স: কুপনের ফায়ারস্টোর ডকুমেন্ট আইডি সংরক্ষণ করার জন্য
   code: string;
   discountType: 'percentage' | 'fixed';
   discountValue: number;
@@ -74,7 +75,7 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      // ২. শুধুমাত্র ডিলিট বা ক্রস বাটনে ক্লিক করলেই প্রোডাক্ট রিমুভ হবে
+      // ২. আইটেম রিমুভ করা
       removeItem: (productId, selectedVariantId) => {
         set({
           items: get().items.filter(
@@ -83,13 +84,12 @@ export const useCartStore = create<CartState>()(
         });
       },
 
-      // ৩. কোয়ান্টিটি আপডেট: মিনিমাম ১ থাকবে (০ হবে না), ম্যাক্সিমাম স্টকের সমান হবে
+      // ৩. কোয়ান্টিটি আপডেট: মিনিমাম ১ থাকবে, ম্যাক্সিমাম স্টকের সমান হবে
       updateQuantity: (productId, quantity, selectedVariantId) => {
         set({
           items: get().items.map((item) => {
             if (item.product.id === productId && item.selectedVariantId === selectedVariantId) {
               const maxStock = Math.max(1, item.product.stock || 1);
-              // কাস্টমার মাইনাস চাপলে সর্বনিম্ন ১ এ থামবে, প্লাস চাপলে স্টকের বেশি বাড়বে না
               const safeQuantity = Math.max(1, Math.min(quantity, maxStock));
               return { ...item, quantity: safeQuantity };
             }
@@ -98,7 +98,7 @@ export const useCartStore = create<CartState>()(
         });
       },
 
-      // ৪. কার্ট সম্পূর্ণ খালি করা
+      // ৪. কার্ট খালি করা
       clearCart: () => set({ items: [], appliedCoupon: null }),
 
       // ৫. কুপন এপ্লাই
