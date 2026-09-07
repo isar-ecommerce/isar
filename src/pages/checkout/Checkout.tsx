@@ -10,12 +10,14 @@ import {
   Lock, 
   Phone, 
   User, 
-  CheckCircle2,
-  Mail,
-  Banknote,
-  Tag,
-  Sparkles,
-  X
+  CheckCircle2, 
+  Mail, 
+  Banknote, 
+  Tag, 
+  Sparkles, 
+  Plus,
+  Minus,
+  X 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { doc, getDoc } from 'firebase/firestore';
@@ -49,8 +51,10 @@ export default function Checkout() {
     getSubtotal, 
     getDiscount, 
     appliedCoupon, 
-    applyCoupon,
-    removeCoupon,
+    applyCoupon, 
+    removeCoupon, 
+    updateQuantity,
+    removeItem,
     clearCart 
   } = useCartStore();
 
@@ -81,7 +85,6 @@ export default function Checkout() {
     window.scrollTo(0, 0);
   }, []);
 
-  // Point 12: Dynamic Back button showing where the customer actually came from
   const originState = location.state as { from?: string; path?: string } | null;
   const backButtonLabel = originState?.from ? `Back to ${originState.from}` : 'Back to Cart';
   const backButtonPath = originState?.path || '/cart';
@@ -211,6 +214,7 @@ export default function Checkout() {
     }
   }, [searchParams, navigate, clearCart]);
 
+  // Live dynamic weight & delivery charge calculation based on current items
   const totalWeight = useMemo(() => {
     return items.reduce((sum, item) => {
       const weightPerItem = (item.product as { weightInKg?: number })?.weightInKg || 0.5;
@@ -294,7 +298,6 @@ export default function Checkout() {
     toast.success('Coupon removed successfully');
   };
 
-  // Point 1: Smooth validation & input focus
   const validateForm = () => {
     if (!fullName.trim()) {
       toast.error('Please enter your full name');
@@ -453,7 +456,7 @@ export default function Checkout() {
   };
 
   return (
-    <div className="bg-secondary min-h-screen py-8 md:py-12">
+    <div className="bg-secondary min-h-screen py-6 sm:py-10">
       <Helmet>
         <title>Checkout | ISAR Marketplace</title>
         <meta name="description" content="Complete your purchase with Cash on Delivery or bKash at ISAR." />
@@ -461,8 +464,8 @@ export default function Checkout() {
 
       <div className="container mx-auto px-4 max-w-6xl">
         
-        {/* Point 12: Dynamic Back Button */}
-        <div className="mb-6">
+        {/* Dynamic Back Button */}
+        <div className="mb-4 sm:mb-6">
           <button
             type="button"
             onClick={handleBackNavigation}
@@ -471,26 +474,26 @@ export default function Checkout() {
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span>{backButtonLabel}</span>
           </button>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-navy mt-2">Checkout</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-navy mt-1.5">Checkout</h1>
         </div>
 
-        <form ref={formRef} onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <form ref={formRef} onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           
           {/* Left Column: Shipping & Payment */}
           <div className="lg:col-span-2 space-y-6">
             
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
-              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-modern border border-gray-100 space-y-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-navy">Shipping & Delivery Address</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-navy">Shipping & Delivery Address</h2>
                   <p className="text-xs text-gray-500">Provide your address for accurate home delivery</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 
                 <div className="space-y-1 sm:col-span-2">
                   <label htmlFor="checkout-fullName" className="text-xs font-bold text-navy">Full Name *</label>
@@ -625,21 +628,21 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Strict 2 Payment Methods Selection */}
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-5">
+            {/* Payment Methods Card */}
+            <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-modern border border-gray-100 space-y-4">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green font-bold">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-navy">Payment Method</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-navy">Payment Method</h2>
                   <p className="text-xs text-gray-500">Choose your preferred payment option</p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 
-                {/* 1. Cash on Delivery (0 BDT Advance) */}
+                {/* Cash on Delivery */}
                 <label 
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'cod' 
@@ -670,7 +673,7 @@ export default function Checkout() {
                   )}
                 </label>
 
-                {/* 2. Full bKash Online Payment (100% Upfront Online) */}
+                {/* bKash Payment */}
                 <label 
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'bkash' 
@@ -709,34 +712,95 @@ export default function Checkout() {
 
           </div>
 
-          {/* Right Column: Order Summary & Coupon */}
+          {/* Right Column: Order Summary with Live Item Quantity Adjustments */}
           <div className="space-y-6">
             
-            <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-5 sticky top-24">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-modern border border-gray-100 space-y-4 sticky top-24">
               
-              <div className="pb-3 border-b border-gray-100">
-                <h2 className="text-base font-black text-navy">Order Summary ({items.length} Items)</h2>
+              <div className="pb-3 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-base font-black text-navy">Order Summary</h2>
+                <span className="text-xs font-bold text-gray-400 font-mono">
+                  {items.reduce((sum, item) => sum + item.quantity, 0)} Pcs ({items.length} Items)
+                </span>
               </div>
 
-              {/* Items Preview */}
-              <div className="max-h-52 overflow-y-auto space-y-3 pr-1">
-                {items.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                    <img
-                      src={item.product.images?.[0] || 'https://via.placeholder.com/80'}
-                      alt={item.product.name}
-                      className="w-12 h-12 rounded-xl object-cover bg-gray-50 border border-gray-100 shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-navy truncate">{item.product.name}</p>
-                      <p className="text-[11px] text-gray-500 font-medium">Qty: {item.quantity} × {item.product.price.toLocaleString()} BDT</p>
+              {/* Items List with Live + / - Quantity Controls on Checkout */}
+              <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
+                {items.map((item, idx) => {
+                  const maxStock = Math.max(1, item.product.stock || 1);
+                  const isAtMin = item.quantity <= 1;
+                  const isAtMax = item.quantity >= maxStock;
+
+                  return (
+                    <div 
+                      key={`${item.product.id}-${item.selectedVariantId || idx}`}
+                      className="p-2.5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-center justify-between gap-2.5 relative group"
+                    >
+                      <img
+                        src={item.product.images?.[0] || 'https://via.placeholder.com/80'}
+                        alt={item.product.name}
+                        className="w-12 h-12 rounded-xl object-cover bg-white border border-gray-200 shrink-0 p-0.5"
+                      />
+                      
+                      <div className="flex-1 min-w-0 pr-1">
+                        <p className="text-xs font-bold text-navy truncate">{item.product.name}</p>
+                        <p className="text-[11px] text-gray-500 font-mono font-medium">
+                          {item.product.price.toLocaleString()} BDT
+                        </p>
+                        
+                        {/* Live Quantity Adjustments */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center border border-gray-200 rounded-lg bg-white shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.selectedVariantId)}
+                              disabled={isAtMin}
+                              className="w-5 h-5 flex items-center justify-center text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              aria-label="Decrease quantity"
+                              title="Decrease quantity"
+                            >
+                              <Minus className="w-2.5 h-2.5" />
+                            </button>
+                            <span className="w-6 text-center text-xs font-black text-navy font-mono">{item.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isAtMax) {
+                                  toast.error(`Max stock is ${maxStock}`);
+                                } else {
+                                  updateQuantity(item.product.id, item.quantity + 1, item.selectedVariantId);
+                                }
+                              }}
+                              disabled={isAtMax}
+                              className="w-5 h-5 flex items-center justify-center text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              aria-label="Increase quantity"
+                              title="Increase quantity"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.product.id, item.selectedVariantId)}
+                            className="p-1 text-gray-400 hover:text-red-500 rounded-md transition-colors cursor-pointer"
+                            title="Remove item"
+                            aria-label="Remove item"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <span className="text-xs font-black text-navy font-mono shrink-0">
+                        {(item.product.price * item.quantity).toLocaleString()} BDT
+                      </span>
                     </div>
-                    <span className="text-xs font-black text-navy font-mono">{(item.product.price * item.quantity).toLocaleString()} BDT</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* Coupon Redemption Box */}
+              {/* Coupon Input Box */}
               <div className="pt-2">
                 {!appliedCoupon ? (
                   <div className="space-y-2">
@@ -784,13 +848,12 @@ export default function Checkout() {
               </div>
 
               {/* Bill Breakdown */}
-              <div className="space-y-3 pt-3 border-t border-gray-100 text-xs sm:text-sm">
+              <div className="space-y-2.5 pt-3 border-t border-gray-100 text-xs sm:text-sm">
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Product Subtotal</span>
                   <span className="font-bold text-navy font-mono">{subtotal.toLocaleString()} BDT</span>
                 </div>
 
-                {/* Point 10: Clear weight specification under Delivery Charge */}
                 <div className="flex justify-between text-gray-600 font-medium">
                   <div>
                     <span className="block">Delivery Charge</span>
@@ -808,17 +871,17 @@ export default function Checkout() {
                   </div>
                 )}
 
-                <div className="flex justify-between text-base font-black text-navy pt-3 border-t border-gray-100">
+                <div className="flex justify-between text-base font-black text-navy pt-2.5 border-t border-gray-100">
                   <span>Total Payable</span>
                   <span className="text-primary font-mono text-lg font-black">{total.toLocaleString()} BDT</span>
                 </div>
               </div>
 
-              {/* Order Button */}
+              {/* Confirm Order Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-black py-4 px-6 rounded-2xl text-sm transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01]"
+                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-black py-3.5 sm:py-4 px-6 rounded-2xl text-sm transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01]"
               >
                 {isSubmitting ? (
                   <>
