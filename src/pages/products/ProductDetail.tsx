@@ -15,7 +15,8 @@ import {
   CreditCard, 
   Zap, 
   Tag, 
-  RotateCcw 
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -52,7 +53,7 @@ export default function ProductDetail() {
           setProduct(data);
         }
       } catch (err) {
-        console.error("Error loading product:", err);
+        console.error('Error loading product:', err);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -78,14 +79,25 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
+      return;
+    }
     addItemToCart(product, quantity);
     toast.success(`Added ${quantity} item(s) to Cart!`);
   };
 
+  // Point 12: Order Now - Passes product title and path to dynamic checkout back button
   const handleOrderNow = () => {
     if (!product) return;
+    if (product.stock <= 0 || product.status === 'out-of-stock') {
+      toast.error('This item is currently sold out');
+      return;
+    }
     addItemToCart(product, quantity);
-    navigate('/checkout');
+    navigate('/checkout', {
+      state: { from: product.name, path: `/products/${product.id}` },
+    });
   };
 
   const handleShare = () => {
@@ -121,11 +133,12 @@ export default function ProductDetail() {
     );
   }
 
-  // ফায়ারবেসের বিদঘুটে আইডি রোধ: সুন্দর নাম থাকলে নাম দেখাবে, না থাকলে AUTHENTIC ITEM দেখাবে
   const rawCat = (product as { categoryName?: string }).categoryName || product.categoryId || '';
   const categoryTag = (rawCat.length > 18 || rawCat.includes('1') || rawCat.includes('2') || rawCat.includes('Z')) 
     ? 'AUTHENTIC ITEM' 
     : rawCat.toUpperCase();
+
+  const hasReviews = (product.reviewCount || 0) > 0;
 
   return (
     <div className="bg-secondary min-h-screen py-6 md:py-10">
@@ -158,6 +171,7 @@ export default function ProductDetail() {
                 />
                 
                 <button 
+                  type="button"
                   onClick={handleShare}
                   className="absolute top-4 right-4 p-2.5 bg-white/90 hover:bg-white rounded-full text-gray-700 shadow-md backdrop-blur-sm transition-all border border-gray-100 hover:scale-110 cursor-pointer"
                   aria-label="Share product"
@@ -171,6 +185,7 @@ export default function ProductDetail() {
                   {product.images.map((img, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => setSelectedImageIndex(idx)}
                       className={`relative w-20 h-20 rounded-2xl overflow-hidden bg-white p-2 border-2 transition-all shrink-0 flex items-center justify-center cursor-pointer ${
                         selectedImageIndex === idx 
@@ -189,9 +204,13 @@ export default function ProductDetail() {
             <div className="flex flex-col space-y-5">
               
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20">
+                {/* Point 7: Clickable clean category tag */}
+                <Link
+                  to={`/products?category=${encodeURIComponent((product as { categorySlug?: string }).categorySlug || product.categoryId || 'all')}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20 hover:bg-primary hover:text-white transition-colors cursor-pointer"
+                >
                   <Tag className="w-3.5 h-3.5" /> {categoryTag}
-                </span>
+                </Link>
                 
                 {product.stock > 0 ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-green bg-brand-green/10 px-3.5 py-1 rounded-full border border-brand-green/20">
@@ -208,14 +227,24 @@ export default function ProductDetail() {
                 {product.name}
               </h1>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center text-amber-500">
-                  <Star className="w-4 h-4 fill-current" />
-                  <span className="ml-1 text-sm font-bold text-navy">{product.rating || 5}</span>
+              {/* Point 3: Clean Rating Display (Hides stars if 0 reviews) */}
+              {hasReviews ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center text-amber-500">
+                    <Star className="w-4 h-4 fill-current" />
+                    <span className="ml-1 text-sm font-bold text-navy">{product.rating}</span>
+                  </div>
+                  <span className="text-gray-300">|</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    {product.reviewCount} Verified Customer Review{product.reviewCount > 1 ? 's' : ''}
+                  </span>
                 </div>
-                <span className="text-gray-300">|</span>
-                <span className="text-xs text-gray-500 font-medium">{product.reviewCount || 1} Verified Customer Review(s)</span>
-              </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
+                  <span>Verified Authentic • No customer reviews yet</span>
+                </div>
+              )}
 
               {/* Price */}
               <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-baseline gap-3 flex-wrap shadow-inner">
@@ -245,6 +274,7 @@ export default function ProductDetail() {
                   <span className="text-xs font-bold text-navy uppercase tracking-wider">Quantity:</span>
                   <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50">
                     <button 
+                      type="button"
                       onClick={() => handleQuantityChange('decrease')}
                       disabled={quantity <= 1}
                       className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors cursor-pointer"
@@ -254,6 +284,7 @@ export default function ProductDetail() {
                     </button>
                     <span className="w-10 text-center font-bold text-sm text-navy font-mono">{quantity}</span>
                     <button 
+                      type="button"
                       onClick={() => handleQuantityChange('increase')}
                       disabled={quantity >= product.stock}
                       className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors cursor-pointer"
@@ -265,8 +296,9 @@ export default function ProductDetail() {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  {/* Order Now (Direct Checkout) */}
+                  {/* Point 12: Order Now with dynamic checkout back link */}
                   <button
+                    type="button"
                     onClick={handleOrderNow}
                     disabled={product.stock === 0}
                     className="w-full flex items-center justify-center gap-2.5 bg-linear-to-r from-primary via-primary-dark to-navy hover:from-blue-700 hover:to-slate-900 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-95 cursor-pointer"
@@ -276,6 +308,7 @@ export default function ProductDetail() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={handleAddToCart}
                     disabled={product.stock === 0}
                     className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-navy border-2 border-gray-200 hover:border-primary/50 py-3.5 px-6 rounded-2xl font-extrabold text-xs sm:text-sm shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -315,6 +348,7 @@ export default function ProductDetail() {
         <div className="bg-white rounded-3xl shadow-modern border border-gray-100 overflow-hidden mb-10">
           <div className="flex border-b border-gray-100 bg-gray-50/50">
             <button
+              type="button"
               onClick={() => setActiveTab('description')}
               className={`px-6 py-4 font-extrabold text-xs sm:text-sm transition-colors border-b-2 cursor-pointer ${
                 activeTab === 'description' 
@@ -326,6 +360,7 @@ export default function ProductDetail() {
             </button>
             {product.specifications && product.specifications.length > 0 && (
               <button
+                type="button"
                 onClick={() => setActiveTab('specifications')}
                 className={`px-6 py-4 font-extrabold text-xs sm:text-sm transition-colors border-b-2 cursor-pointer ${
                   activeTab === 'specifications' 

@@ -12,7 +12,8 @@ import {
   Tag, 
   ImageIcon,
   Edit,
-  Scale
+  Scale,
+  Sparkles
 } from 'lucide-react';
 import { 
   collection, 
@@ -30,6 +31,8 @@ import { useAuthStore } from '../../store/authStore';
 import { uploadImageToCloudinary } from '../../cloudinary/upload';
 import type { Category } from '../../types/product';
 
+const PRESET_SECTIONS = ['Mega Deals', 'Flash Sale', 'Best Sellers', 'Eid Collection', 'Gadget Zone'];
+
 export default function AdminAddProduct() {
   const { id } = useParams<{ id?: string }>();
   const isEditMode = Boolean(id);
@@ -37,11 +40,10 @@ export default function AdminAddProduct() {
   const { user } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ক্যাটাগরি তালিকা স্টেট (কোনো ফেক ক্যাটাগরি থাকবে না)
   const [categories, setCategories] = useState<Category[]>([]);
   const [isFetchingProduct, setIsFetchingProduct] = useState<boolean>(false);
   
-  // প্রোডাক্ট ফর্ম স্টেট
+  // Product Form State
   const [name, setName] = useState<string>('');
   const [slug, setSlug] = useState<string>('');
   const [shortDescription, setShortDescription] = useState<string>('');
@@ -49,17 +51,20 @@ export default function AdminAddProduct() {
   
   const [price, setPrice] = useState<number | ''>('');
   const [originalPrice, setOriginalPrice] = useState<number | ''>('');
-  const [weightInKg, setWeightInKg] = useState<number | ''>(0.5); // স্টেডফাস্ট ডেলিভারি হিসাবের জন্য
+  const [weightInKg, setWeightInKg] = useState<number | ''>(0.5);
   const [stock, setStock] = useState<number | ''>(10);
   const [lowStockAlert, setLowStockAlert] = useState<number | ''>(2);
   const [sku, setSku] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string>('');
 
-  // ইমেজেস স্টেট (Cloudinary URLs)
+  // Point 4: Custom Section Name State (Unlimited / Infinity Naming)
+  const [customSection, setCustomSection] = useState<string>('');
+
+  // Images State
   const [images, setImages] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
 
-  // স্ট্যাটাস ও ফ্ল্যাগস
+  // Status & Visibility Flags
   const [status, setStatus] = useState<'active' | 'draft'>('active');
   const [isFeatured, setIsFeatured] = useState<boolean>(false);
   const [isTrending, setIsTrending] = useState<boolean>(false);
@@ -67,7 +72,7 @@ export default function AdminAddProduct() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // ১. ফায়ারস্টোর থেকে শুধুমাত্র অ্যাডমিনের তৈরি করা আসল ক্যাটাগরি লোড করা
+  // 1. Fetch categories from Firestore
   useEffect(() => {
     let isMounted = true;
 
@@ -86,7 +91,7 @@ export default function AdminAddProduct() {
           }
         }
       } catch (error) {
-        console.error("Error fetching categories:", error);
+        console.error('Error fetching categories:', error);
       }
     };
 
@@ -97,7 +102,7 @@ export default function AdminAddProduct() {
     };
   }, [isEditMode, categoryId]);
 
-  // ২. Edit Mode হলে ফায়ারস্টোর থেকে প্রোডাক্টের আগের ডেটা লোড করা
+  // 2. Fetch existing product details if Edit Mode
   useEffect(() => {
     let isMounted = true;
     if (!id) return;
@@ -121,6 +126,7 @@ export default function AdminAddProduct() {
           setLowStockAlert(data.lowStockAlert ?? 2);
           setSku(data.sku || '');
           setCategoryId(data.categoryId || '');
+          setCustomSection(data.customSection || '');
           setImages(data.images || []);
           setStatus(data.status || 'active');
           setIsFeatured(data.isFeatured || false);
@@ -147,7 +153,6 @@ export default function AdminAddProduct() {
     };
   }, [id, navigate]);
 
-  // প্রোডাক্টের নাম লিখলে অটোমেটিক স্লাগ ও SKU জেনারেট করা
   const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setName(val);
@@ -165,7 +170,6 @@ export default function AdminAddProduct() {
     }
   };
 
-  // অপটিমাইজড ছবি আপলোড হ্যান্ডলার (Cloudinary)
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -194,12 +198,10 @@ export default function AdminAddProduct() {
     }
   };
 
-  // ছবি তালিকা থেকে রিমুভ করা
   const handleRemoveImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // প্রোডাক্ট সেভ বা আপডেট করার হ্যান্ডলার
   const handleSubmitProduct = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -223,6 +225,7 @@ export default function AdminAddProduct() {
 
       const selectedCat = categories.find(c => c.id === categoryId);
       const categoryName = selectedCat ? selectedCat.name : 'General';
+      const categorySlug = selectedCat ? selectedCat.slug : 'general';
 
       const productPayload = {
         name: name.trim(),
@@ -237,6 +240,8 @@ export default function AdminAddProduct() {
         sku: sku.trim() || `ISAR-${Date.now().toString().slice(-6)}`,
         categoryId: categoryId || (categories[0]?.id || 'general'),
         categoryName: categoryName,
+        categorySlug: categorySlug,
+        customSection: customSection.trim() || null,
         images: images,
         status: status,
         isFeatured: isFeatured,
@@ -246,12 +251,10 @@ export default function AdminAddProduct() {
       };
 
       if (isEditMode && id) {
-        // Edit Mode: Update existing Firestore document
         const productRef = doc(db, 'products', id);
         await updateDoc(productRef, productPayload);
         toast.success('Product updated successfully!');
       } else {
-        // Add Mode: Create new document
         const newProduct = {
           ...productPayload,
           rating: 5.0,
@@ -318,7 +321,7 @@ export default function AdminAddProduct() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* Name */}
+            {/* Title */}
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-bold text-navy">Product Title *</label>
               <input
@@ -343,7 +346,7 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Dynamic Category Dropdown (Only Admin Created Categories) */}
+            {/* Category */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Category *</label>
               <select
@@ -362,7 +365,7 @@ export default function AdminAddProduct() {
               </select>
             </div>
 
-            {/* Short Description */}
+            {/* Short Summary */}
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-bold text-navy">Short Summary</label>
               <input
@@ -374,7 +377,7 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Full Description */}
+            {/* Description */}
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-bold text-navy">Full Description (HTML or Plain Text)</label>
               <textarea
@@ -389,7 +392,7 @@ export default function AdminAddProduct() {
           </div>
         </div>
 
-        {/* Pricing & Inventory Card in Pure BDT with Weight */}
+        {/* Pricing, Weight & Inventory */}
         <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
           <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-brand-green" /> Pricing, Weight & Inventory
@@ -397,7 +400,6 @@ export default function AdminAddProduct() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
             
-            {/* Price in BDT */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Selling Price (BDT) *</label>
               <input
@@ -411,7 +413,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Original Price in BDT */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Original Price (BDT)</label>
               <input
@@ -424,7 +425,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Weight in Kg (For Steadfast dynamic calculation) */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy flex items-center gap-1">
                 <Scale className="w-3 h-3 text-indigo-600" /> Weight (kg) *
@@ -441,7 +441,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Stock Quantity */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Stock Quantity *</label>
               <input
@@ -455,7 +454,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Low Stock Alert */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Low Stock Alert</label>
               <input
@@ -468,7 +466,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* SKU */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Product SKU</label>
               <input
@@ -483,7 +480,7 @@ export default function AdminAddProduct() {
           </div>
         </div>
 
-        {/* Product Images Card */}
+        {/* Product Images */}
         <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-gray-100">
             <h2 className="text-base font-black text-navy flex items-center gap-2">
@@ -493,8 +490,6 @@ export default function AdminAddProduct() {
           </div>
 
           <div className="space-y-4">
-            
-            {/* Uploaded Images Grid */}
             {images.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
                 {images.map((imgUrl, index) => (
@@ -518,7 +513,6 @@ export default function AdminAddProduct() {
               </div>
             )}
 
-            {/* Hidden Input */}
             <input
               type="file"
               ref={fileInputRef}
@@ -527,7 +521,6 @@ export default function AdminAddProduct() {
               className="hidden"
             />
 
-            {/* Upload Button */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -549,66 +542,115 @@ export default function AdminAddProduct() {
                 </>
               )}
             </button>
-
           </div>
         </div>
 
-        {/* Status & Visibility */}
+        {/* Visibility, Badges & Point 4: Custom Homepage Section Control */}
         <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
           <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-brand-gold" /> Visibility & Badges
+            <Layers className="w-4 h-4 text-brand-gold" /> Visibility & Section Controls
           </h2>
 
-          <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="space-y-4">
             
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-bold text-navy">Status:</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as 'active' | 'draft')}
-                className="px-3.5 py-1.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:outline-none cursor-pointer"
-              >
-                <option value="active">Active (Published)</option>
-                <option value="draft">Draft (Hidden)</option>
-              </select>
+            {/* Status & Checkbox Badges */}
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-bold text-navy">Status:</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as 'active' | 'draft')}
+                  className="px-3.5 py-1.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:outline-none cursor-pointer"
+                >
+                  <option value="active">Active (Published)</option>
+                  <option value="draft">Draft (Hidden)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-6 flex-wrap">
+                <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isFeatured}
+                    onChange={(e) => setIsFeatured(e.target.checked)}
+                    className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
+                  />
+                  Show in Featured
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isTrending}
+                    onChange={(e) => setIsTrending(e.target.checked)}
+                    className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
+                  />
+                  Show in Trending
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isNewArrival}
+                    onChange={(e) => setIsNewArrival(e.target.checked)}
+                    className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
+                  />
+                  New Arrival Tag
+                </label>
+              </div>
             </div>
 
-            <div className="flex items-center gap-6 flex-wrap">
-              <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isFeatured}
-                  onChange={(e) => setIsFeatured(e.target.checked)}
-                  className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
-                />
-                Show in Featured
-              </label>
+            {/* Point 4: Infinity Homepage Custom Section Input */}
+            <div className="pt-4 border-t border-gray-100 space-y-2">
+              <div>
+                <label className="text-xs font-bold text-navy flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" /> Homepage Custom Section (Unlimited / Infinity)
+                </label>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Type any custom section name to group this product on the homepage (e.g. Mega Deals, Flash Sale, Eid Special).
+                </p>
+              </div>
 
-              <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isTrending}
-                  onChange={(e) => setIsTrending(e.target.checked)}
-                  className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
-                />
-                Show in Trending
-              </label>
+              <input
+                type="text"
+                value={customSection}
+                onChange={(e) => setCustomSection(e.target.value)}
+                placeholder="e.g. Mega Deals or Eid Special"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
+              />
 
-              <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isNewArrival}
-                  onChange={(e) => setIsNewArrival(e.target.checked)}
-                  className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
-                />
-                New Arrival Tag
-              </label>
+              {/* Quick-Click Presets */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {PRESET_SECTIONS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setCustomSection(preset)}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                      customSection === preset
+                        ? 'border-primary bg-primary text-white shadow-2xs'
+                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    + {preset}
+                  </button>
+                ))}
+                {customSection && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomSection('')}
+                    className="text-[10px] font-bold px-2 py-1 text-red-500 hover:underline cursor-pointer"
+                  >
+                    Clear Section
+                  </button>
+                )}
+              </div>
             </div>
 
           </div>
         </div>
 
-        {/* Submit Action */}
+        {/* Submit Actions */}
         <div className="flex justify-end gap-4 pt-4">
           <Link
             to="/admin/products"

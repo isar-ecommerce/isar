@@ -19,17 +19,18 @@ import {
   MessageCircle,
   Sparkles,
   Server,
-  CheckCircle2
+  CheckCircle2,
+  Plus,
+  ExternalLink,
+  Sliders
 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 import { db } from '../../firebase/config';
-import { useSettingsStore } from '../../store/settingsStore';
+import { useSettingsStore, type HeroBannerItem } from '../../store/settingsStore';
+import { uploadImageToCloudinary } from '../../cloudinary/upload';
 
-/**
- * ব্র্যান্ড লোগোকে স্ট্যান্ডার্ড ওয়েব সাইজে (Max 400x160px) অপটিমাইজ করার ফাংশন
- */
 const optimizeLogoImage = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -77,40 +78,51 @@ const optimizeLogoImage = (file: File): Promise<string> => {
 
 export default function AdminSettings() {
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const updateGlobalStore = useSettingsStore((state) => state.setSettings);
 
-  // ব্র্যান্ড লোগো স্টেট
+  // Logo State
   const [logoType, setLogoType] = useState<'text' | 'image'>('text');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
 
-  // স্টোর আইডেন্টিটি স্টেট
+  // Store Identity State
   const [siteName, setSiteName] = useState<string>('ISAR');
   const [siteTagline, setSiteTagline] = useState<string>("Bangladesh's Premier E-commerce Marketplace");
   const [contactEmail, setContactEmail] = useState<string>('support@isar.com.bd');
-  const [contactPhone, setContactPhone] = useState<string>('+880 1234 567890');
-  const [whatsappNumber, setWhatsappNumber] = useState<string>('+880 1234 567890');
+  const [contactPhone, setContactPhone] = useState<string>('+880 1624789764');
+  const [whatsappNumber, setWhatsappNumber] = useState<string>('+880 1624789764');
   const [officeAddress, setOfficeAddress] = useState<string>('Dhaka, Bangladesh');
   
-  // ডেলিভারি চার্জ স্টেট
-  const [feeInsideDhaka, setFeeInsideDhaka] = useState<number>(60);
-  const [feeOutsideDhaka, setFeeOutsideDhaka] = useState<number>(150);
+  // Delivery Rates
+  const [feeInsideDhaka, setFeeInsideDhaka] = useState<number>(70);
+  const [feeOutsideDhaka, setFeeOutsideDhaka] = useState<number>(130);
   const [freeShippingMinAmount, setFreeShippingMinAmount] = useState<number>(5000);
 
-  // সোশ্যাল মিডিয়া লিংক
+  // Social Links
   const [facebookUrl, setFacebookUrl] = useState<string>('https://facebook.com');
   const [instagramUrl, setInstagramUrl] = useState<string>('https://instagram.com');
 
-  // ফ্ল্যাশ সেল স্টেট
+  // Flash Sale
   const [flashSaleActive, setFlashSaleActive] = useState<boolean>(true);
   const [flashSaleTitle, setFlashSaleTitle] = useState<string>('Flash Sale Offers');
   const [flashSaleDiscountText, setFlashSaleDiscountText] = useState<string>('Up to 50% Off');
   const [flashSaleEndTime, setFlashSaleEndTime] = useState<string>('2026-12-31T23:59');
 
+  // Hero Banner Slider State
+  const [heroBanners, setHeroBanners] = useState<HeroBannerItem[]>([]);
+  const [newBadge, setNewBadge] = useState<string>('Mega Anniversary Sale');
+  const [newTitle, setNewTitle] = useState<string>('Upgrade Your');
+  const [newHighlight, setNewHighlight] = useState<string>('Everyday Carry');
+  const [newDesc, setNewDesc] = useState<string>('Discover premium backpacks, gadgets & accessories.');
+  const [newBtnText, setNewBtnText] = useState<string>('Shop Collection');
+  const [newLinkUrl, setNewLinkUrl] = useState<string>('/products');
+  const [newBannerImg, setNewBannerImg] = useState<string>('');
+  const [isUploadingBannerImg, setIsUploadingBannerImg] = useState<boolean>(false);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // ফায়ারস্টোর থেকে গ্লোবাল সেটিংস লোড করা (React 19 সেফ)
   useEffect(() => {
     let isMounted = true;
 
@@ -143,6 +155,8 @@ export default function AdminSettings() {
           if (data.flashSaleTitle) setFlashSaleTitle(data.flashSaleTitle);
           if (data.flashSaleDiscountText) setFlashSaleDiscountText(data.flashSaleDiscountText);
           if (data.flashSaleEndTime) setFlashSaleEndTime(data.flashSaleEndTime);
+
+          if (Array.isArray(data.heroBanners)) setHeroBanners(data.heroBanners);
         }
       } catch (error) {
         console.error('Error fetching settings:', error);
@@ -162,7 +176,6 @@ export default function AdminSettings() {
     };
   }, []);
 
-  // লোগো ছবি আপলোড হ্যান্ডলার
   const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -192,6 +205,55 @@ export default function AdminSettings() {
     }
   };
 
+  const handleBannerImgUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setIsUploadingBannerImg(true);
+      const file = files[0];
+      const uploadedUrl = await uploadImageToCloudinary(file);
+      setNewBannerImg(uploadedUrl);
+      toast.success('Banner image uploaded!');
+    } catch (error: unknown) {
+      console.error('Banner upload error:', error);
+      toast.error('Failed to upload banner image');
+    } finally {
+      setIsUploadingBannerImg(false);
+      if (bannerFileInputRef.current) {
+        bannerFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleAddBannerSlide = () => {
+    if (!newTitle.trim() || !newLinkUrl.trim()) {
+      toast.error('Banner Title and Destination Link URL are required');
+      return;
+    }
+
+    const newSlide: HeroBannerItem = {
+      id: `banner-${Date.now()}`,
+      badge: newBadge.trim() || 'Featured Offer',
+      title: newTitle.trim(),
+      highlightText: newHighlight.trim(),
+      description: newDesc.trim(),
+      buttonText: newBtnText.trim() || 'Shop Now',
+      linkUrl: newLinkUrl.trim(),
+      imageUrl: newBannerImg || undefined,
+      bgGradient: 'from-navy via-slate-900 to-primary/90',
+    };
+
+    setHeroBanners(prev => [...prev, newSlide]);
+    setNewBannerImg('');
+    toast.success('New banner slide added! Click "Save Global Settings" to publish.');
+  };
+
+  const handleRemoveBannerSlide = (slideId: string) => {
+    setHeroBanners(prev => prev.filter(b => b.id !== slideId));
+    toast.success('Banner slide removed. Click "Save Global Settings" to update.');
+  };
+
   const handleSaveSettings = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -204,48 +266,31 @@ export default function AdminSettings() {
         logoUrl: logoUrl || '',
         siteName: siteName.trim() || 'ISAR',
         siteTagline: siteTagline.trim() || "Bangladesh's Premier E-commerce Marketplace",
-        contactEmail: contactEmail.trim() || 'support@isar.com.bd',
-        contactPhone: contactPhone.trim() || '+880 1234 567890',
-        whatsappNumber: whatsappNumber.trim() || contactPhone.trim() || '+880 1234 567890',
+        contactEmail: contactEmail.trim() || 'isar.store.bd@gmail.com',
+        contactPhone: contactPhone.trim() || '+880 1624789764',
+        whatsappNumber: whatsappNumber.trim() || contactPhone.trim() || '+880 1624789764',
         officeAddress: officeAddress.trim() || 'Dhaka, Bangladesh',
-        feeInsideDhaka: Number(feeInsideDhaka) || 0,
-        feeOutsideDhaka: Number(feeOutsideDhaka) || 0,
-        freeShippingMinAmount: Number(freeShippingMinAmount) || 0,
+        feeInsideDhaka: Number(feeInsideDhaka) || 70,
+        feeOutsideDhaka: Number(feeOutsideDhaka) || 130,
+        freeShippingMinAmount: Number(freeShippingMinAmount) || 5000,
         facebookUrl: facebookUrl.trim() || 'https://facebook.com',
         instagramUrl: instagramUrl.trim() || 'https://instagram.com',
         flashSaleActive,
         flashSaleTitle: flashSaleTitle.trim() || 'Flash Sale Offers',
         flashSaleDiscountText: flashSaleDiscountText.trim() || 'Up to 50% Off',
         flashSaleEndTime,
+        heroBanners: heroBanners,
         updatedAt: serverTimestamp(),
       };
 
-      // ১. ফায়ারস্টোর ডেটাবেসে সেভ করা
       await setDoc(docRef, firestorePayload, { merge: true });
 
-      // ২. গ্লোবাল Zustand ক্যাশ স্টোরে সেভ করা
       updateGlobalStore({
-        logoType,
-        logoUrl: logoUrl || '',
-        siteName: siteName.trim() || 'ISAR',
-        siteTagline: siteTagline.trim() || "Bangladesh's Premier E-commerce Marketplace",
-        contactEmail: contactEmail.trim() || 'support@isar.com.bd',
-        contactPhone: contactPhone.trim() || '+880 1234 567890',
-        whatsappNumber: whatsappNumber.trim() || contactPhone.trim() || '+880 1234 567890',
-        officeAddress: officeAddress.trim() || 'Dhaka, Bangladesh',
-        feeInsideDhaka: Number(feeInsideDhaka) || 0,
-        feeOutsideDhaka: Number(feeOutsideDhaka) || 0,
-        freeShippingMinAmount: Number(freeShippingMinAmount) || 0,
-        facebookUrl: facebookUrl.trim() || 'https://facebook.com',
-        instagramUrl: instagramUrl.trim() || 'https://instagram.com',
-        flashSaleActive,
-        flashSaleTitle: flashSaleTitle.trim() || 'Flash Sale Offers',
-        flashSaleDiscountText: flashSaleDiscountText.trim() || 'Up to 50% Off',
-        flashSaleEndTime,
+        ...firestorePayload,
         isLoaded: true,
       });
 
-      toast.success('Website settings & brand configurations saved successfully!');
+      toast.success('Website settings & hero banners saved successfully!');
     } catch (error: unknown) {
       console.error('Error saving settings:', error);
       const err = error as Error;
@@ -270,7 +315,7 @@ export default function AdminSettings() {
           <div>
             <h1 className="text-2xl font-black text-navy">Website Settings</h1>
             <p className="text-xs text-gray-500 mt-0.5">
-              Configure brand logo, contact details, live delivery rates and flash sale
+              Configure brand logo, slider banners, live delivery rates and store details
             </p>
           </div>
         </div>
@@ -280,7 +325,7 @@ export default function AdminSettings() {
         </span>
       </div>
 
-      {/* Enterprise Security Architecture Banner */}
+      {/* Security Architecture Banner */}
       <div className="bg-navy text-white rounded-3xl p-5 sm:p-6 shadow-modern flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-navy-light">
         <div className="flex items-center gap-3.5">
           <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-brand-gold shrink-0">
@@ -309,6 +354,178 @@ export default function AdminSettings() {
       ) : (
         <form onSubmit={handleSaveSettings} className="space-y-6">
           
+          {/* Banner Slider Manager */}
+          <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h2 className="text-base font-black text-navy flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-primary" /> Hero Banner Slider Manager (Homepage)
+              </h2>
+              <span className="text-xs font-bold text-gray-400 font-mono">{heroBanners.length} Custom Banner(s)</span>
+            </div>
+
+            {/* List of Active Banner Slides */}
+            {heroBanners.length > 0 && (
+              <div className="space-y-3">
+                {heroBanners.map((slide, idx) => (
+                  <div key={slide.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-primary text-white font-mono">Slide #{idx + 1}</span>
+                        <span className="text-xs font-extrabold text-navy">{slide.title} {slide.highlightText}</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 line-clamp-1">{slide.description}</p>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-primary font-mono">
+                        <ExternalLink className="w-3 h-3" /> Target Link: {slide.linkUrl}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBannerSlide(slide.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer self-end sm:self-center shrink-0"
+                      title="Delete Slide"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add New Slide Box */}
+            <div className="p-5 bg-primary/5 rounded-3xl border border-primary/20 space-y-4">
+              <h3 className="text-xs font-black text-navy uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-primary" /> Add New Banner Slide
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-navy">Badge Text</label>
+                  <input
+                    type="text"
+                    value={newBadge}
+                    onChange={(e) => setNewBadge(e.target.value)}
+                    placeholder="e.g. Mega Anniversary Sale"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-xs font-medium text-navy focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-navy">Title *</label>
+                  <input
+                    type="text"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. Upgrade Your"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-xs font-medium text-navy focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-navy">Highlight Text (Gold)</label>
+                  <input
+                    type="text"
+                    value={newHighlight}
+                    onChange={(e) => setNewHighlight(e.target.value)}
+                    placeholder="e.g. Everyday Carry"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-xs font-medium text-navy focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-[11px] font-bold text-navy">Description</label>
+                  <input
+                    type="text"
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                    placeholder="e.g. Premium bags & smartphone accessories with fast shipping."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-xs font-medium text-navy focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-navy">Button Label</label>
+                  <input
+                    type="text"
+                    value={newBtnText}
+                    onChange={(e) => setNewBtnText(e.target.value)}
+                    placeholder="e.g. Shop Collection"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-xs font-medium text-navy focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                {/* Destination Link URL */}
+                <div className="space-y-1 sm:col-span-3">
+                  <label className="text-[11px] font-bold text-navy flex items-center gap-1">
+                    <ExternalLink className="w-3.5 h-3.5 text-primary" /> Destination Page Link URL *
+                  </label>
+                  <input
+                    type="text"
+                    value={newLinkUrl}
+                    onChange={(e) => setNewLinkUrl(e.target.value)}
+                    placeholder="e.g. /products?category=smart-phone or /products"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-mono font-bold text-primary focus:outline-none focus:border-primary"
+                  />
+                  <p className="text-[10px] text-gray-400">Clicking anywhere on this banner will take the customer to this page.</p>
+                </div>
+
+                {/* Banner Background Image Upload Box */}
+                <div className="space-y-1 sm:col-span-3">
+                  <label className="text-[11px] font-bold text-navy flex items-center gap-1">
+                    <ImageIcon className="w-3.5 h-3.5 text-primary" /> Custom Banner Image (Optional)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      ref={bannerFileInputRef}
+                      onChange={handleBannerImgUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => bannerFileInputRef.current?.click()}
+                      disabled={isUploadingBannerImg}
+                      className="px-4 py-2 bg-white border border-gray-200 hover:border-primary text-navy text-xs font-bold rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isUploadingBannerImg ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading Image...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" /> {newBannerImg ? 'Change Image' : 'Upload Banner Image'}
+                        </>
+                      )}
+                    </button>
+                    {newBannerImg && (
+                      <div className="flex items-center gap-2">
+                        <img src={newBannerImg} alt="Banner Preview" className="h-8 w-16 object-cover rounded-lg border border-gray-200" />
+                        <button
+                          type="button"
+                          onClick={() => setNewBannerImg('')}
+                          className="text-red-500 hover:underline text-[10px] font-bold cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleAddBannerSlide}
+                  className="px-5 py-2.5 bg-navy hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Slide to Carousel
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* 1. Brand Logo Settings Card */}
           <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
             <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
@@ -316,8 +533,6 @@ export default function AdminSettings() {
             </h2>
 
             <div className="space-y-4">
-              
-              {/* Logo Mode Selection */}
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 text-xs font-bold text-navy cursor-pointer">
                   <input
@@ -344,7 +559,6 @@ export default function AdminSettings() {
                 </label>
               </div>
 
-              {/* Logo Image Upload & Standard Preview */}
               <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-center gap-6">
                 {logoUrl ? (
                   <div className="relative w-44 h-16 rounded-xl bg-white border border-gray-200 p-2 flex items-center justify-center overflow-hidden shadow-xs">
@@ -392,7 +606,6 @@ export default function AdminSettings() {
                   <p className="text-[11px] text-gray-400 font-medium">Standard Size: 180×44px • PNG, SVG or JPG (Transparent background recommended)</p>
                 </div>
               </div>
-
             </div>
           </div>
 
@@ -404,7 +617,7 @@ export default function AdminSettings() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-navy">Inside Dhaka Delivery Fee (৳)</label>
+                <label className="text-xs font-bold text-navy">Inside Dhaka Base Fee (৳)</label>
                 <input
                   type="number"
                   required
@@ -416,7 +629,7 @@ export default function AdminSettings() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-navy">Outside Dhaka Delivery Fee (৳)</label>
+                <label className="text-xs font-bold text-navy">Outside Dhaka Base Fee (৳)</label>
                 <input
                   type="number"
                   required
@@ -445,7 +658,7 @@ export default function AdminSettings() {
           <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h2 className="text-base font-black text-navy flex items-center gap-2">
-                <Flame className="w-5 h-5 text-amber-500" /> Flash Sale Countdown Control (Bangladesh Time)
+                <Flame className="w-5 h-5 text-amber-500" /> Flash Sale Countdown Control
               </h2>
 
               <label className="relative inline-flex items-center cursor-pointer">
@@ -545,7 +758,7 @@ export default function AdminSettings() {
                     required
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    placeholder="+880 1234 567890"
+                    placeholder="+880 1624789764"
                     className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -559,7 +772,7 @@ export default function AdminSettings() {
                     type="text"
                     value={whatsappNumber}
                     onChange={(e) => setWhatsappNumber(e.target.value)}
-                    placeholder="+880 1234 567890"
+                    placeholder="+880 1624789764"
                     className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -574,7 +787,7 @@ export default function AdminSettings() {
                     required
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="support@isar.com.bd"
+                    placeholder="isar.store.bd@gmail.com"
                     className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -589,7 +802,7 @@ export default function AdminSettings() {
                     required
                     value={officeAddress}
                     onChange={(e) => setOfficeAddress(e.target.value)}
-                    placeholder="House #10, Road #2, Dhanmondi, Dhaka, Bangladesh"
+                    placeholder="Dhaka, Bangladesh"
                     className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -610,7 +823,7 @@ export default function AdminSettings() {
                   type="url"
                   value={facebookUrl}
                   onChange={(e) => setFacebookUrl(e.target.value)}
-                  placeholder="https://facebook.com/isarbd"
+                  placeholder="https://facebook.com"
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -621,7 +834,7 @@ export default function AdminSettings() {
                   type="url"
                   value={instagramUrl}
                   onChange={(e) => setInstagramUrl(e.target.value)}
-                  placeholder="https://instagram.com/isarbd"
+                  placeholder="https://instagram.com"
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
                 />
               </div>

@@ -20,7 +20,7 @@ export default function Login() {
       await loginUser(email, password);
       navigate('/');
     } catch (error) {
-      console.error("Login Error", error);
+      console.error('Login Error', error);
     } finally {
       setIsLoading(false);
     }
@@ -34,37 +34,37 @@ export default function Login() {
         navigate('/');
       }
     } catch (error) {
-      console.error("Google Login Error", error);
+      console.error('Google Login Error', error);
     } finally {
       setIsGoogleLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-secondary py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-secondary py-8 px-4 sm:px-6 lg:px-8">
       <Helmet>
         <title>Login | ISAR Marketplace</title>
         <meta name="description" content="Login to your ISAR account." />
       </Helmet>
 
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-modern-lg p-8 border border-gray-100">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-modern-lg p-8 sm:p-10 border border-gray-100 my-auto">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-block mb-4">
-            <span className="text-4xl font-extrabold text-primary tracking-tight">ISAR</span>
+          <Link to="/" className="inline-block mb-3">
+            <span className="text-4xl font-black text-primary tracking-tight">ISAR</span>
           </Link>
-          <h2 className="text-2xl font-bold text-navy">Welcome Back</h2>
-          <p className="text-sm text-gray-500 mt-2">Sign in to continue your shopping</p>
+          <h2 className="text-2xl font-black text-navy">Welcome Back</h2>
+          <p className="text-xs text-gray-500 mt-1">Sign in to continue your shopping experience</p>
         </div>
 
-        {/* ইমেইল ও পাসওয়ার্ড লগইন ফর্ম */}
-        <form onSubmit={handleLogin} className="space-y-5">
+        {/* Email Password Form */}
+        <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1">
-            <label htmlFor="email" className="block text-sm font-medium text-navy">
+            <label htmlFor="email" className="block text-xs font-bold text-navy">
               Email Address
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-gray-400" />
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Mail className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 id="email"
@@ -72,7 +72,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm"
+                className="block w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-colors text-xs sm:text-sm text-navy placeholder:text-gray-400 font-medium"
                 placeholder="you@example.com"
               />
             </div>
@@ -80,16 +80,16 @@ export default function Login() {
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label htmlFor="password" className="block text-sm font-medium text-navy">
+              <label htmlFor="password" className="block text-xs font-bold text-navy">
                 Password
               </label>
-              <Link to="/forgot-password" className="text-xs font-semibold text-primary hover:text-primary-dark">
+              <Link to="/forgot-password" className="text-[11px] font-bold text-primary hover:underline">
                 Forgot password?
               </Link>
             </div>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Lock className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 id="password"
@@ -97,7 +97,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm"
+                className="block w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-colors text-xs sm:text-sm text-navy placeholder:text-gray-400 font-medium"
                 placeholder="••••••••"
               />
             </div>
@@ -106,10 +106,10 @@ export default function Login() {
           <button
             type="submit"
             disabled={isLoading || isGoogleLoading}
-            className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+            className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl shadow-md text-xs sm:text-sm font-black text-white bg-primary hover:bg-primary-dark disabled:opacity-70 disabled:cursor-not-allowed transition-all cursor-pointer hover:scale-102 mt-2"
           >
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
                 Sign In <ArrowRight className="w-4 h-4" />
@@ -118,29 +118,28 @@ export default function Login() {
           </button>
         </form>
 
-        {/* সুন্দর OR ডিভাইডার */}
+        {/* OR Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200" />
+            <div className="w-full border-t border-gray-100" />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-3 text-gray-400 font-medium tracking-wider">Or continue with</span>
+          <div className="relative flex justify-center text-[10px] uppercase">
+            <span className="bg-white px-3 text-gray-400 font-bold tracking-widest">Or continue with</span>
           </div>
         </div>
 
-        {/* অফিশিয়াল গুগল সাইন-ইন বাটন */}
+        {/* Google 1-Click Sign-in Button */}
         <button
           type="button"
           onClick={handleGoogleLogin}
           disabled={isLoading || isGoogleLoading}
-          className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-gray-200 rounded-xl shadow-2xs bg-white text-xs sm:text-sm font-bold text-navy hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer"
         >
           {isGoogleLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-gray-500" />
+            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
           ) : (
             <>
-              {/* Google 4-Color SVG Icon */}
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -163,10 +162,10 @@ export default function Login() {
           )}
         </button>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-600">
+        <div className="mt-6 text-center">
+          <p className="text-xs text-gray-500">
             Don't have an account?{' '}
-            <Link to="/register" className="font-bold text-primary hover:text-primary-dark transition-colors">
+            <Link to="/register" className="font-bold text-primary hover:underline transition-colors">
               Create an account
             </Link>
           </p>

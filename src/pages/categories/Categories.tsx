@@ -22,7 +22,7 @@ const INITIAL_CATEGORIES: Category[] = [
   { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 }
 ];
 
-// স্ট্যাটিক ও পারফরম্যান্ট স্মার্ট ক্যাটাগরি ম্যাচিং ইঞ্জিন
+// আল্ট্রা-স্মার্ট ক্যাটাগরি ম্যাচিং ইঞ্জিন (স্ল্যাগ এবং আইডি উভয় নির্ভুলভাবে ট্র্যাক করে)
 const isProductInCategory = (product: Product, targetCatId: string, categories: Category[]) => {
   if (targetCatId === 'all') return true;
 
@@ -32,7 +32,10 @@ const isProductInCategory = (product: Product, targetCatId: string, categories: 
   const pCatName = clean((product as { categoryName?: string }).categoryName);
   const pName = clean(product.name);
 
-  const targetCatObj = categories.find(c => c.id === targetCatId);
+  const targetCatObj = categories.find(
+    c => c.id.toLowerCase() === targetCatId.toLowerCase() || 
+         c.slug.toLowerCase() === targetCatId.toLowerCase()
+  );
   const targetId = clean(targetCatId);
   const targetSlug = clean(targetCatObj?.slug);
   const targetName = clean(targetCatObj?.name);
@@ -81,7 +84,7 @@ export default function Categories() {
           }
         }
       } catch (error) {
-        console.error("Error loading categories data:", error);
+        console.error('Error loading categories data:', error);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -109,6 +112,7 @@ export default function Categories() {
     });
   }, [products, selectedCategoryId, categories, searchQuery]);
 
+  // Point 12: Buy Now - পাসিং ডায়নামিক প্রোডাক্ট নাম চেকআউটের জন্য
   const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -117,7 +121,9 @@ export default function Categories() {
       return;
     }
     addItemToCart(product, 1);
-    navigate('/checkout');
+    navigate('/checkout', {
+      state: { from: product.name, path: `/products/${product.id}` },
+    });
   };
 
   const handleAddToCart = (e: MouseEvent, product: Product) => {
@@ -131,7 +137,9 @@ export default function Categories() {
     toast.success(`Added ${product.name} to Cart!`);
   };
 
-  const selectedCategoryObj = categories.find(c => c.id === selectedCategoryId);
+  const selectedCategoryObj = categories.find(
+    c => c.id === selectedCategoryId || c.slug === selectedCategoryId
+  );
 
   return (
     <div className="bg-secondary min-h-screen py-6 md:py-10">
@@ -145,7 +153,7 @@ export default function Categories() {
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold shadow-2xs">
               <LayoutGrid className="w-5 h-5" />
             </div>
             <div>
@@ -166,17 +174,18 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Horizontal Category Tab Bar */}
+        {/* Horizontal Category Tab Bar (Daraz Style Sleek Horizontal Scroll) */}
         <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-modern border border-gray-100">
           <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
             {categories.map((cat) => {
-              const isSelected = selectedCategoryId === cat.id;
+              const isSelected = selectedCategoryId === cat.id || selectedCategoryId === cat.slug;
               const { icon: Icon, color } = getCategoryIconConfig(cat.name || cat.slug);
 
               return (
                 <button
                   key={cat.id}
-                  onClick={() => setSelectedCategoryId(cat.id)}
+                  type="button"
+                  onClick={() => setSelectedCategoryId(cat.slug || cat.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all shrink-0 cursor-pointer ${
                     isSelected 
                       ? 'bg-navy text-white shadow-md scale-102 ring-2 ring-primary/20' 
@@ -210,9 +219,9 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Products Grid */}
+        {/* Products Grid (Point 3 & Point 6 Polish Applied) */}
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center">
+          <div className="py-20 flex flex-col items-center justify-center bg-white rounded-3xl border border-gray-100">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
             <span className="text-xs text-gray-500 font-medium">Loading collection products...</span>
           </div>
@@ -224,8 +233,9 @@ export default function Categories() {
               We are adding new products to this collection soon. Try selecting another category above!
             </p>
             <button
+              type="button"
               onClick={() => { setSelectedCategoryId('all'); setSearchQuery(''); }}
-              className="px-5 py-2 bg-primary text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer hover:bg-primary-dark transition-colors"
+              className="px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer hover:bg-primary-dark transition-colors"
             >
               View All Products
             </button>
@@ -238,6 +248,9 @@ export default function Categories() {
                 ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
                 : 0;
 
+              // Point 3: Hide star rating if zero reviews
+              const hasReviews = (product.reviewCount || 0) > 0;
+
               return (
                 <div 
                   key={product.id}
@@ -247,20 +260,20 @@ export default function Categories() {
                   <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 sm:p-3 flex items-center justify-center">
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
-                        <span className="text-red-500 font-black text-lg sm:text-xl tracking-widest uppercase border-3 border-red-500 py-1 px-3 rounded-xl rotate-[-15deg] shadow-2xl bg-white/95">
+                        <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white/95">
                           SOLD OUT
                         </span>
                       </div>
                     )}
 
                     {!isOutOfStock && product.isNewArrival && (
-                      <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                      <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
                         New
                       </span>
                     )}
 
                     {!isOutOfStock && discountPercent > 0 && (
-                      <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                      <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-2xs">
                         SAVE {discountPercent}%
                       </span>
                     )}
@@ -272,17 +285,22 @@ export default function Categories() {
                     />
                   </Link>
 
-                  {/* Product Info & Action Buttons */}
+                  {/* Product Info & Compact Buttons (Point 6) */}
                   <div className="p-3 sm:p-3.5 flex flex-col grow">
-                    {product.rating ? (
+                    {/* Point 3: Star rating only if reviewCount > 0 */}
+                    {hasReviews ? (
                       <div className="flex items-center gap-1 mb-1 text-amber-500">
                         <Star className="w-3 h-3 fill-current" />
                         <span className="text-[11px] font-bold text-navy">{product.rating}</span>
-                        <span className="text-[9px] text-gray-400">({product.reviewCount || 0})</span>
+                        <span className="text-[9px] text-gray-400">({product.reviewCount})</span>
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="h-4 mb-1 text-[9px] text-gray-400 font-medium flex items-center">
+                        Verified Authentic
+                      </div>
+                    )}
 
-                    <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow">
+                    <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow leading-snug">
                       {product.name}
                     </Link>
                     
@@ -293,30 +311,34 @@ export default function Categories() {
                       )}
                     </div>
 
+                    {/* Compact Dual Buttons */}
                     <div className="mt-auto pt-2 border-t border-gray-100">
                       {isOutOfStock ? (
                         <button 
+                          type="button"
                           disabled
-                          className="w-full py-2 px-2 rounded-xl border-2 border-red-500 text-red-500 font-black text-[11px] uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
+                          className="w-full py-1.5 px-2 rounded-xl border border-red-500 text-red-500 font-black text-[10px] uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
                         >
-                          STOCK OUT
+                          Stock Out
                         </button>
                       ) : (
                         <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
                           <button 
+                            type="button"
                             onClick={(e) => handleBuyNow(e, product)}
-                            className="py-1.5 sm:py-2 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[9px] sm:text-[10px] rounded-lg shadow-xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
+                            className="py-1.5 sm:py-2 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[9px] sm:text-[10px] rounded-lg shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
                           >
                             <Zap className="w-2.5 h-2.5 fill-brand-gold text-brand-gold" />
                             <span>Buy Now</span>
                           </button>
 
                           <button 
+                            type="button"
                             onClick={(e) => handleAddToCart(e, product)}
                             className="py-1.5 sm:py-2 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[9px] sm:text-[10px] rounded-lg transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
                           >
                             <ShoppingBag className="w-2.5 h-2.5 text-primary" />
-                            <span>Add to Cart</span>
+                            <span>Add</span>
                           </button>
                         </div>
                       )}

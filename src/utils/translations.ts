@@ -1,0 +1,38 @@
+export type Language = 'en' | 'bn';
+
+export const translations = {
+  en: {
+    searchPlaceholder: 'Search for products, brands and more...',
+    loginSignUp: 'Login / Sign Up',
+    account: 'Account',
+    myProfile: 'My Profile',
+    myOrders: 'My Orders',
+    adminDashboard: 'Admin Dashboard',
+    sellerDashboard: 'Seller Dashboard',
+    logout: 'Logout',
+    cart: 'Cart',
+    categories: 'Categories',
+    buyNow: 'Buy Now',
+    addToCart: 'Add to Cart',
+    stockOut: 'Stock Out',
+    home: 'Home',
+    shopAll: 'Shop All Products',
+  },
+  bn: {
+    searchPlaceholder: 'পণ্য, ব্র্যান্ড বা ক্যাটাগরি খুঁজুন...',
+    loginSignUp: 'লগইন / সাইন আপ',
+    account: 'অ্যাকাউন্ট',
+    myProfile: 'আমার প্রোফাইল',
+    myOrders: 'আমার অর্ডার',
+    adminDashboard: 'অ্যাডমিন প্যানেল',
+    sellerDashboard: 'সেলার ড্যাশবোর্ড',
+    logout: 'লগআউট',
+    cart: 'কার্ট',
+    categories: 'ক্যাটাগরি',
+    buyNow: 'এখনই কিনুন',
+    addToCart: 'কার্টে যোগ করুন',
+    stockOut: 'স্টক শেষ',
+    home: 'হোম',
+    shopAll: 'সকল পণ্য দেখুন',
+  },
+};

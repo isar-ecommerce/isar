@@ -46,13 +46,8 @@ export default function Products() {
       const ms = new Date(val).getTime();
       return isNaN(ms) ? 0 : ms;
     }
-    if (typeof val === 'object' && val !== null) {
-      if ('toDate' in val && typeof (val as { toDate: () => Date }).toDate === 'function') {
-        return (val as { toDate: () => Date }).toDate().getTime();
-      }
-      if ('seconds' in val && typeof (val as { seconds: number }).seconds === 'number') {
-        return (val as { seconds: number }).seconds * 1000;
-      }
+    if (typeof val === 'object' && val !== null && 'toDate' in val) {
+      return ((val as { toDate: () => Date }).toDate()).getTime();
     }
     return 0;
   };
@@ -81,7 +76,7 @@ export default function Products() {
           }
         }
       } catch (error) {
-        console.error("Error loading shop data:", error);
+        console.error('Error loading shop data:', error);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -96,7 +91,7 @@ export default function Products() {
     };
   }, []);
 
-  // আল্ট্রা-স্মার্ট সেলফ-হিলিং ক্যাটাগরি ম্যাচিং ইঞ্জিন (হাইফেন ও স্পেস সহনশীল)
+  // আল্ট্রা-স্মার্ট সেলফ-হিলিং ক্যাটাগরি ম্যাচিং ইঞ্জিন (স্ল্যাগ ও আইডি উভয় সমর্থন করে)
   const isProductInCategory = (product: Product, cat: Category | string) => {
     const clean = (str?: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -108,14 +103,9 @@ export default function Products() {
     const targetSlug = typeof cat === 'string' ? clean(cat) : clean(cat.slug);
     const targetName = typeof cat === 'string' ? clean(cat) : clean(cat.name);
 
-    // ১. ডিরেক্ট আইডি বা স্লাগ ম্যাচ
     if (pCatId && (pCatId === targetId || pCatId === targetSlug)) return true;
-
-    // ২. স্লাগ বা নামের সাথে পার্শিয়াল ম্যাচিং
     if (targetSlug && pCatId && (pCatId.includes(targetSlug) || targetSlug.includes(pCatId))) return true;
     if (targetName && pCatName && (pCatName.includes(targetName) || targetName.includes(pCatName))) return true;
-
-    // ৩. টাইটেল কি-ওয়ার্ড ম্যাচ (যেমন: "Emon Bhai smartphone"-এর সাথে "Smart Phone")
     if (targetName.length >= 4 && pName.includes(targetName)) return true;
     if (targetSlug.length >= 4 && pName.includes(targetSlug)) return true;
 
@@ -127,7 +117,10 @@ export default function Products() {
   };
 
   const filteredProducts = useMemo(() => {
-    const selectedCatObj = categories.find(c => c.id === selectedCategory || c.slug === selectedCategory);
+    const selectedCatObj = categories.find(
+      c => c.id.toLowerCase() === selectedCategory.toLowerCase() || 
+           c.slug.toLowerCase() === selectedCategory.toLowerCase()
+    );
 
     return products
       .filter((product) => {
@@ -162,11 +155,12 @@ export default function Products() {
       });
   }, [products, selectedCategory, categories, searchQuery, minPrice, maxPrice, inStockOnly, selectedRating, sortBy]);
 
-  const handleCategorySelect = (categoryId: string) => {
-    if (selectedCategory === categoryId || !categoryId) {
+  // Point 7: ক্লিন Slug URL হ্যান্ডলার
+  const handleCategorySelect = (categoryTarget: string) => {
+    if (selectedCategory === categoryTarget || !categoryTarget) {
       searchParams.delete('category');
     } else {
-      searchParams.set('category', categoryId);
+      searchParams.set('category', categoryTarget);
     }
     setSearchParams(searchParams);
     setIsFilterDrawerOpen(false);
@@ -182,7 +176,7 @@ export default function Products() {
     setIsFilterDrawerOpen(false);
   };
 
-  // Buy Now: সরাসরি কার্টে নিয়ে /checkout পেজে নিয়ে যাবে
+  // Point 12: Buy Now - চেকআউটে ডায়নামিক প্রোডাক্ট নাম সহ ব্যাক লিংক পাস করা
   const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -191,7 +185,9 @@ export default function Products() {
       return;
     }
     addItemToCart(product, 1);
-    navigate('/checkout');
+    navigate('/checkout', {
+      state: { from: product.name, path: `/products/${product.id}` },
+    });
   };
 
   const handleAddToCart = (e: MouseEvent, product: Product) => {
@@ -213,7 +209,7 @@ export default function Products() {
     <div className="bg-secondary min-h-screen py-8 md:py-12">
       <Helmet>
         <title>Shop Products | ISAR</title>
-        <meta name="description" content="Browse authentic bags, smartphone accessories, and lifestyle gear at ISAR." />
+        <meta name="description" content="Browse authentic backpacks, smartphone accessories, and lifestyle gear at ISAR." />
       </Helmet>
 
       <div className="container mx-auto px-4 max-w-7xl space-y-6">
@@ -229,6 +225,7 @@ export default function Products() {
 
           {hasActiveFilters && (
             <button
+              type="button"
               onClick={clearFilters}
               className="px-4 py-2 bg-white rounded-xl shadow-xs border border-gray-200 text-red-500 hover:bg-red-50 hover:border-red-200 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer"
             >
@@ -241,6 +238,7 @@ export default function Products() {
         <div className="bg-white rounded-2xl shadow-modern p-4 flex flex-wrap items-center justify-between gap-4 border border-gray-100">
           
           <button 
+            type="button"
             onClick={() => setIsFilterDrawerOpen(true)}
             className="lg:hidden flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
@@ -251,8 +249,8 @@ export default function Products() {
           <div className="hidden lg:flex items-center gap-2 flex-wrap">
             {selectedCategory && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
-                Category: {categories.find(c => c.id === selectedCategory || c.slug === selectedCategory)?.name || selectedCategory}
-                <button onClick={() => handleCategorySelect('')} className="hover:text-red-500 cursor-pointer">
+                Category: {categories.find(c => c.slug === selectedCategory || c.id === selectedCategory)?.name || selectedCategory}
+                <button type="button" onClick={() => handleCategorySelect('')} className="hover:text-red-500 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </span>
@@ -260,7 +258,7 @@ export default function Products() {
             {searchQuery && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
                 Search: {searchQuery}
-                <button onClick={() => { searchParams.delete('search'); setSearchParams(searchParams); }} className="hover:text-red-500 cursor-pointer">
+                <button type="button" onClick={() => { searchParams.delete('search'); setSearchParams(searchParams); }} className="hover:text-red-500 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </span>
@@ -268,7 +266,7 @@ export default function Products() {
             {inStockOnly && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-green/10 text-brand-green text-xs font-bold border border-brand-green/20">
                 In Stock Only
-                <button onClick={() => setInStockOnly(false)} className="hover:text-red-500 cursor-pointer">
+                <button type="button" onClick={() => setInStockOnly(false)} className="hover:text-red-500 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </span>
@@ -276,7 +274,7 @@ export default function Products() {
             {(minPrice || maxPrice) && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 text-xs font-bold border border-amber-500/20">
                 {minPrice || '0'} BDT - {maxPrice ? `${maxPrice} BDT` : 'Any'}
-                <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="hover:text-red-500 cursor-pointer">
+                <button type="button" onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="hover:text-red-500 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </span>
@@ -284,7 +282,7 @@ export default function Products() {
             {selectedRating !== null && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-gold/15 text-navy text-xs font-bold border border-brand-gold/30">
                 {selectedRating}★ & Above
-                <button onClick={() => setSelectedRating(null)} className="hover:text-red-500 cursor-pointer">
+                <button type="button" onClick={() => setSelectedRating(null)} className="hover:text-red-500 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </span>
@@ -326,6 +324,7 @@ export default function Products() {
                 </h3>
                 {hasActiveFilters && (
                   <button 
+                    type="button"
                     onClick={clearFilters} 
                     className="text-xs font-bold text-red-500 hover:underline flex items-center gap-1 cursor-pointer"
                   >
@@ -334,11 +333,12 @@ export default function Products() {
                 )}
               </div>
 
-              {/* 1. Category Filter Section */}
+              {/* 1. Category Filter Section (Point 7: Clean Slug Matching) */}
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-navy uppercase tracking-wider">Categories</h4>
                 <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
                   <button
+                    type="button"
                     onClick={() => handleCategorySelect('')}
                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
                       !selectedCategory ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
@@ -352,12 +352,14 @@ export default function Products() {
 
                   {categories.map((cat) => {
                     const count = getCategoryCount(cat);
-                    const isSelected = selectedCategory === cat.id || selectedCategory === cat.slug;
+                    const categoryTarget = cat.slug || cat.id;
+                    const isSelected = selectedCategory === cat.slug || selectedCategory === cat.id;
 
                     return (
                       <button
                         key={cat.id}
-                        onClick={() => handleCategorySelect(cat.id)}
+                        type="button"
+                        onClick={() => handleCategorySelect(categoryTarget)}
                         className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
                           isSelected ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
                         }`}
@@ -395,18 +397,21 @@ export default function Products() {
 
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <button
+                    type="button"
                     onClick={() => { setMinPrice('0'); setMaxPrice('1500'); }}
                     className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
                   >
                     Under 1.5K BDT
                   </button>
                   <button
+                    type="button"
                     onClick={() => { setMinPrice('1500'); setMaxPrice('5000'); }}
                     className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
                   >
                     1.5K - 5K BDT
                   </button>
                   <button
+                    type="button"
                     onClick={() => { setMinPrice('5000'); setMaxPrice(''); }}
                     className="text-[10px] font-bold px-2 py-1 rounded-lg bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
                   >
@@ -422,7 +427,7 @@ export default function Products() {
                     type="checkbox"
                     checked={inStockOnly}
                     onChange={(e) => setInStockOnly(e.target.checked)}
-                    className="w-4 h-4 text-brand-green rounded border-gray-300 focus:ring-brand-green"
+                    className="w-4 h-4 text-brand-green rounded border-gray-300 focus:ring-brand-green cursor-pointer"
                   />
                   <span className="text-xs font-bold text-navy">In Stock Only</span>
                 </label>
@@ -435,6 +440,7 @@ export default function Products() {
                   {[4, 3].map((star) => (
                     <button
                       key={star}
+                      type="button"
                       onClick={() => setSelectedRating(selectedRating === star ? null : star)}
                       className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-colors cursor-pointer ${
                         selectedRating === star ? 'bg-primary/10 font-bold text-primary' : 'hover:bg-gray-50 text-gray-600'
@@ -460,7 +466,7 @@ export default function Products() {
             </div>
           </aside>
 
-          {/* Product Grid Area with Buy Now & Add to Cart (NO Wishlist Heart) */}
+          {/* Product Grid Area (Point 3 & Point 6 Polish Applied) */}
           <main className="lg:col-span-3">
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-100 bg-white rounded-3xl p-12 border border-gray-100 shadow-modern">
@@ -475,6 +481,7 @@ export default function Products() {
                   We couldn't find any products matching your current filters. Try selecting another category or clearing filters.
                 </p>
                 <button 
+                  type="button"
                   onClick={clearFilters}
                   className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-extrabold text-xs rounded-2xl transition-all shadow-md cursor-pointer hover:scale-102"
                 >
@@ -482,12 +489,15 @@ export default function Products() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-5">
                 {filteredProducts.map((product) => {
                   const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
                   const discountPercent = (product.originalPrice && product.originalPrice > product.price)
                     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
                     : 0;
+
+                  // Point 3: Hide rating if zero reviews
+                  const hasReviews = (product.reviewCount || 0) > 0;
 
                   return (
                     <div 
@@ -495,12 +505,12 @@ export default function Products() {
                       className="bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col h-full relative"
                     >
                       {/* Product Image Box */}
-                      <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-3 flex items-center justify-center">
+                      <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 flex items-center justify-center">
                         
                         {/* Sold Out Red Watermark Stamp */}
                         {isOutOfStock && (
                           <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
-                            <span className="text-red-500 font-black text-xl sm:text-2xl tracking-widest uppercase border-3 border-red-500 py-1 px-3.5 rounded-xl rotate-[-15deg] shadow-2xl bg-white/95">
+                            <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white/95">
                               SOLD OUT
                             </span>
                           </div>
@@ -508,14 +518,14 @@ export default function Products() {
 
                         {/* New Badge */}
                         {!isOutOfStock && product.isNewArrival && (
-                          <span className="absolute top-3 left-3 z-10 bg-brand-green text-white text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                          <span className="absolute top-2.5 left-2.5 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
                             New
                           </span>
                         )}
 
                         {/* Save Discount Badge */}
                         {!isOutOfStock && discountPercent > 0 && (
-                          <span className="absolute top-3 right-3 z-10 bg-red-600 text-white text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                          <span className="absolute top-2.5 right-2.5 z-10 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-2xs">
                             SAVE {discountPercent}%
                           </span>
                         )}
@@ -523,57 +533,63 @@ export default function Products() {
                         <img 
                           src={product.images[0] || 'https://via.placeholder.com/400'} 
                           alt={product.name} 
-                          className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500 filter drop-shadow-xs"
+                          className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300 filter drop-shadow-2xs"
                         />
                       </Link>
 
-                      {/* Product Info & Action Buttons */}
-                      <div className="p-3.5 sm:p-5 flex flex-col grow">
+                      {/* Product Info & Compact Action Buttons (Point 6) */}
+                      <div className="p-3 sm:p-4 flex flex-col grow">
                         
-                        {/* Rating */}
-                        {product.rating ? (
+                        {/* Point 3: Only display rating if reviewCount > 0 */}
+                        {hasReviews ? (
                           <div className="flex items-center gap-1 mb-1 text-amber-500">
                             <Star className="w-3.5 h-3.5 fill-current" />
                             <span className="text-xs font-extrabold text-navy">{product.rating}</span>
-                            <span className="text-[10px] text-gray-400 font-medium">({product.reviewCount || 0})</span>
+                            <span className="text-[10px] text-gray-400 font-medium">({product.reviewCount})</span>
                           </div>
-                        ) : null}
+                        ) : (
+                          <div className="h-4 mb-1 text-[9px] text-gray-400 font-medium flex items-center">
+                            Verified Authentic
+                          </div>
+                        )}
 
                         {/* Title */}
                         <Link 
                           to={`/products/${product.id}`} 
-                          className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-black text-navy mb-2 grow"
+                          className="hover:text-primary transition-colors line-clamp-2 text-xs sm:text-sm font-black text-navy mb-1.5 grow leading-snug"
                         >
                           {product.name}
                         </Link>
 
                         {/* Price */}
-                        <div className="flex items-baseline gap-2 mb-3">
-                          <span className="text-sm sm:text-base font-black text-primary font-mono block">
+                        <div className="flex items-baseline gap-1.5 mb-3">
+                          <span className="text-xs sm:text-sm font-black text-primary font-mono block">
                             {product.price.toLocaleString()} BDT
                           </span>
                           {product.originalPrice && product.originalPrice > product.price && (
-                            <span className="text-[10px] sm:text-[11px] text-gray-400 line-through font-semibold font-mono">
+                            <span className="text-[10px] text-gray-400 line-through font-semibold font-mono">
                               {product.originalPrice.toLocaleString()} BDT
                             </span>
                           )}
                         </div>
 
-                        {/* Action Buttons */}
+                        {/* Compact Action Buttons */}
                         <div className="mt-auto pt-2 border-t border-gray-100">
                           {isOutOfStock ? (
                             <button 
+                              type="button"
                               disabled
-                              className="w-full py-2.5 px-3 rounded-xl border-2 border-red-500 text-red-500 font-black text-xs uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
+                              className="w-full py-2 px-2 rounded-xl border border-red-500 text-red-500 font-black text-[11px] uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
                             >
-                              STOCK OUT
+                              Stock Out
                             </button>
                           ) : (
-                            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                              {/* 1-Click Buy Now (Goes directly to /checkout) */}
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {/* 1-Click Buy Now (Point 12: Passes product title for dynamic back button) */}
                               <button 
+                                type="button"
                                 onClick={(e) => handleBuyNow(e, product)}
-                                className="py-2 sm:py-2.5 px-2 bg-navy hover:bg-slate-800 text-white font-black text-[10px] sm:text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                                className="py-2 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[10px] sm:text-xs rounded-xl shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                               >
                                 <Zap className="w-3 h-3 fill-brand-gold text-brand-gold" />
                                 <span>Buy Now</span>
@@ -581,8 +597,9 @@ export default function Products() {
 
                               {/* Add to Cart */}
                               <button 
+                                type="button"
                                 onClick={(e) => handleAddToCart(e, product)}
-                                className="py-2 sm:py-2.5 px-2 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] sm:text-xs rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                                className="py-2 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] sm:text-xs rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                               >
                                 <ShoppingBag className="w-3 h-3 text-primary" />
                                 <span>Add to Cart</span>
@@ -613,7 +630,7 @@ export default function Products() {
               <h3 className="text-lg font-black text-navy flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4 text-primary" /> Filters
               </h3>
-              <button onClick={() => setIsFilterDrawerOpen(false)} className="p-1 text-gray-400 hover:text-navy cursor-pointer">
+              <button type="button" onClick={() => setIsFilterDrawerOpen(false)} className="p-1 text-gray-400 hover:text-navy cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -622,6 +639,7 @@ export default function Products() {
               <h4 className="text-xs font-black text-navy uppercase tracking-wider">Categories</h4>
               <div className="space-y-1 max-h-48 overflow-y-auto">
                 <button
+                  type="button"
                   onClick={() => handleCategorySelect('')}
                   className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
                     !selectedCategory ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
@@ -630,18 +648,24 @@ export default function Products() {
                   <span>All Categories</span>
                   <span className="text-[10px]">{products.length}</span>
                 </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategorySelect(cat.id)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                      selectedCategory === cat.id || selectedCategory === cat.slug ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{cat.name}</span>
-                    <span className="text-[10px]">{getCategoryCount(cat)}</span>
-                  </button>
-                ))}
+                {categories.map((cat) => {
+                  const categoryTarget = cat.slug || cat.id;
+                  const isSelected = selectedCategory === cat.slug || selectedCategory === cat.id;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => handleCategorySelect(categoryTarget)}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                        isSelected ? 'bg-primary text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{cat.name}</span>
+                      <span className="text-[10px]">{getCategoryCount(cat)}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -671,7 +695,7 @@ export default function Products() {
                   type="checkbox"
                   checked={inStockOnly}
                   onChange={(e) => setInStockOnly(e.target.checked)}
-                  className="w-4 h-4 text-brand-green rounded border-gray-300"
+                  className="w-4 h-4 text-brand-green rounded border-gray-300 cursor-pointer"
                 />
                 <span className="text-xs font-bold text-navy">In Stock Only</span>
               </label>
@@ -679,12 +703,14 @@ export default function Products() {
 
             <div className="pt-4 border-t border-gray-100 mt-auto flex gap-3">
               <button
+                type="button"
                 onClick={clearFilters}
                 className="w-1/2 py-3 border border-gray-300 text-navy font-extrabold text-xs rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 Reset All
               </button>
               <button
+                type="button"
                 onClick={() => setIsFilterDrawerOpen(false)}
                 className="w-1/2 py-3 bg-primary text-white font-extrabold text-xs rounded-xl hover:bg-primary-dark transition-colors shadow-md cursor-pointer"
               >

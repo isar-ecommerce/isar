@@ -3,6 +3,18 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
+export interface HeroBannerItem {
+  id: string;
+  badge: string;
+  title: string;
+  highlightText: string;
+  description: string;
+  buttonText: string;
+  linkUrl: string;
+  imageUrl?: string;
+  bgGradient?: string;
+}
+
 export interface SettingsState {
   logoType: 'text' | 'image';
   logoUrl: string;
@@ -21,6 +33,7 @@ export interface SettingsState {
   flashSaleEndTime: string;
   facebookUrl: string;
   instagramUrl: string;
+  heroBanners: HeroBannerItem[];
   isLoaded: boolean;
   language: 'en' | 'bn';
 
@@ -49,13 +62,14 @@ export const useSettingsStore = create<SettingsState>()(
       flashSaleEndTime: '2026-12-31T23:59',
       facebookUrl: 'https://facebook.com',
       instagramUrl: 'https://instagram.com',
+      heroBanners: [],
       isLoaded: true,
       language: 'en',
 
       setLanguage: (lang: 'en' | 'bn') => set({ language: lang }),
       setSettings: (newSettings) => set((state) => ({ ...state, ...newSettings })),
 
-      // ফায়ারস্টোর থেকে অ্যাডমিনের দেওয়া আসল সেটিংস সরাসরি লোড করা
+      // ফায়ারস্টোর থেকে অ্যাডমিনের দেওয়া ব্যানার ও সেটিংস সরাসরি লোড
       fetchSettings: async () => {
         try {
           const docRef = doc(db, 'settings', 'general');
@@ -81,6 +95,7 @@ export const useSettingsStore = create<SettingsState>()(
               flashSaleEndTime: data.flashSaleEndTime || '2026-12-31T23:59',
               facebookUrl: data.facebookUrl || 'https://facebook.com',
               instagramUrl: data.instagramUrl || 'https://instagram.com',
+              heroBanners: Array.isArray(data.heroBanners) ? data.heroBanners : [],
               isLoaded: true,
             });
           }
