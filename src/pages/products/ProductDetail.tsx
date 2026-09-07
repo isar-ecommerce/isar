@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { getProductById } from '../../services/productService';
+import { getProductById, getProductBySlug } from '../../services/productService';
 import { useCartStore } from '../../store/cartStore';
 import type { Product } from '../../types/product';
 import ProductReviews from '../../components/product/ProductReviews';
@@ -48,7 +48,14 @@ export default function ProductDetail() {
       if (!id) return;
 
       try {
-        const data = await getProductById(id);
+        // ১. প্রথমে ক্লিন স্লাগ (Slug) দিয়ে ডাটাবেসে প্রোডাক্ট খুঁজবে
+        let data = await getProductBySlug(id);
+        
+        // ২. যদি স্লাগ না পায় (যেমন পুরনো আইডি লিংক থেকে আসলে), তখন আইডি দিয়ে খুঁজবে
+        if (!data) {
+          data = await getProductById(id);
+        }
+
         if (isMounted && data) {
           setProduct(data);
         }
@@ -87,17 +94,16 @@ export default function ProductDetail() {
     toast.success(`Added ${quantity} item(s) to Cart!`);
   };
 
-  // Point 12 & Buy Now: clear cart and pass dynamic back state for checkout
   const handleOrderNow = () => {
     if (!product) return;
     if (product.stock <= 0 || product.status === 'out-of-stock') {
       toast.error('This item is currently sold out');
       return;
     }
-    clearCart(); // 🔴 আগের সব কার্ট খালি করে শুধু এই প্রোডাক্টটি নিয়ে চেকআউটে যাবে
+    clearCart();
     addItemToCart(product, quantity);
     navigate('/checkout', {
-      state: { from: product.name, path: `/products/${product.id}` },
+      state: { from: product.name, path: `/products/${product.slug || product.id}` },
     });
   };
 
@@ -205,7 +211,6 @@ export default function ProductDetail() {
             <div className="flex flex-col space-y-5">
               
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                {/* Point 7: Clickable clean category slug link */}
                 <Link
                   to={`/products?category=${encodeURIComponent((product as { categorySlug?: string }).categorySlug || product.categoryId || 'all')}`}
                   className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/20 hover:bg-primary hover:text-white transition-colors cursor-pointer"
@@ -228,7 +233,6 @@ export default function ProductDetail() {
                 {product.name}
               </h1>
 
-              {/* Point 3: Clean Rating Display (Hides stars if 0 reviews) */}
               {hasReviews ? (
                 <div className="flex items-center gap-2">
                   <div className="flex items-center text-amber-500">
@@ -247,7 +251,6 @@ export default function ProductDetail() {
                 </div>
               )}
 
-              {/* Price */}
               <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-100 flex items-baseline gap-3 flex-wrap shadow-inner">
                 <span className="text-3xl sm:text-4xl font-black text-primary font-mono">
                   {product.price.toLocaleString()} BDT
@@ -297,7 +300,6 @@ export default function ProductDetail() {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  {/* Point 12: Order Now with dynamic checkout back link */}
                   <button
                     type="button"
                     onClick={handleOrderNow}

@@ -100,7 +100,7 @@ export default function Cart() {
           </div>
           <h2 className="text-2xl font-black text-navy mb-2">Your Cart is Empty</h2>
           <p className="text-gray-500 text-xs sm:text-sm mb-8 leading-relaxed">
-            Looks like you have not added anything to your cart yet. Explore our authentic products!
+            Looks like you have not added anything to your cart yet. Explore our authentic bags and smart accessories!
           </p>
           <Link
             to="/products"
@@ -124,6 +124,7 @@ export default function Cart() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl md:text-3xl font-black text-navy">Shopping Cart</h1>
           <button
+            type="button"
             onClick={clearCart}
             className="text-xs font-bold text-red-500 hover:text-red-700 hover:underline flex items-center gap-1 transition-colors cursor-pointer"
           >
@@ -133,7 +134,6 @@ export default function Cart() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Side: Cart Items List */}
           <div className="lg:col-span-2 space-y-4">
             
             {items.map((item, index) => {
@@ -146,7 +146,7 @@ export default function Cart() {
                   key={`${item.product.id}-${item.selectedVariantId || index}`}
                   className="bg-white rounded-3xl p-4 md:p-6 shadow-modern border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:shadow-modern-lg relative group"
                 >
-                  {/* Point 11: Prominent Cross (X) Delete Button on Top Right */}
+                  {/* Point 11: Prominent Cross (X) Delete Button */}
                   <button
                     type="button"
                     onClick={() => removeItem(item.product.id, item.selectedVariantId)}
@@ -157,8 +157,7 @@ export default function Cart() {
                     <X className="w-4 h-4" />
                   </button>
 
-                  {/* Product Thumbnail */}
-                  <Link to={`/products/${item.product.id}`} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden bg-gray-50 shrink-0 border border-gray-100 p-1 flex items-center justify-center">
+                  <Link to={`/products/${item.product.slug || item.product.id}`} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden bg-gray-50 shrink-0 border border-gray-100 p-1 flex items-center justify-center">
                     <img
                       src={item.product.images[0] || 'https://via.placeholder.com/150'}
                       alt={item.product.name}
@@ -166,10 +165,9 @@ export default function Cart() {
                     />
                   </Link>
 
-                  {/* Product Information */}
                   <div className="flex-1 min-w-0 pr-6 sm:pr-8">
                     <Link 
-                      to={`/products/${item.product.id}`}
+                      to={`/products/${item.product.slug || item.product.id}`}
                       className="text-sm md:text-base font-black text-navy hover:text-primary transition-colors line-clamp-1 mb-1 block"
                     >
                       {item.product.name}
@@ -217,7 +215,6 @@ export default function Cart() {
                     </div>
                   </div>
 
-                  {/* Item Total Price */}
                   <div className="text-right sm:self-center ml-auto">
                     <span className="text-base md:text-lg font-black text-primary font-mono">
                       {(item.product.price * item.quantity).toLocaleString()} BDT
@@ -238,13 +235,10 @@ export default function Cart() {
 
           </div>
 
-          {/* Right Side: Order Summary & Coupon */}
           <div className="space-y-6">
-            
             <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-5 sticky top-24">
               <h2 className="text-lg font-black text-navy pb-3 border-b border-gray-100">Order Summary</h2>
 
-              {/* Coupon Redemption Card */}
               <div className="space-y-2">
                 {!appliedCoupon ? (
                   <form onSubmit={handleApplyCoupon} className="space-y-2">
@@ -289,7 +283,6 @@ export default function Cart() {
                 )}
               </div>
 
-              {/* Breakdown */}
               <div className="space-y-3 pt-3 border-t border-gray-100 text-xs sm:text-sm">
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Selected Items:</span>
@@ -319,6 +312,7 @@ export default function Cart() {
               </div>
 
               <button
+                type="button"
                 onClick={handleProceedToCheckout}
                 className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-black py-4 px-6 rounded-2xl text-sm transition-all shadow-md cursor-pointer hover:scale-[1.01] active:scale-95"
               >
@@ -327,9 +321,7 @@ export default function Cart() {
               </button>
 
             </div>
-
           </div>
-
         </div>
 
       </div>

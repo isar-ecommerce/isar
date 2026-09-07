@@ -22,7 +22,6 @@ const INITIAL_CATEGORIES: Category[] = [
   { id: 'all', name: 'All Products', slug: 'all', status: 'active', order: 0 }
 ];
 
-// আল্ট্রা-স্মার্ট ক্যাটাগরি ম্যাচিং ইঞ্জিন (স্ল্যাগ এবং আইডি উভয় নির্ভুলভাবে ট্র্যাক করে)
 const isProductInCategory = (product: Product, targetCatId: string, categories: Category[]) => {
   if (targetCatId === 'all') return true;
 
@@ -57,7 +56,7 @@ export default function Categories() {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const addItemToCart = useCartStore((state) => state.addItem);
+  const { addItem: addItemToCart, clearCart } = useCartStore();
 
   useEffect(() => {
     let isMounted = true;
@@ -112,7 +111,6 @@ export default function Categories() {
     });
   }, [products, selectedCategoryId, categories, searchQuery]);
 
-  // Point 12: Buy Now - পাসিং ডায়নামিক প্রোডাক্ট নাম চেকআউটের জন্য
   const handleBuyNow = (e: MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -120,9 +118,10 @@ export default function Categories() {
       toast.error('This item is currently sold out');
       return;
     }
+    clearCart(); // 🔴 আগের কার্ট মুছে দেবে
     addItemToCart(product, 1);
     navigate('/checkout', {
-      state: { from: product.name, path: `/products/${product.id}` },
+      state: { from: product.name, path: `/products/${product.slug || product.id}` },
     });
   };
 
@@ -174,7 +173,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Horizontal Category Tab Bar (Daraz Style Sleek Horizontal Scroll) */}
+        {/* Horizontal Category Tab Bar */}
         <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-modern border border-gray-100">
           <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
             {categories.map((cat) => {
@@ -219,7 +218,7 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Products Grid (Point 3 & Point 6 Polish Applied) */}
+        {/* Products Grid */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center bg-white rounded-3xl border border-gray-100">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
@@ -248,7 +247,6 @@ export default function Categories() {
                 ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
                 : 0;
 
-              // Point 3: Hide star rating if zero reviews
               const hasReviews = (product.reviewCount || 0) > 0;
 
               return (
@@ -256,8 +254,7 @@ export default function Categories() {
                   key={product.id}
                   className="bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col"
                 >
-                  {/* Product Image */}
-                  <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 sm:p-3 flex items-center justify-center">
+                  <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 sm:p-3 flex items-center justify-center">
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
                         <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white/95">
@@ -285,9 +282,7 @@ export default function Categories() {
                     />
                   </Link>
 
-                  {/* Product Info & Compact Buttons (Point 6) */}
                   <div className="p-3 sm:p-3.5 flex flex-col grow">
-                    {/* Point 3: Star rating only if reviewCount > 0 */}
                     {hasReviews ? (
                       <div className="flex items-center gap-1 mb-1 text-amber-500">
                         <Star className="w-3 h-3 fill-current" />
@@ -300,7 +295,7 @@ export default function Categories() {
                       </div>
                     )}
 
-                    <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow leading-snug">
+                    <Link to={`/products/${product.slug || product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow leading-snug">
                       {product.name}
                     </Link>
                     
@@ -311,7 +306,6 @@ export default function Categories() {
                       )}
                     </div>
 
-                    {/* Compact Dual Buttons */}
                     <div className="mt-auto pt-2 border-t border-gray-100">
                       {isOutOfStock ? (
                         <button 
@@ -322,11 +316,11 @@ export default function Categories() {
                           Stock Out
                         </button>
                       ) : (
-                        <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
                           <button 
                             type="button"
                             onClick={(e) => handleBuyNow(e, product)}
-                            className="py-1.5 sm:py-2 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[9px] sm:text-[10px] rounded-lg shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
+                            className="py-1.5 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[10px] rounded-xl shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
                           >
                             <Zap className="w-2.5 h-2.5 fill-brand-gold text-brand-gold" />
                             <span>Buy Now</span>
@@ -335,7 +329,7 @@ export default function Categories() {
                           <button 
                             type="button"
                             onClick={(e) => handleAddToCart(e, product)}
-                            className="py-1.5 sm:py-2 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[9px] sm:text-[10px] rounded-lg transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
+                            className="py-1.5 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-0.5"
                           >
                             <ShoppingBag className="w-2.5 h-2.5 text-primary" />
                             <span>Add</span>

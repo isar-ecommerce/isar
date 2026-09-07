@@ -72,6 +72,8 @@ export default function Home() {
   const banners = heroBanners && heroBanners.length > 0 ? heroBanners : DEFAULT_BANNERS;
 
   const trendingSliderRef = useRef<HTMLDivElement>(null);
+  const megaDealsSliderRef = useRef<HTMLDivElement>(null);
+  
   const { addItem: addItemToCart, clearCart } = useCartStore();
 
   useEffect(() => {
@@ -137,19 +139,23 @@ export default function Home() {
     }
   };
 
-  const handleBuyNow = (product: Product) => {
+  const handleBuyNow = (e: React.MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (product.stock <= 0 || product.status === 'out-of-stock') {
       toast.error('This item is currently sold out');
       return;
     }
-    clearCart();
+    clearCart(); // 🔴 আগের সব কার্ট আইটেম মুছে ফেলবে
     addItemToCart(product, 1);
     navigate('/checkout', {
-      state: { from: product.name, path: `/products/${product.id}` },
+      state: { from: product.name, path: `/products/${product.slug || product.id}` },
     });
   };
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (e: React.MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (product.stock <= 0 || product.status === 'out-of-stock') {
       toast.error('This item is currently sold out');
       return;
@@ -182,6 +188,14 @@ export default function Home() {
     }));
   }, [products]);
 
+  const discountedMegaDeals = useMemo(() => {
+    return products.filter(p => p.originalPrice && p.originalPrice > p.price);
+  }, [products]);
+
+  const newArrivalsList = useMemo(() => {
+    return products.filter(p => p.isNewArrival);
+  }, [products]);
+
   const activeBanner = banners[currentBannerIndex] || DEFAULT_BANNERS[0];
 
   const renderProductCard = (product: Product) => {
@@ -197,7 +211,7 @@ export default function Home() {
         key={product.id} 
         className="w-44 sm:w-52 md:w-60 bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col shrink-0"
       >
-        <Link to={`/products/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 flex items-center justify-center">
+        <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 flex items-center justify-center">
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
               <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white/95">
@@ -238,7 +252,7 @@ export default function Home() {
             </div>
           )}
 
-          <Link to={`/products/${product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow leading-snug">
+          <Link to={`/products/${product.slug || product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow leading-snug">
             {product.name}
           </Link>
           
@@ -262,7 +276,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-1.5">
                 <button 
                   type="button"
-                  onClick={() => handleBuyNow(product)}
+                  onClick={(e) => handleBuyNow(e, product)}
                   className="py-1.5 px-1 bg-navy hover:bg-slate-800 text-white font-black text-[10px] rounded-xl shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Zap className="w-3 h-3 fill-brand-gold text-brand-gold" />
@@ -271,7 +285,7 @@ export default function Home() {
 
                 <button 
                   type="button"
-                  onClick={() => handleAddToCart(product)}
+                  onClick={(e) => handleAddToCart(e, product)}
                   className="py-1.5 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                 >
                   <ShoppingBag className="w-3 h-3 text-primary" />
@@ -475,7 +489,7 @@ export default function Home() {
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-2xs`}>
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <span className="text-[11px] sm:text-xs font-bold text-navy text-center line-click-1">{category.name}</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-navy text-center line-clamp-1">{category.name}</span>
                 </Link>
               );
             })}
@@ -531,6 +545,74 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* Section 2: Mega Deals / Flash Discounted Section */}
+      {discountedMegaDeals.length > 0 && (
+        <section className="container mx-auto px-3 sm:px-4 pt-2">
+          <div className="bg-linear-to-r from-amber-500/10 via-rose-500/5 to-primary/10 rounded-3xl p-4 sm:p-6 border border-amber-500/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-navy flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" /> Best of Mega Deals
+                </h2>
+                <p className="text-[11px] text-gray-500">Biggest discounts & special price drops</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => scrollSlider(megaDealsSliderRef, 'left')}
+                  className="p-1.5 rounded-xl bg-white hover:bg-primary hover:text-white border border-gray-200 text-navy transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  aria-label="Scroll left"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollSlider(megaDealsSliderRef, 'right')}
+                  className="p-1.5 rounded-xl bg-white hover:bg-primary hover:text-white border border-gray-200 text-navy transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  aria-label="Scroll right"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <Link to="/products" className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 group">
+                  See Deals <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
+            </div>
+
+            <div 
+              ref={megaDealsSliderRef}
+              className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 pt-1 scroll-smooth no-scrollbar"
+            >
+              {discountedMegaDeals.map((product) => renderProductCard(product))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Section 3: New Arrivals Grid */}
+      {newArrivalsList.length > 0 && (
+        <section className="container mx-auto px-3 sm:px-4 pt-2">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-navy flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-brand-green" /> New Arrivals
+              </h2>
+              <p className="text-[11px] text-gray-500">Freshly added inventory items</p>
+            </div>
+
+            <Link to="/products" className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 group">
+              Explore All <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {newArrivalsList.slice(0, 6).map((product) => renderProductCard(product))}
+          </div>
+        </section>
+      )}
 
       {/* Point 4: Dynamic Custom Sections created by Admin */}
       {dynamicCustomSections.map((section) => (
