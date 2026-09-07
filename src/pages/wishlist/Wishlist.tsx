@@ -113,7 +113,7 @@ export default function Wishlist() {
               </div>
 
               {/* Info Box */}
-              <div className="p-4 flex flex-col flex-grow">
+              <div className="p-4 flex flex-col ">
                 {product.rating ? (
                   <div className="flex items-center gap-1 mb-1 text-amber-500">
                     <Star className="w-3.5 h-3.5 fill-current" />
@@ -124,7 +124,7 @@ export default function Wishlist() {
 
                 <Link 
                   to={`/products/${product.id}`} 
-                  className="hover:text-primary transition-colors line-clamp-2 text-xs md:text-sm font-semibold text-navy mb-2 flex-grow"
+                  className="hover:text-primary transition-colors line-clamp-2 text-xs md:text-sm font-semibold text-navy mb-2"
                 >
                   {product.name}
                 </Link>

@@ -27,6 +27,14 @@ export interface BkashExecuteResult {
   message: string;
 }
 
+interface BkashApiBackendResponse {
+  success: boolean;
+  paymentID?: string;
+  bkashURL?: string;
+  trxID?: string;
+  message?: string;
+}
+
 /**
  * ১. বিকাশ পেমেন্ট শুরু করার ফাংশন (Direct Server-to-Server Create Payment)
  */
@@ -45,10 +53,13 @@ export const initiateBkashPayment = async (
       }),
     });
 
-    const createData = await createRes.json();
+    const createData = (await createRes.json()) as BkashApiBackendResponse;
 
     if (!createRes.ok || !createData.success || !createData.paymentID) {
-      throw new Error(createData.message || 'Failed to initiate bKash payment gateway.');
+      return {
+        success: false,
+        message: createData.message || 'Failed to initiate bKash payment gateway.',
+      };
     }
 
     return {
@@ -57,11 +68,11 @@ export const initiateBkashPayment = async (
       bkashURL: createData.bkashURL || null,
     };
   } catch (error: unknown) {
-    console.error('bKash payment initiation error:', error);
-    const err = error instanceof Error ? error : new Error(String(error));
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('bKash payment initiation error:', errorMsg);
     return {
       success: false,
-      message: err.message || 'Could not connect to bKash gateway.',
+      message: errorMsg || 'Could not connect to bKash gateway.',
     };
   }
 };
@@ -86,7 +97,7 @@ export const verifyAndExecuteBkashPayment = async (
       }),
     });
 
-    const execData = await execRes.json();
+    const execData = (await execRes.json()) as BkashApiBackendResponse;
 
     if (!execRes.ok || !execData.success || !execData.trxID) {
       throw new Error(execData.message || 'bKash payment verification failed or cancelled by user.');
@@ -103,9 +114,10 @@ export const verifyAndExecuteBkashPayment = async (
       message: `bKash payment successful! TrxID: ${trxId}`,
     };
   } catch (error: unknown) {
-    console.error('bKash payment verification error:', error);
-    const err = error instanceof Error ? error : new Error(String(error));
-    throw new Error(err.message, { cause: error });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('bKash payment verification error:', errorMsg);
+    // ESLint preserve-caught-error ফিক্স: ক্যাচে পাওয়া মূল 'error' সরাসরি cause হিসেবে দেওয়া হলো
+    throw new Error(`bKash Verification Error: ${errorMsg}`, { cause: error });
   }
 };
 
@@ -153,9 +165,10 @@ export const executeBkashPayment = async (
       message: 'bKash payment completed and verified successfully!',
     };
   } catch (error: unknown) {
-    console.error('bKash payment execution error:', error);
-    const err = error instanceof Error ? error : new Error(String(error));
-    throw new Error(err.message, { cause: error });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('bKash payment execution error:', errorMsg);
+    // ESLint preserve-caught-error ফিক্স
+    throw new Error(`bKash Execution Error: ${errorMsg}`, { cause: error });
   }
 };
 
@@ -200,8 +213,9 @@ export const executeNagadPayment = async (
       message: 'Nagad payment completed successfully!',
     };
   } catch (error: unknown) {
-    console.error('Nagad payment execution error:', error);
-    const err = error instanceof Error ? error : new Error(String(error));
-    throw new Error(err.message, { cause: error });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('Nagad payment execution error:', errorMsg);
+    // ESLint preserve-caught-error ফিক্স
+    throw new Error(`Nagad Execution Error: ${errorMsg}`, { cause: error });
   }
 };

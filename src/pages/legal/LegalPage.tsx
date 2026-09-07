@@ -160,7 +160,7 @@ export default function LegalPage() {
         <div className="bg-white rounded-2xl shadow-modern border border-gray-100 p-6 md:p-10 space-y-6">
           
           <div className="flex items-center gap-3 pb-6 border-b border-gray-100">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0">
+           <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>

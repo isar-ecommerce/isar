@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, X, CheckCircle2, Clock } from 'lucide-react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import type { Order } from '../../types/order';
 
@@ -11,25 +11,24 @@ export default function RealSalesPopup() {
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
 
-  // ১. ফায়ারস্টোর থেকে শুধুমাত্র আসল অর্ডারগুলো লোড করা (কোনো ফেক ডেটা ছাড়া)
+  // ফায়ারস্টোর থেকে নিরাপদ ও ক্র্যাশ-প্রুফ ফেচ (গেস্ট ইউজারদের কনসোল এরর থেকে মুক্ত)
   useEffect(() => {
     let isMounted = true;
 
     const fetchRealOrders = async () => {
       try {
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(8));
+        const q = query(collection(db, 'orders'), limit(6));
         const snapshot = await getDocs(q);
         const list = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() })) as Order[];
 
-        // শুধুমাত্র ভ্যালিড আইটেম সহ আসল অর্ডারগুলো ফিল্টার করা
         const validOrders = list.filter((o) => o.items && o.items.length > 0 && o.status !== 'cancelled');
 
         if (isMounted && validOrders.length > 0) {
           setOrders(validOrders);
         }
-      } catch (error) {
-        console.error('Error fetching real orders for sales popup:', error);
+      } catch {
+        // ফায়ারস্টোর পারমিশন সীমাবদ্ধতা থাকলে কনসোলে ক্র্যাশ না করে সাইলেন্টলি স্কিপ করবে
       }
     };
 
@@ -42,16 +41,13 @@ export default function RealSalesPopup() {
     };
   }, []);
 
-  // ২. নির্দিষ্ট সময় পরপর লাইভ পপআপ দেখানো ও হাইড করা
   useEffect(() => {
     if (orders.length === 0 || isDismissed) return;
 
-    // পেজ লোডের ৬ সেকেন্ড পর প্রথম পপআপ আসবে
     const initialTimer = setTimeout(() => {
       setIsVisible(true);
     }, 6000);
 
-    // প্রতি ১৮ সেকেন্ড পর পর পরবর্তী আসল অর্ডার রোটেট করবে
     const interval = setInterval(() => {
       setIsVisible(false);
 
@@ -60,7 +56,6 @@ export default function RealSalesPopup() {
         setIsVisible(true);
       }, 1000);
 
-      // ৫ সেকেন্ড প্রদর্শিত থাকার পর অটো হাইড হবে
       setTimeout(() => {
         setIsVisible(false);
       }, 6000);
@@ -72,7 +67,6 @@ export default function RealSalesPopup() {
     };
   }, [orders, isDismissed]);
 
-  // ডেটাবেসে কোনো আসল অর্ডার না থাকলে বা কাস্টমার ক্লোজ করলে কিছুই দেখাবে না (জিরো ফেক ডেটা)
   if (orders.length === 0 || !isVisible || isDismissed) {
     return null;
   }
@@ -93,7 +87,7 @@ export default function RealSalesPopup() {
         {/* Dismiss Button */}
         <button
           onClick={() => setIsDismissed(true)}
-          className="absolute -top-1.5 -right-1.5 p-1 bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-navy rounded-full transition-colors shadow-sm"
+          className="absolute -top-1.5 -right-1.5 p-1 bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-navy rounded-full transition-colors shadow-sm cursor-pointer"
           title="Dismiss"
         >
           <X className="w-3 h-3" />
@@ -111,7 +105,7 @@ export default function RealSalesPopup() {
         {/* Order Content */}
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-1 mb-0.5">
-            <CheckCircle2 className="w-3 h-3 text-brand-green shrink-0" />
+            <CheckCircle2 className="w-3 text-brand-green shrink-0" />
             <p className="text-[11px] font-bold text-navy truncate">
               <span className="text-primary">{customerFirstName}</span> ({district})
             </p>

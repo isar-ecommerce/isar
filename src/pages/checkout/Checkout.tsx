@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -12,13 +12,19 @@ import {
   User, 
   CheckCircle2,
   Mail,
-  Banknote
+  Banknote,
+  Tag,
+  Sparkles,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { doc, getDoc } from 'firebase/firestore';
 
+import { db } from '../../firebase/config';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
 import { createOrder, calculateDynamicDeliveryFee } from '../../services/orderService';
+import { validateCouponCode, incrementCouponUsage } from '../../services/couponService';
 import { 
   sendOrderConfirmationSMS, 
   sendOrderConfirmationEmail, 
@@ -41,6 +47,8 @@ export default function Checkout() {
     getSubtotal, 
     getDiscount, 
     appliedCoupon, 
+    applyCoupon,
+    removeCoupon,
     clearCart 
   } = useCartStore();
 
@@ -61,15 +69,63 @@ export default function Checkout() {
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
 
+  // Strict 2 Payment Methods: Cash on Delivery or bKash
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // চেকআউট পেজে ঢোকামাত্রই একদম ওপর থেকে লোড হবে
+  // Coupon Input State
+  const [couponCodeInput, setCouponCodeInput] = useState<string>('');
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  // ডায়নামিক ব্যাক বাটন (যে পেজ থেকে আসবে, ঠিক সেই পেজে ফিরিয়ে নেবে)
+  // Auto-fill address from User Profile if logged in
+  useEffect(() => {
+    let isMounted = true;
+    if (!user?.uid) return;
+
+    const loadSavedAddress = async () => {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists() && isMounted) {
+          const data = userSnap.data();
+          if (data.savedAddress) {
+            const addr = data.savedAddress;
+            if (addr.fullName) setFullName(addr.fullName);
+            if (addr.phone) setPhone(addr.phone);
+            if (addr.division) {
+              setDivision(addr.division);
+              const dists = getDistrictsByDivision(addr.division);
+              setAvailableDistricts(dists);
+            }
+            if (addr.district) {
+              setDistrict(addr.district);
+              const upas = getUpazilasByDistrict(addr.division || 'Dhaka', addr.district);
+              setAvailableUpazilas(upas);
+            }
+            if (addr.upazila) setUpazila(addr.upazila);
+            if (addr.fullAddress) setFullAddress(addr.fullAddress);
+          // পরিবর্তন করে লিখুন:
+} else if (data.displayName) {
+  setFullName((prev) => (prev.trim() ? prev : data.displayName));
+}
+        }
+      } catch (err) {
+        console.warn('Could not auto-fill profile address:', err);
+      }
+    };
+
+    Promise.resolve().then(() => loadSavedAddress());
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
+
   const originState = location.state as { from?: string; path?: string } | null;
   const backButtonLabel = originState?.from ? `Back to ${originState.from}` : 'Back to Cart';
   const backButtonPath = originState?.path || '/cart';
@@ -78,7 +134,7 @@ export default function Checkout() {
     navigate(backButtonPath);
   };
 
-  // বিকাশ কলব্যাক লিসেনার
+  // Official bKash Tokenized Callback Listener
   useEffect(() => {
     const paymentID = searchParams.get('paymentID');
     const status = searchParams.get('status');
@@ -101,7 +157,7 @@ export default function Checkout() {
           const execData = await execRes.json();
           toast.dismiss(toastId);
 
-          if (execRes.ok && execData.success) {
+          if (execRes.ok && execData.success && execData.trxID) {
             const pendingOrder = JSON.parse(pendingDataStr);
             sessionStorage.removeItem('isar_pending_order');
 
@@ -110,8 +166,13 @@ export default function Checkout() {
               paymentStatus: 'paid',
               paidAmount: pendingOrder.totalAmount,
               dueAmount: 0,
+              paymentMethod: 'bkash',
               transactionId: execData.trxID,
             });
+
+            if (pendingOrder.couponId) {
+              incrementCouponUsage(pendingOrder.couponId);
+            }
 
             sendOrderConfirmationSMS(order.customerPhone, order.orderNumber, order.totalAmount);
             sendOrderConfirmationEmail(order);
@@ -194,6 +255,44 @@ export default function Checkout() {
     setUpazila(upazilas[0] || '');
   };
 
+  // Coupon Code Validation Handler
+  const handleApplyCoupon = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!couponCodeInput.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+
+    try {
+      setIsValidatingCoupon(true);
+      const result = await validateCouponCode(couponCodeInput, subtotal);
+
+      if (result.isValid && result.coupon) {
+        applyCoupon({
+          code: result.coupon.code,
+          discountType: result.coupon.discountType,
+          discountValue: result.coupon.discountValue,
+          minOrderAmount: result.coupon.minOrderAmount,
+          maxDiscount: result.coupon.maxDiscountAmount || undefined,
+        });
+        toast.success(result.message);
+        setCouponCodeInput('');
+      } else {
+        toast.error(result.message);
+      }
+    } catch (err) {
+      console.error('Coupon validation error:', err);
+      toast.error('Failed to validate coupon');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    removeCoupon();
+    toast.success('Coupon removed successfully');
+  };
+
   const validateForm = () => {
     if (!fullName.trim() || !phone.trim() || !email.trim() || !district.trim() || !upazila.trim() || !fullAddress.trim()) {
       toast.error('Please fill in all required shipping fields');
@@ -215,7 +314,7 @@ export default function Checkout() {
     return true;
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
@@ -234,6 +333,7 @@ export default function Checkout() {
         deliveryNotes: deliveryNotes.trim() || undefined,
       };
 
+      // 1. Full bKash Payment Flow (100% Upfront Online)
       if (paymentMethod === 'bkash') {
         sessionStorage.setItem('isar_pending_order', JSON.stringify({
           userId: user?.uid || 'guest-user',
@@ -248,6 +348,7 @@ export default function Checkout() {
           deliveryFee,
           discount,
           couponCode: appliedCoupon?.code,
+          couponId: (appliedCoupon as { id?: string })?.id,
           totalAmount: total,
           paymentMethod: 'bkash',
           paymentStatus: 'paid',
@@ -277,6 +378,7 @@ export default function Checkout() {
         }
       }
 
+      // 2. Pure Cash on Delivery (COD) Flow (0 BDT in advance, 100% due on delivery)
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -296,6 +398,10 @@ export default function Checkout() {
         paidAmount: 0,
         dueAmount: total,
       });
+
+      if ((appliedCoupon as { id?: string })?.id) {
+        incrementCouponUsage((appliedCoupon as { id?: string }).id!);
+      }
 
       sendOrderConfirmationSMS(phone.trim(), order.orderNumber, total);
       sendOrderConfirmationEmail(order);
@@ -353,7 +459,7 @@ export default function Checkout() {
 
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column */}
+          {/* Left Column: Shipping & Payment */}
           <div className="lg:col-span-2 space-y-6">
             
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-6">
@@ -493,7 +599,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Payment Method Card */}
+            {/* Strict 2 Payment Methods Selection */}
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-modern border border-gray-100 space-y-5">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green font-bold">
@@ -501,12 +607,13 @@ export default function Checkout() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-navy">Payment Method</h2>
-                  <p className="text-xs text-gray-500">Select how you want to pay</p>
+                  <p className="text-xs text-gray-500">Choose your preferred payment option</p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 
+                {/* 1. Cash on Delivery (0 BDT Advance) */}
                 <label 
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'cod' 
@@ -527,8 +634,8 @@ export default function Checkout() {
                       <Banknote className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="font-black text-sm text-navy block">Cash On Delivery</span>
-                      <span className="text-xs text-gray-500">Pay cash when your parcel arrives at your doorstep</span>
+                      <span className="font-black text-sm text-navy block">Cash on Delivery</span>
+                      <span className="text-xs text-gray-500">Zero advance payment. Pay full amount when receiving parcel.</span>
                     </div>
                   </div>
 
@@ -537,6 +644,7 @@ export default function Checkout() {
                   )}
                 </label>
 
+                {/* 2. Full bKash Online Payment (100% Upfront Online) */}
                 <label 
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                     paymentMethod === 'bkash' 
@@ -560,7 +668,7 @@ export default function Checkout() {
                     </div>
                     <div>
                       <span className="font-black text-sm text-[#E2136E] block">bKash Online Payment</span>
-                      <span className="text-xs text-gray-500">Instant checkout via official bKash portal</span>
+                      <span className="text-xs text-gray-500">Pay 100% total order amount online via official bKash gateway.</span>
                     </div>
                   </div>
 
@@ -575,16 +683,17 @@ export default function Checkout() {
 
           </div>
 
-          {/* Right Column: Order Summary */}
+          {/* Right Column: Order Summary & Coupon */}
           <div className="space-y-6">
             
-            <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-6 sticky top-24">
+            <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-5 sticky top-24">
               
               <div className="pb-3 border-b border-gray-100">
                 <h2 className="text-base font-black text-navy">Order Summary ({items.length} Items)</h2>
               </div>
 
-              <div className="max-h-56 overflow-y-auto space-y-3 pr-1">
+              {/* Items Preview */}
+              <div className="max-h-52 overflow-y-auto space-y-3 pr-1">
                 {items.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
                     <img
@@ -601,7 +710,54 @@ export default function Checkout() {
                 ))}
               </div>
 
-              <div className="space-y-3 pt-4 border-t border-gray-100 text-xs sm:text-sm">
+              {/* Coupon Redemption Box */}
+              <div className="pt-2">
+                {!appliedCoupon ? (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-navy flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-primary" /> Promo Coupon
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCodeInput}
+                        onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                        placeholder="e.g. EID2026"
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs font-mono font-bold text-navy uppercase focus:bg-white focus:outline-none focus:border-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={isValidatingCoupon || !couponCodeInput.trim()}
+                        className="px-4 py-2 bg-navy hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {isValidatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-brand-green/10 border border-brand-green/20 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-brand-green shrink-0" />
+                      <div>
+                        <span className="text-xs font-black text-navy font-mono">{appliedCoupon.code}</span>
+                        <span className="text-[10px] text-brand-green font-bold block">Coupon Applied</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="p-1 text-gray-400 hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                      title="Remove Coupon"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Bill Breakdown */}
+              <div className="space-y-3 pt-3 border-t border-gray-100 text-xs sm:text-sm">
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Product Subtotal</span>
                   <span className="font-bold text-navy font-mono">{subtotal.toLocaleString()} BDT</span>
@@ -617,7 +773,7 @@ export default function Checkout() {
 
                 {discount > 0 && (
                   <div className="flex justify-between text-brand-green font-bold">
-                    <span>Discount</span>
+                    <span>Coupon Discount</span>
                     <span className="font-mono">-{discount.toLocaleString()} BDT</span>
                   </div>
                 )}
@@ -641,7 +797,11 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock className="w-4 h-4" /> 
-                    <span>{paymentMethod === 'bkash' ? `Pay ${total.toLocaleString()} BDT with bKash` : `Order Now (${total.toLocaleString()} BDT)`}</span>
+                    <span>
+                      {paymentMethod === 'bkash' 
+                        ? `Pay ${total.toLocaleString()} BDT with bKash` 
+                        : `Confirm Order (${total.toLocaleString()} BDT)`}
+                    </span>
                   </>
                 )}
               </button>

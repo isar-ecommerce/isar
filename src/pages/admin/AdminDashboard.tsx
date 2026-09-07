@@ -39,7 +39,8 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // ১. অর্ডারসমূহ ফেস করা
+      setLoading(true);
+      // ১. আসল অর্ডারসমূহ ফেচ করা
       const ordersSnap = await getDocs(collection(db, 'orders'));
       const allOrders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
       
@@ -47,39 +48,56 @@ export default function AdminDashboard() {
       const validOrders = allOrders.filter(order => order.status !== 'cancelled');
       const revenue = validOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
-      // ২. প্রোডাক্টসমূহ গুনে দেখা
+      // ২. প্রোডাক্ট ও ইউজার কাউন্ট
       const productsSnap = await getDocs(collection(db, 'products'));
-
-      // ৩. ইউজারসমূহ গুনে দেখা
       const usersSnap = await getDocs(collection(db, 'users'));
 
-      // ৪. সাম্প্রতিক ৫টি অর্ডার
+      // ৩. সাম্প্রতিক ৫টি অর্ডার
       const recentOrdersQuery = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(5));
       const recentOrdersSnap = await getDocs(recentOrdersQuery);
       const recentList = recentOrdersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
 
-      // ৫. গত ৭ দিনের রিয়েল সেলস চার্ট হিসাব করা
+      // ৪. গত ৭ দিনের রিয়েল সেলস চার্ট হিসাব (কোনো Math.random() ছাড়া)
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const last7Days: DailySaleData[] = [];
       const today = new Date();
 
+      const getOrderTimeMs = (val: unknown): number => {
+        if (!val) return 0;
+        if (val instanceof Date) return val.getTime();
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') return new Date(val).getTime();
+        if (typeof val === 'object' && val !== null && 'toDate' in val) {
+          return ((val as { toDate: () => Date }).toDate()).getTime();
+        }
+        return 0;
+      };
+
       for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(today.getDate() - i);
-        const dayLabel = days[d.getDay()];
-        const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-        
-        // ঐ নির্দিষ্ট দিনের সেলস ফিল্টার করা
-        const dayRevenue = validOrders.reduce((sum, order) => {
-          return sum + (order.totalAmount || 0);
-        }, 0) / 7; // গড় ও প্রপোশনাল স্কেল
+        const targetDay = new Date();
+        targetDay.setDate(today.getDate() - i);
+        targetDay.setHours(0, 0, 0, 0);
+
+        const nextDay = new Date(targetDay);
+        nextDay.setDate(targetDay.getDate() + 1);
+
+        const dayLabel = days[targetDay.getDay()];
+        const dateStr = targetDay.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+        // ঐ নির্দিষ্ট দিনের আসল অর্ডারগুলো ফিল্টার করা
+        const dayOrders = validOrders.filter(o => {
+          const ms = getOrderTimeMs(o.createdAt);
+          return ms >= targetDay.getTime() && ms < nextDay.getTime();
+        });
+
+        const dayRevenue = dayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
         last7Days.push({
           dayLabel,
           dateStr,
-          revenue: Math.round(dayRevenue * (0.5 + Math.random() * 0.8)),
-          orders: Math.floor(Math.random() * 4) + (allOrders.length > 0 ? 1 : 0),
-          heightPercent: 20,
+          revenue: dayRevenue,
+          orders: dayOrders.length,
+          heightPercent: 15,
         });
       }
 
@@ -87,7 +105,7 @@ export default function AdminDashboard() {
       const maxRev = Math.max(...last7Days.map(d => d.revenue), 1000);
       const scaledChartData = last7Days.map(d => ({
         ...d,
-        heightPercent: Math.max(15, Math.round((d.revenue / maxRev) * 100)),
+        heightPercent: Math.max(12, Math.round((d.revenue / maxRev) * 100)),
       }));
 
       setStats({
@@ -136,20 +154,20 @@ export default function AdminDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-navy">Dashboard Overview</h1>
-          <p className="text-xs text-gray-500 mt-1">Welcome back! Here is what is happening with ISAR today.</p>
+          <p className="text-xs text-gray-500 mt-1">Welcome back! Live business insights for ISAR Marketplace.</p>
         </div>
 
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => { setLoading(true); fetchDashboardData(); }}
-            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2"
+            onClick={() => fetchDashboardData()}
+            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" /> Refresh Data
           </button>
           
           <Link
             to="/admin/products/add"
-            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2"
+            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add Product
           </Link>
@@ -165,7 +183,7 @@ export default function AdminDashboard() {
             <span className="text-xs font-bold text-gray-400 block mb-1">Total Revenue</span>
             <span className="text-2xl font-extrabold text-navy">৳{stats.totalRevenue.toLocaleString()}</span>
             <span className="text-[11px] text-brand-green font-semibold flex items-center gap-1 mt-1">
-              <TrendingUp className="w-3 h-3" /> Live Firestore
+              <TrendingUp className="w-3 h-3" /> Live Verified Orders
             </span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green">
@@ -217,7 +235,7 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* Visual Sales Analytics Graph Section (Interactive 7-Day Revenue Growth Chart) */}
+      {/* Visual Sales Analytics Graph Section (100% Real Firestore Data) */}
       <div className="bg-white rounded-2xl shadow-modern border border-gray-100 p-6 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -226,7 +244,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-navy">Sales & Revenue Analytics</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Live 7-day revenue trends and daily order volume</p>
+              <p className="text-xs text-gray-500 mt-0.5">Real 7-day revenue trends based on actual customer orders</p>
             </div>
           </div>
 
@@ -236,7 +254,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Interactive Bar Chart */}
+        {/* Bar Chart */}
         <div className="pt-4 pb-2">
           <div className="h-56 flex items-end justify-between gap-2 sm:gap-6 px-2 sm:px-6">
             {chartData.map((item, index) => (
@@ -274,7 +292,7 @@ export default function AdminDashboard() {
           </div>
           <Link
             to="/admin/orders"
-            className="text-xs font-bold text-primary hover:text-primary-dark transition-colors flex items-center gap-1"
+            className="text-xs font-bold text-primary hover:text-primary-dark transition-colors flex items-center gap-1 cursor-pointer"
           >
             View All Orders <ArrowRight className="w-4 h-4" />
           </Link>
@@ -318,7 +336,7 @@ export default function AdminDashboard() {
                     <td className="py-3 px-2 text-right">
                       <Link
                         to="/admin/orders"
-                        className="px-3 py-1.5 bg-gray-100 hover:bg-primary hover:text-white rounded-lg text-[11px] font-bold text-navy transition-colors inline-block"
+                        className="px-3 py-1.5 bg-gray-100 hover:bg-primary hover:text-white rounded-lg text-[11px] font-bold text-navy transition-colors inline-block cursor-pointer"
                       >
                         Manage
                       </Link>

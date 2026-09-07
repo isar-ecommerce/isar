@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -29,8 +29,11 @@ export default function SellerDashboard() {
   const [sellerOrders, setSellerOrders] = useState<Order[]>([]);
   const [totalEarnings, setTotalEarnings] = useState<number>(0);
 
-  const fetchSellerData = async () => {
-    if (!user) return;
+  const fetchSellerData = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       // ১. সেলারের নিজস্ব প্রোডাক্টসমূহ লোড করা
       const pQuery = query(collection(db, 'products'), where('sellerId', '==', user.uid));
@@ -63,13 +66,19 @@ export default function SellerDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
+    let isMounted = true;
     Promise.resolve().then(() => {
-      fetchSellerData();
+      if (isMounted) {
+        fetchSellerData();
+      }
     });
-  }, [user]);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchSellerData]);
 
   const handleWithdrawalRequest = () => {
     toast.success("Payout withdrawal request submitted to ISAR Admin!");
@@ -101,14 +110,14 @@ export default function SellerDashboard() {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => { setLoading(true); fetchSellerData(); }}
-            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2"
+            className="p-2.5 bg-white border border-gray-200 rounded-xl text-navy hover:text-primary transition-colors text-xs font-bold shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
 
           <Link
             to="/admin/products/add"
-            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2"
+            className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add New Item
           </Link>
@@ -175,7 +184,7 @@ export default function SellerDashboard() {
               </div>
               <button
                 onClick={handleWithdrawalRequest}
-                className="mt-3 w-full py-2 px-3 bg-brand-green hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                className="mt-3 w-full py-2 px-3 bg-brand-green hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <CreditCard className="w-4 h-4" /> Request Payout
               </button>

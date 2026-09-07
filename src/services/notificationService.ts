@@ -41,10 +41,8 @@ export const sendOrderConfirmationSMS = async (
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const message = `ISAR: Dear Customer, your order #${orderNumber} of Tk.${totalAmount.toLocaleString()} has been confirmed. Thank you for shopping with us!`;
 
-    // ১. ব্যাকএন্ডের মাধ্যমে সরাসরি এসএমএস পাঠানো
     await triggerServerlessSMS(cleanPhone, message);
 
-    // ২. ফায়ারস্টোর নোটিফিকেশন লগে সংরক্ষণ
     await addDoc(notificationsRef, {
       type: 'order_confirmation_sms',
       recipient: cleanPhone,
@@ -54,7 +52,6 @@ export const sendOrderConfirmationSMS = async (
       createdAt: serverTimestamp(),
     });
 
-    console.log(`[Order Confirmation SMS Dispatched to ${cleanPhone}]`);
     return true;
   } catch (error) {
     console.error('Error sending order confirmation SMS:', error);
@@ -75,10 +72,8 @@ export const sendCourierTrackingSMS = async (
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const message = `ISAR: Your order #${orderNumber} is on the way via ${courierName}! Tracking Code: ${trackingCode}. Track at: steadfast.com.bd/t/${trackingCode}`;
 
-    // ১. ব্যাকএন্ডের মাধ্যমে ট্র্যাকিং এসএমএস পাঠানো
     await triggerServerlessSMS(cleanPhone, message);
 
-    // ২. ফায়ারস্টোর নোটিফিকেশন লগে সংরক্ষণ
     await addDoc(notificationsRef, {
       type: 'courier_tracking_sms',
       recipient: cleanPhone,
@@ -90,7 +85,6 @@ export const sendCourierTrackingSMS = async (
       createdAt: serverTimestamp(),
     });
 
-    console.log(`[Courier Tracking SMS Dispatched to ${cleanPhone}]`);
     return true;
   } catch (error) {
     console.error('Error sending courier tracking SMS:', error);
@@ -99,32 +93,62 @@ export const sendCourierTrackingSMS = async (
 };
 
 /**
- * কাস্টমারকে স্বয়ংক্রিয় ইমেইল ইনভয়েস (Email) পাঠানোর ফাংশন
+ * কাস্টমারকে আসল Nodemailer ইমেইল ইনভয়েস (/api/email) পাঠানোর ফাংশন
  */
 export const sendOrderConfirmationEmail = async (order: Order): Promise<boolean> => {
   try {
-    const emailContent = `
-      Dear ${order.customerName},
-      Thank you for your order on ISAR Marketplace.
-      Order Number: ${order.orderNumber}
-      Total Amount: BDT ${order.totalAmount.toLocaleString()}
-      Delivery Address: ${order.shippingAddress?.fullAddress}, ${order.shippingAddress?.district}
-      Payment Method: ${order.paymentMethod?.toUpperCase()}
-    `;
+    // ১. Vercel Serverless Email Proxy কল করা
+    const res = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'order_confirmation',
+        order: {
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail || 'customer@gmail.com',
+          customerPhone: order.customerPhone,
+          shippingAddress: {
+            fullAddress: order.shippingAddress.fullAddress,
+            upazila: order.shippingAddress.upazila,
+            district: order.shippingAddress.district,
+            division: order.shippingAddress.division,
+          },
+          items: order.items.map((item) => ({
+            productName: item.productName,
+            price: item.price,
+            quantity: item.quantity,
+            image: item.image,
+          })),
+          subtotal: order.subtotal,
+          deliveryFee: order.deliveryFee,
+          discount: order.discount || 0,
+          totalAmount: order.totalAmount,
+          paidAmount: order.paidAmount,
+          dueAmount: order.dueAmount,
+          transactionId: order.transactionId,
+        },
+      }),
+    });
 
+    const result = await res.json();
+    if (!res.ok) {
+      console.warn('Email proxy response warning:', result.message);
+    }
+
+    // ২. ফায়ারস্টোরে নোটিফিকেশন লগ সংরক্ষণ
     await addDoc(notificationsRef, {
       type: 'email',
-      recipient: order.customerEmail || 'customer@isar.com.bd',
+      recipient: order.customerEmail || 'customer@gmail.com',
       orderNumber: order.orderNumber,
-      subject: `Order Confirmation - #${order.orderNumber}`,
-      message: emailContent,
-      status: 'sent',
+      subject: `Order Confirmation #${order.orderNumber} - ISAR`,
+      status: res.ok ? 'sent' : 'failed',
       createdAt: serverTimestamp(),
     });
 
-    return true;
+    return res.ok;
   } catch (error) {
-    console.error('Error recording customer Email notification:', error);
+    console.warn('Email dispatch network warning:', error);
     return false;
   }
 };
@@ -134,20 +158,27 @@ export const sendOrderConfirmationEmail = async (order: Order): Promise<boolean>
  */
 export const sendAdminOrderAlert = async (order: Order): Promise<boolean> => {
   try {
-    const adminAlertMessage = `New Order Received! #${order.orderNumber} by ${order.customerName} (Phone: ${order.customerPhone}) for Tk.${order.totalAmount?.toLocaleString()}`;
+    await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'admin_alert',
+        order,
+      }),
+    }).catch(() => {});
 
     await addDoc(notificationsRef, {
       type: 'admin_alert',
       recipient: 'admin@isar.com.bd',
       orderNumber: order.orderNumber,
-      message: adminAlertMessage,
+      message: `New Order Received #${order.orderNumber} from ${order.customerName} (Total: ${order.totalAmount} BDT)`,
       status: 'unread',
       createdAt: serverTimestamp(),
     });
 
     return true;
   } catch (error) {
-    console.error('Error recording admin alert:', error);
+    console.warn('Admin alert notification warning:', error);
     return false;
   }
 };
