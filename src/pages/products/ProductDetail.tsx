@@ -94,7 +94,7 @@ export default function ProductDetail() {
       toast.error('This item is currently sold out');
       return;
     }
-    clearCart();
+    clearCart(); // 🔴 আগের সব কার্ট খালি করে শুধু এই প্রোডাক্টটি নিয়ে চেকআউটে যাবে
     addItemToCart(product, quantity);
     navigate('/checkout', {
       state: { from: product.name, path: `/products/${product.id}` },
