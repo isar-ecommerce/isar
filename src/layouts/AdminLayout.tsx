@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, Outlet, Link, useNavigate, Navigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -14,25 +14,56 @@ import {
   ExternalLink, 
   ShieldCheck, 
   FileText,
-  Ticket
+  Ticket,
+  PhoneCall,
+  Loader2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/authStore';
 import { logoutUser } from '../firebase/auth';
 import BrandLogo from '../components/common/BrandLogo';
 
 export default function AdminLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
-  const { user } = useAuthStore();
+  const { user, isAuthenticated, isLoading } = useAuthStore();
   const navigate = useNavigate();
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !isAdmin) {
+      toast.error('Access Denied: You do not have admin privileges');
+    }
+  }, [isLoading, isAuthenticated, isAdmin]);
 
   const handleLogout = async () => {
     await logoutUser();
     navigate('/login');
   };
 
+  // ১. অথেনটিকেশন লোডিং চেক
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-secondary">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // ২. লগইন না থাকলে লগইন পেজে পাঠান
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // ৩. অ্যাডমিন না হলে হোমপেজে পাঠান
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, end: true },
     { name: 'Manage Orders', path: '/admin/orders', icon: ShoppingCart },
+    { name: 'Abandoned Carts', path: '/admin/abandoned-carts', icon: PhoneCall },
     { name: 'Promo Coupons', path: '/admin/coupons', icon: Ticket },
     { name: 'All Products', path: '/admin/products', icon: ShoppingBag, end: true },
     { name: 'Add Product', path: '/admin/products/add', icon: PlusCircle },
@@ -48,7 +79,7 @@ export default function AdminLayout() {
       {/* Sidebar for Desktop */}
       <aside className="hidden lg:flex flex-col w-64 bg-navy text-white border-r border-navy-light shrink-0">
         
-        {/* Admin Brand Header with Dynamic Logo */}
+        {/* Admin Brand Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-navy-light bg-navy-light/30">
           <div className="flex items-center gap-2">
             <BrandLogo adminMode={true} to="/admin" />
@@ -80,7 +111,7 @@ export default function AdminLayout() {
           })}
         </nav>
 
-        {/* Sidebar Footer / Quick Link to Store */}
+        {/* Sidebar Footer */}
         <div className="p-4 border-t border-navy-light">
           <Link
             to="/"
@@ -96,7 +127,7 @@ export default function AdminLayout() {
 
       </aside>
 
-      {/* Mobile Sidebar Modal / Overlay */}
+      {/* Mobile Sidebar */}
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileSidebarOpen(false)} />
@@ -149,7 +180,7 @@ export default function AdminLayout() {
             <h1 className="text-lg font-bold text-navy hidden sm:block">Control Panel</h1>
           </div>
 
-          {/* User Profile & Actions */}
+          {/* User Profile */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-bold text-sm">
@@ -173,7 +204,7 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        {/* Page View Container */}
+        {/* Page View Container (সরাসরি কন্টেন্ট লোড হবে) */}
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
           <Outlet />
         </main>

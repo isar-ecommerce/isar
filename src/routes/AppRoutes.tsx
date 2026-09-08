@@ -1,187 +1,98 @@
-import { useState } from 'react';
-import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ShoppingBag, 
-  PlusCircle, 
-  ShoppingCart, 
-  FolderTree, 
-  Users, 
-  Settings, 
-  LogOut, 
-  Menu, 
-  X, 
-  ExternalLink, 
-  ShieldCheck, 
-  FileText,
-  Ticket,
-  PhoneCall
-} from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
-import { logoutUser } from '../firebase/auth';
-import BrandLogo from '../components/common/BrandLogo';
+import { Routes, Route } from 'react-router-dom';
 
-export default function AdminLayout() {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
-  const { user } = useAuthStore();
-  const navigate = useNavigate();
+// লেআউট এবং সিকিউরিটি গার্ডস
+import MainLayout from '../layouts/MainLayout';
+import ProtectedRoute from './ProtectedRoute';
+import AdminLayout from '../layouts/AdminLayout';
 
-  const handleLogout = async () => {
-    await logoutUser();
-    navigate('/login');
-  };
+// পাবলিক ও কাস্টমার পেজসমূহ
+import Home from '../pages/home/Home';
+import Products from '../pages/products/Products';
+import ProductDetail from '../pages/products/ProductDetail';
+import Categories from '../pages/categories/Categories';
+import Cart from '../pages/cart/Cart';
+import Checkout from '../pages/checkout/Checkout';
+import Orders from '../pages/orders/Orders';
+import Login from '../pages/auth/Login';
+import Register from '../pages/auth/Register';
+import Profile from '../pages/profile/Profile';
+import LegalPage from '../pages/legal/LegalPage';
 
-  const navItems = [
-    { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, end: true },
-    { name: 'Manage Orders', path: '/admin/orders', icon: ShoppingCart },
-    { name: 'Abandoned Carts', path: '/admin/abandoned-carts', icon: PhoneCall },
-    { name: 'Promo Coupons', path: '/admin/coupons', icon: Ticket },
-    { name: 'All Products', path: '/admin/products', icon: ShoppingBag, end: true },
-    { name: 'Add Product', path: '/admin/products/add', icon: PlusCircle },
-    { name: 'Categories', path: '/admin/categories', icon: FolderTree },
-    { name: 'Manage Sellers', path: '/admin/sellers', icon: Users },
-    { name: 'Legal Pages CMS', path: '/admin/legal', icon: FileText },
-    { name: 'Website Settings', path: '/admin/settings', icon: Settings },
-  ];
+// অর্ডার কনফার্মেশন ও ইনভয়েস পেজ
+import OrderSuccess from '../components/checkout/OrderSuccess';
 
+// সেলার মার্কেটপ্লেস পেজ
+import SellerDashboard from '../pages/seller/SellerDashboard';
+
+// অ্যাডমিন পেজসমূহ
+import AdminDashboard from '../pages/admin/AdminDashboard';
+import AdminOrders from '../pages/admin/AdminOrders';
+import AdminAbandonedCarts from '../pages/admin/AdminAbandonedCarts';
+import AdminCoupons from '../pages/admin/AdminCoupons';
+import AdminProducts from '../pages/admin/AdminProducts';
+import AdminAddProduct from '../pages/admin/AdminAddProduct';
+import AdminCategories from '../pages/admin/AdminCategories';
+import AdminSellers from '../pages/admin/AdminSellers';
+import AdminLegalCMS from '../pages/admin/AdminLegalCMS';
+import AdminSettings from '../pages/admin/AdminSettings';
+
+// 404 পেজ
+const NotFound = () => (
+  <div className="flex flex-col items-center justify-center min-h-[60vh]">
+    <h2 className="text-4xl font-bold text-slate-900 mb-2">404</h2>
+    <p className="text-slate-500">Page Not Found</p>
+  </div>
+);
+
+export default function AppRoutes() {
   return (
-    <div className="min-h-screen bg-secondary flex">
-      
-      {/* Sidebar for Desktop */}
-      <aside className="hidden lg:flex flex-col w-64 bg-navy text-white border-r border-navy-light shrink-0">
+    <Routes>
+      {/* Main Layout এর আন্ডারে থাকা পাবলিক ও কাস্টমার রাউটস */}
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/categories" element={<Categories />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/order-success" element={<OrderSuccess />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        {/* লিগ্যাল ও পলিসি রাউটস */}
+        <Route path="/privacy-policy" element={<LegalPage />} />
+        <Route path="/terms" element={<LegalPage />} />
+        <Route path="/refund-policy" element={<LegalPage />} />
+        <Route path="/return-policy" element={<LegalPage />} />
+        <Route path="/shipping-policy" element={<LegalPage />} />
+        <Route path="/about-us" element={<LegalPage />} />
+        <Route path="/faq" element={<LegalPage />} />
         
-        {/* Admin Brand Header with Dynamic Logo */}
-        <div className="h-16 flex items-center justify-between px-6 border-b border-navy-light bg-navy-light/30">
-          <div className="flex items-center gap-2">
-            <BrandLogo adminMode={true} to="/admin" />
-            <span className="text-[10px] uppercase font-bold bg-primary text-white px-2 py-0.5 rounded">Admin</span>
-          </div>
-        </div>
+        {/* প্রটেক্টেড কাস্টমার ও সেলার রাউটস */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/seller" element={<SellerDashboard />} />
+        </Route>
 
-        {/* Navigation Links */}
-        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.end}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition-all ${
-                    isActive 
-                      ? 'bg-primary text-white shadow-md' 
-                      : 'text-gray-300 hover:bg-navy-light hover:text-white'
-                  }`
-                }
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                <span>{item.name}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
+        {/* 404 পেজ */}
+        <Route path="*" element={<NotFound />} />
+      </Route>
 
-        {/* Sidebar Footer / Quick Link to Store */}
-        <div className="p-4 border-t border-navy-light">
-          <Link
-            to="/"
-            target="_blank"
-            className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-gray-300 transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <ExternalLink className="w-4 h-4 text-primary-light" /> Live Store
-            </span>
-            <span className="text-[10px] text-gray-400">View site</span>
-          </Link>
-        </div>
-
-      </aside>
-
-      {/* Mobile Sidebar Modal / Overlay */}
-      {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileSidebarOpen(false)} />
-          <aside className="relative w-64 bg-navy text-white h-full flex flex-col z-10 shadow-2xl">
-            <div className="h-16 flex items-center justify-between px-6 border-b border-navy-light">
-              <BrandLogo adminMode={true} to="/admin" />
-              <button onClick={() => setIsMobileSidebarOpen(false)} className="text-gray-400 hover:text-white cursor-pointer">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    end={item.end}
-                    onClick={() => setIsMobileSidebarOpen(false)}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all ${
-                        isActive ? 'bg-primary text-white' : 'text-gray-300 hover:bg-navy-light'
-                      }`
-                    }
-                  >
-                    <Icon className="w-5 h-5 shrink-0" />
-                    <span>{item.name}</span>
-                  </NavLink>
-                );
-              })}
-            </nav>
-          </aside>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        
-        {/* Top Header */}
-        <header className="h-16 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between px-4 lg:px-8 sticky top-0 z-40">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden p-2 text-navy hover:text-primary transition-colors cursor-pointer"
-              aria-label="Open sidebar"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-            <h1 className="text-lg font-bold text-navy hidden sm:block">Control Panel</h1>
-          </div>
-
-          {/* User Profile & Actions */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-bold text-sm">
-                {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
-              </div>
-              <div className="hidden sm:block text-left">
-                <span className="block text-xs font-bold text-navy">{user?.displayName || 'Admin'}</span>
-                <span className="text-[10px] font-semibold text-brand-green flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> {user?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
-
-        {/* Page View Container */}
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          <Outlet />
-        </main>
-
-      </div>
-
-    </div>
+      {/* সরাসরি ক্লিন অ্যাডমিন রাউটস (ডাবল আউলেটের জট সম্পূর্ণ মুক্ত) */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="orders" element={<AdminOrders />} />
+        <Route path="abandoned-carts" element={<AdminAbandonedCarts />} />
+        <Route path="coupons" element={<AdminCoupons />} />
+        <Route path="products" element={<AdminProducts />} />
+        <Route path="products/add" element={<AdminAddProduct />} />
+        <Route path="products/edit/:id" element={<AdminAddProduct />} />
+        <Route path="categories" element={<AdminCategories />} />
+        <Route path="sellers" element={<AdminSellers />} />
+        <Route path="legal" element={<AdminLegalCMS />} />
+        <Route path="settings" element={<AdminSettings />} />
+      </Route>
+    </Routes>
   );
 }
