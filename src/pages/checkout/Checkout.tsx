@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
   ShieldCheck, 
   MapPin, 
-  CreditCard, 
   Loader2, 
   ArrowLeft, 
   Lock, 
@@ -37,12 +36,11 @@ import {
   getDistrictsByDivision, 
   getUpazilasByDistrict 
 } from '../../data/bangladeshGeoData';
-import type { ShippingAddress, PaymentMethod } from '../../types/order';
+import type { ShippingAddress } from '../../types/order';
 
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -75,9 +73,7 @@ export default function Checkout() {
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
   const [couponCodeInput, setCouponCodeInput] = useState<string>('');
   const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
 
@@ -137,83 +133,6 @@ export default function Checkout() {
     };
   }, [user?.uid]);
 
-  // Official bKash Tokenized Callback Listener
-  useEffect(() => {
-    const paymentID = searchParams.get('paymentID');
-    const status = searchParams.get('status');
-
-    if (paymentID && status === 'success') {
-      const pendingDataStr = sessionStorage.getItem('isar_pending_order');
-      if (!pendingDataStr) return;
-
-      const executePayment = async () => {
-        try {
-          setIsSubmitting(true);
-          const toastId = toast.loading('Verifying official bKash payment...');
-
-          const execRes = await fetch('/api/bkash', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'execute-payment', paymentID }),
-          });
-
-          const execData = await execRes.json();
-          toast.dismiss(toastId);
-
-          if (execRes.ok && execData.success && execData.trxID) {
-            const pendingOrder = JSON.parse(pendingDataStr);
-            sessionStorage.removeItem('isar_pending_order');
-
-            const order = await createOrder({
-              ...pendingOrder,
-              paymentStatus: 'paid',
-              paidAmount: pendingOrder.totalAmount,
-              dueAmount: 0,
-              paymentMethod: 'bkash',
-              transactionId: execData.trxID,
-            });
-
-            if (pendingOrder.couponId) {
-              incrementCouponUsage(pendingOrder.couponId);
-            }
-
-            await Promise.allSettled([
-              sendOrderConfirmationSMS(order.customerPhone, order.orderNumber, order.totalAmount),
-              sendOrderConfirmationEmail(order),
-              sendAdminOrderAlert(order),
-            ]);
-
-            clearCart();
-            toast.success(`bKash payment successful! TrxID: ${execData.trxID}`);
-
-            navigate('/order-success', {
-              state: {
-                order: {
-                  ...order,
-                  paymentStatus: 'paid',
-                  paidAmount: pendingOrder.totalAmount,
-                  dueAmount: 0,
-                  totalAmount: pendingOrder.totalAmount,
-                },
-              },
-            });
-          } else {
-            toast.error(execData.message || 'Payment execution failed.');
-          }
-        } catch (err) {
-          console.error('Execute error:', err);
-          toast.error('Payment verification failed.');
-        } finally {
-          setIsSubmitting(false);
-        }
-      };
-
-      executePayment();
-    } else if (status === 'cancel' || status === 'failure') {
-      toast.error('bKash payment was cancelled or failed.');
-    }
-  }, [searchParams, navigate, clearCart]);
-
   // Live dynamic weight & delivery charge calculation based on current items
   const totalWeight = useMemo(() => {
     return items.reduce((sum, item) => {
@@ -235,11 +154,11 @@ export default function Checkout() {
   }, [subtotal, deliveryFee, discount]);
 
   useEffect(() => {
-    if (items.length === 0 && !searchParams.get('paymentID')) {
+    if (items.length === 0) {
       toast.error('Your cart is empty');
       navigate('/cart');
     }
-  }, [items, navigate, searchParams]);
+  }, [items, navigate]);
 
   const handleDivisionChange = (newDivision: string) => {
     setDivision(newDivision);
@@ -340,62 +259,19 @@ export default function Checkout() {
 
     try {
       setIsSubmitting(true);
-      const generatedOrderNumber = `ISAR-${Date.now().toString().slice(-6)}`;
 
+      // email বাদ দিয়ে সঠিক ShippingAddress অবজেক্ট গঠন
       const shippingAddress: ShippingAddress = {
         fullName: fullName.trim(),
         phone: phone.trim(),
-        alternatePhone: alternatePhone.trim() || undefined,
+        alternatePhone: alternatePhone.trim() || '',
+      
         division,
         district,
         upazila,
         fullAddress: fullAddress.trim(),
-        deliveryNotes: deliveryNotes.trim() || undefined,
+        deliveryNotes: deliveryNotes.trim() || '',
       };
-
-      if (paymentMethod === 'bkash') {
-        sessionStorage.setItem('isar_pending_order', JSON.stringify({
-          userId: user?.uid || 'guest-user',
-          customerName: fullName.trim(),
-          customerEmail: email.trim(),
-          customerPhone: phone.trim(),
-          shippingAddress,
-          deliveryZone,
-          totalWeight: Number(totalWeight.toFixed(2)),
-          cartItems: items,
-          subtotal,
-          deliveryFee,
-          discount,
-          couponCode: appliedCoupon?.code,
-          couponId: (appliedCoupon as { id?: string })?.id,
-          totalAmount: total,
-          paymentMethod: 'bkash',
-          paymentStatus: 'paid',
-          paidAmount: total,
-          dueAmount: 0,
-          orderNumber: generatedOrderNumber,
-        }));
-
-        const res = await fetch('/api/bkash', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'create-payment',
-            amount: total,
-            orderNumber: generatedOrderNumber,
-            callbackURL: `${window.location.origin}/checkout?bkash_callback=true`,
-          }),
-        });
-
-        const data = await res.json();
-        if (res.ok && data.success && data.bkashURL) {
-          window.location.assign(data.bkashURL);
-          return;
-        } else {
-          toast.error(data.message || 'Failed to connect to bKash Gateway.');
-          return;
-        }
-      }
 
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
@@ -410,6 +286,7 @@ export default function Checkout() {
         deliveryFee,
         discount,
         couponCode: appliedCoupon?.code,
+        couponId: (appliedCoupon as { id?: string })?.id,
         totalAmount: total,
         paymentMethod: 'cod',
         paymentStatus: 'pending',
@@ -459,7 +336,7 @@ export default function Checkout() {
     <div className="bg-secondary min-h-screen py-6 sm:py-10">
       <Helmet>
         <title>Checkout | ISAR Marketplace</title>
-        <meta name="description" content="Complete your purchase with Cash on Delivery or bKash at ISAR." />
+        <meta name="description" content="Complete your purchase with 100% Cash on Delivery at ISAR." />
       </Helmet>
 
       <div className="container mx-auto px-4 max-w-6xl">
@@ -628,84 +505,40 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Payment Methods Card */}
+            {/* Payment Methods Card - 100% Cash on Delivery Only */}
             <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-modern border border-gray-100 space-y-4">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-                <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green font-bold">
-                  <CreditCard className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 font-bold">
+                  <Banknote className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-navy">Payment Method</h2>
-                  <p className="text-xs text-gray-500">Choose your preferred payment option</p>
+                  <p className="text-xs text-gray-500">Pay safely with Cash on Delivery</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                
-                {/* Cash on Delivery */}
-                <label 
-                  className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                    paymentMethod === 'cod' 
-                      ? 'border-navy bg-slate-50 shadow-xs' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
+                {/* Cash on Delivery Card (Selected by Default) */}
+                <div className="flex items-center justify-between p-4.5 rounded-2xl border-2 border-navy bg-slate-50 shadow-xs">
                   <div className="flex items-center gap-3.5">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="cod"
-                      checked={paymentMethod === 'cod'}
-                      onChange={() => setPaymentMethod('cod')}
-                      className="w-4 h-4 text-navy focus:ring-navy cursor-pointer"
-                    />
-                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                      <Banknote className="w-5 h-5" />
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                      <Banknote className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="font-black text-sm text-navy block">Cash on Delivery</span>
-                      <span className="text-xs text-gray-500">Zero advance payment. Pay full amount when receiving parcel.</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm text-navy block">Cash on Delivery</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                          Zero Advance
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-600 block mt-0.5">
+                        পণ্য হাতে পেয়ে পুরো টাকা ডেলিভারিম্যানকে পরিশোধ করুন। কোনো অগ্রিম পেমেন্ট নেই।
+                      </span>
                     </div>
                   </div>
 
-                  {paymentMethod === 'cod' && (
-                    <CheckCircle2 className="w-5 h-5 text-navy shrink-0" />
-                  )}
-                </label>
-
-                {/* bKash Payment */}
-                <label 
-                  className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                    paymentMethod === 'bkash' 
-                      ? 'border-[#E2136E] bg-pink-50/50 shadow-xs' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="bkash"
-                      checked={paymentMethod === 'bkash'}
-                      onChange={() => setPaymentMethod('bkash')}
-                      className="w-4 h-4 text-[#E2136E] focus:ring-[#E2136E] cursor-pointer"
-                    />
-                    <div className="w-9 h-9 rounded-xl bg-[#E2136E] p-1.5 flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 32 32" className="w-full h-full" fill="none">
-                        <path d="M19.5 3L8 16.5L14.5 18L12 29L26 14.5L18.5 13.5L19.5 3Z" fill="white" />
-                      </svg>
-                    </div>
-                    <div>
-                      <span className="font-black text-sm text-[#E2136E] block">bKash Online Payment</span>
-                      <span className="text-xs text-gray-500">Pay 100% total order amount online via official bKash gateway.</span>
-                    </div>
-                  </div>
-
-                  {paymentMethod === 'bkash' && (
-                    <CheckCircle2 className="w-5 h-5 text-[#E2136E] shrink-0" />
-                  )}
-                </label>
-
+                  <CheckCircle2 className="w-6 h-6 text-navy shrink-0" />
+                </div>
               </div>
 
             </div>
@@ -724,7 +557,7 @@ export default function Checkout() {
                 </span>
               </div>
 
-              {/* Items List with Live + / - Quantity Controls on Checkout */}
+              {/* Items List with Live + / - Quantity Controls */}
               <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
                 {items.map((item, idx) => {
                   const maxStock = Math.max(1, item.product.stock || 1);
@@ -890,18 +723,14 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock className="w-4 h-4" /> 
-                    <span>
-                      {paymentMethod === 'bkash' 
-                        ? `Pay ${total.toLocaleString()} BDT with bKash` 
-                        : `Confirm Order (${total.toLocaleString()} BDT)`}
-                    </span>
+                    <span>Confirm Order ({total.toLocaleString()} BDT)</span>
                   </>
                 )}
               </button>
 
               <div className="flex items-center justify-center gap-2 text-[11px] text-gray-400 font-medium">
                 <ShieldCheck className="w-4 h-4 text-brand-green" />
-                <span>Encrypted & Safe Checkout</span>
+                <span>Encrypted & Safe Cash on Delivery</span>
               </div>
 
             </div>
