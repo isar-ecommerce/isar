@@ -10,7 +10,7 @@ import {
   ShoppingCart, 
   MapPin 
 } from 'lucide-react';
-import { collection, getDocs, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 import { db } from '../../firebase/config';
@@ -41,23 +41,36 @@ export default function AdminAbandonedCarts() {
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // React 19 Pure Render Compliance: Date.now() স্টেট হিসেবে সেফলি সংরক্ষিত
   const [currentTime] = useState<number>(() => Date.now());
 
+  const getTimestampMs = (val: unknown): number => {
+    if (!val) return 0;
+    if (val instanceof Date) return val.getTime();
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') return new Date(val).getTime();
+    if (typeof val === 'object' && val !== null && 'toDate' in val) {
+      return ((val as { toDate: () => Date }).toDate()).getTime();
+    }
+    return 0;
+  };
+
+  // ইনডেক্স এরর ছাড়া নিরাপদে ড্রাফট কার্ট ফেচ
   const fetchAbandonedCarts = useCallback(async () => {
     try {
       setLoading(true);
-      const q = query(collection(db, 'abandoned_carts'), orderBy('updatedAt', 'desc'));
-      const snap = await getDocs(q);
+      const snap = await getDocs(collection(db, 'abandoned_carts'));
       const list = snap.docs.map(d => ({
         id: d.id,
         ...d.data()
       })) as AbandonedCartItem[];
 
-      setCarts(list);
-    } catch (err) {
-      console.error('Error fetching abandoned carts:', err);
-      toast.error('Failed to load abandoned carts');
+      // জাভাস্ক্রিপ্ট মেমোরিতে লেটেস্ট টাইম অনুযায়ী নিখুঁত সাজানো
+      const sorted = list.sort((a, b) => getTimestampMs(b.updatedAt) - getTimestampMs(a.updatedAt));
+      setCarts(sorted);
+    } catch (err: unknown) {
+      console.warn('Note on abandoned carts load:', err);
+      // পারমিশন সিঙ্ক চলাকালীন ফলব্যাক হিসেবে ফাঁকা তালিকা রাখবে
+      setCarts([]);
     } finally {
       setLoading(false);
     }
@@ -167,7 +180,7 @@ export default function AdminAbandonedCarts() {
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Customers who typed their details but didn't confirm order. Call them or send a free email reminder!
+            Customers who typed their details but didn't confirm order. Call them directly or send free email reminders!
           </p>
         </div>
 
