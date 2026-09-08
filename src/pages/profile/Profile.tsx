@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
   Package, 
-  Heart, 
   MapPin, 
   Camera,
   LogOut,
@@ -21,7 +20,6 @@ import { updateProfile } from 'firebase/auth';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 import { useAuthStore } from '../../store/authStore';
-import { useWishlistStore } from '../../store/wishlistStore';
 import { logoutUser } from '../../firebase/auth';
 import { uploadImageToCloudinary } from '../../cloudinary/upload';
 import { auth, db } from '../../firebase/config';
@@ -34,7 +32,6 @@ import {
 export default function Profile() {
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
-  const { items: wishlistItems } = useWishlistStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploading, setIsUploading] = useState(false);
@@ -61,14 +58,13 @@ export default function Profile() {
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
 
-  // ফায়ারস্টোর থেকে ইউজারের সেভড অ্যাড্রেস ও অর্ডার সংখ্যা লোড করা (React 19 সেফ)
+  // ফায়ারস্টোর থেকে ইউজারের সেভড অ্যাড্রেস ও অর্ডার সংখ্যা লোড করা
   useEffect(() => {
     let isMounted = true;
     if (!user?.uid) return;
 
     const loadUserProfileData = async () => {
       try {
-        // ১. সেভড অ্যাড্রেস ফেচ
         const userRef = doc(db, 'users', user.uid);
         const userSnap = await getDoc(userRef);
 
@@ -91,7 +87,6 @@ export default function Profile() {
           }
         }
 
-        // ২. ইউজারের মোট অর্ডার সংখ্যা ফেচ
         const q = query(collection(db, 'orders'), where('userId', '==', user.uid));
         const ordersSnap = await getDocs(q);
         if (isMounted) {
@@ -111,7 +106,6 @@ export default function Profile() {
     };
   }, [user?.uid, user?.displayName, user?.phoneNumber]);
 
-  // বিভাগ পরিবর্তন হ্যান্ডলার
   const handleDivisionChange = (newDivision: string) => {
     setDivision(newDivision);
     const districts = getDistrictsByDivision(newDivision);
@@ -125,7 +119,6 @@ export default function Profile() {
     setUpazila(upazilas[0] || '');
   };
 
-  // জেলা পরিবর্তন হ্যান্ডলার
   const handleDistrictChange = (newDistrict: string) => {
     setDistrict(newDistrict);
     const upazilas = getUpazilasByDistrict(division, newDistrict);
@@ -133,13 +126,11 @@ export default function Profile() {
     setUpazila(upazilas[0] || '');
   };
 
-  // লগআউট
   const handleLogout = async () => {
     await logoutUser();
     navigate('/login');
   };
 
-  // প্রোফাইল ছবি আপলোড (Cloudinary)
   const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -181,7 +172,6 @@ export default function Profile() {
     }
   };
 
-  // ব্যক্তিগত তথ্য সেভ করা
   const handleSavePersonalInfo = async (e: FormEvent) => {
     e.preventDefault();
     if (!editName.trim()) {
@@ -216,7 +206,6 @@ export default function Profile() {
     }
   };
 
-  // ৩-টিয়ার ডেলিভারি ঠিকানা সেভ করা
   const handleSaveDeliveryAddress = async (e: FormEvent) => {
     e.preventDefault();
     if (!addressFullName.trim() || !addressPhone.trim() || !fullAddress.trim()) {
@@ -272,7 +261,7 @@ export default function Profile() {
 
       <div className="container mx-auto px-4 max-w-6xl space-y-8">
         
-        {/* Page Title & Breadcrumb */}
+        {/* Page Title */}
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-navy">My Account</h1>
           <p className="text-xs text-gray-500 mt-1">Manage your profile information, delivery address book, and order history</p>
@@ -280,10 +269,9 @@ export default function Profile() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
           
-          {/* Left Column: Profile Card & Quick Nav */}
+          {/* Left Column */}
           <div className="lg:col-span-1 space-y-6">
             
-            {/* User Profile Card */}
             <div className="bg-white rounded-3xl shadow-modern p-6 text-center border border-gray-100 relative">
               <div className="relative inline-block mb-4">
                 <div className="w-24 h-24 rounded-full bg-primary/10 mx-auto flex items-center justify-center border-4 border-white shadow-md overflow-hidden relative group">
@@ -326,11 +314,10 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Quick Navigation Links */}
+            {/* Quick Navigation Links (Wishlist সম্পূর্ণ অপসারিত) */}
             <div className="bg-white rounded-3xl shadow-modern overflow-hidden border border-gray-100">
               <nav className="flex flex-col divide-y divide-gray-50">
                 
-                {/* Admin Shortcut if Admin */}
                 {isAdmin && (
                   <Link 
                     to="/admin"
@@ -355,17 +342,6 @@ export default function Profile() {
                   <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
                 </Link>
 
-                <Link 
-                  to="/wishlist"
-                  className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors text-navy font-bold text-xs group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <Heart className="w-4 h-4 text-red-500" />
-                    <span>My Wishlist ({wishlistItems.length})</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-                </Link>
-
                 <button 
                   onClick={handleLogout}
                   className="flex items-center gap-3 px-5 py-4 hover:bg-red-50 text-red-600 font-bold text-xs transition-colors text-left w-full cursor-pointer"
@@ -378,10 +354,10 @@ export default function Profile() {
 
           </div>
 
-          {/* Right Column: Information & Saved 3-Tier Address Book */}
+          {/* Right Column */}
           <div className="lg:col-span-3 space-y-6">
             
-            {/* 1. Personal Information Card */}
+            {/* Personal Information */}
             <div className="bg-white rounded-3xl shadow-modern p-6 sm:p-8 border border-gray-100 space-y-6">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div>
@@ -470,7 +446,7 @@ export default function Profile() {
               )}
             </div>
 
-            {/* 2. Saved 3-Tier Delivery Address Book Card */}
+            {/* Saved Delivery Address Book */}
             <div className="bg-white rounded-3xl shadow-modern p-6 sm:p-8 border border-gray-100 space-y-6">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div>
@@ -534,7 +510,6 @@ export default function Profile() {
                 <form onSubmit={handleSaveDeliveryAddress} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     
-                    {/* Full Name */}
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-navy">Recipient Name *</label>
                       <input
@@ -547,7 +522,6 @@ export default function Profile() {
                       />
                     </div>
 
-                    {/* Phone Number */}
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-navy">Mobile Number (11 Digits) *</label>
                       <input
@@ -560,7 +534,6 @@ export default function Profile() {
                       />
                     </div>
 
-                    {/* Division */}
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-navy">বিভাগ (Division) *</label>
                       <select
@@ -574,7 +547,6 @@ export default function Profile() {
                       </select>
                     </div>
 
-                    {/* District */}
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-navy">জেলা (District) *</label>
                       <select
@@ -588,7 +560,6 @@ export default function Profile() {
                       </select>
                     </div>
 
-                    {/* Upazila / Thana */}
                     <div className="space-y-1 sm:col-span-2">
                       <label className="text-xs font-bold text-navy">থানা / উপজেলা (Upazila / Thana) *</label>
                       <select
@@ -602,7 +573,6 @@ export default function Profile() {
                       </select>
                     </div>
 
-                    {/* Full Address */}
                     <div className="space-y-1 sm:col-span-2">
                       <label className="text-xs font-bold text-navy">বিস্তারিত ঠিকানা (বাড়ি, রোড, এলাকা) *</label>
                       <textarea

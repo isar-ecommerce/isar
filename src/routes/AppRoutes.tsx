@@ -11,7 +11,6 @@ import Home from '../pages/home/Home';
 import Products from '../pages/products/Products';
 import ProductDetail from '../pages/products/ProductDetail';
 import Categories from '../pages/categories/Categories';
-import Wishlist from '../pages/wishlist/Wishlist';
 import Cart from '../pages/cart/Cart';
 import Checkout from '../pages/checkout/Checkout';
 import Orders from '../pages/orders/Orders';
@@ -56,7 +55,6 @@ export default function AppRoutes() {
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/categories" element={<Categories />} />
-        <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/order-success" element={<OrderSuccess />} />
