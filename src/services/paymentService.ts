@@ -36,7 +36,7 @@ interface BkashApiBackendResponse {
 }
 
 /**
- * ১. বিকাশ পেমেন্ট শুরু করার ফাংশন (Direct Server-to-Server Create Payment)
+ * ১. বিকাশ পেমেন্ট শুরু করার ফাংশন (Direct Serverless API Proxy: /api/bkash)
  */
 export const initiateBkashPayment = async (
   orderNumber: string,
@@ -69,7 +69,7 @@ export const initiateBkashPayment = async (
     };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('bKash payment initiation error:', errorMsg);
+    console.error('[PaymentService] bKash initiate error:', errorMsg);
     return {
       success: false,
       message: errorMsg || 'Could not connect to bKash gateway.',
@@ -105,7 +105,7 @@ export const verifyAndExecuteBkashPayment = async (
 
     const trxId = execData.trxID;
 
-    // ফায়ারস্টোরে পেমেন্ট সেভ ও অর্ডারের স্ট্যাটাস 'paid' করা
+    // ফায়ারস্টোরে পেমেন্ট সেভ ও অর্ডার স্ট্যাটাস 'paid' আপডেট
     await executeBkashPayment(orderId, orderNumber, amount, customerPhone, trxId);
 
     return {
@@ -115,14 +115,13 @@ export const verifyAndExecuteBkashPayment = async (
     };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('bKash payment verification error:', errorMsg);
-    // ESLint preserve-caught-error ফিক্স: ক্যাচে পাওয়া মূল 'error' সরাসরি cause হিসেবে দেওয়া হলো
+    console.error('[PaymentService] bKash verify error:', errorMsg);
     throw new Error(`bKash Verification Error: ${errorMsg}`, { cause: error });
   }
 };
 
 /**
- * ৩. ফায়ারস্টোর ডেটাবেসে বিকাশ পেমেন্ট ট্রানজেকশন রেকর্ড ও অর্ডার 'paid' আপডেট
+ * ৩. ফায়ারস্টোর ডেটাবেসে বিকাশ পেমেন্ট রেকর্ড ও অর্ডার 'paid' আপডেট
  */
 export const executeBkashPayment = async (
   orderId: string,
@@ -154,7 +153,7 @@ export const executeBkashPayment = async (
     const orderRef = doc(db, 'orders', orderId);
     await updateDoc(orderRef, {
       paymentStatus: 'paid',
-      transactionId: transactionId,
+      transactionId,
       paymentMethod: 'bkash',
       updatedAt: serverTimestamp(),
     });
@@ -162,27 +161,26 @@ export const executeBkashPayment = async (
     return {
       success: true,
       transactionId,
-      message: 'bKash payment completed and verified successfully!',
+      message: 'bKash payment completed and recorded successfully!',
     };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('bKash payment execution error:', errorMsg);
-    // ESLint preserve-caught-error ফিক্স
+    console.error('[PaymentService] bKash record error:', errorMsg);
     throw new Error(`bKash Execution Error: ${errorMsg}`, { cause: error });
   }
 };
 
 /**
- * ৪. নগদ পেমেন্ট রেকর্ড সার্ভিস (ম্যানুয়াল বা গেটওয়ে ট্রানজেকশন)
+ * ৪. ক্যাশ অন ডেলিভারি (Cash on Delivery) অর্ডার পেমেন্ট রেকর্ড
  */
-export const executeNagadPayment = async (
+export const recordCodOrderPayment = async (
   orderId: string,
   orderNumber: string,
   amount: number,
   customerPhone: string
 ): Promise<{ success: boolean; transactionId: string; message: string }> => {
   try {
-    const transactionId = `NGD${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
+    const transactionId = `COD-${Date.now().toString().slice(-6)}`;
 
     const paymentDocRef = doc(collection(db, 'payments'));
     const paymentData: PaymentTransaction = {
@@ -190,8 +188,8 @@ export const executeNagadPayment = async (
       orderId,
       orderNumber,
       amount,
-      method: 'nagad',
-      status: 'paid',
+      method: 'cod',
+      status: 'pending',
       transactionId,
       customerPhone,
       createdAt: serverTimestamp(),
@@ -199,23 +197,14 @@ export const executeNagadPayment = async (
 
     await setDoc(paymentDocRef, paymentData);
 
-    const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, {
-      paymentStatus: 'paid',
-      transactionId: transactionId,
-      paymentMethod: 'nagad',
-      updatedAt: serverTimestamp(),
-    });
-
     return {
       success: true,
       transactionId,
-      message: 'Nagad payment completed successfully!',
+      message: 'COD payment record initialized successfully!',
     };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('Nagad payment execution error:', errorMsg);
-    // ESLint preserve-caught-error ফিক্স
-    throw new Error(`Nagad Execution Error: ${errorMsg}`, { cause: error });
+    console.error('[PaymentService] COD record error:', errorMsg);
+    throw new Error(`COD Record Error: ${errorMsg}`, { cause: error });
   }
 };
