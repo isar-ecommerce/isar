@@ -10,7 +10,6 @@ import {
   Mail, 
   Plus, 
   Minus, 
-  Zap, 
   CheckCircle2, 
   ChevronDown, 
   Building, 
@@ -48,7 +47,6 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
   const [email, setEmail] = useState<string>(user?.email || '');
   const [phone, setPhone] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
-  const [paymentMode, setPaymentMode] = useState<'cod' | 'bkash'>('cod');
 
   const [division, setDivision] = useState<string>('Dhaka');
   const [district, setDistrict] = useState<string>('Dhaka');
@@ -124,61 +122,19 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
 
     try {
       setIsSubmitting(true);
-      const generatedOrderNumber = `ISAR-${Date.now().toString().slice(-6)}`;
 
       const shippingAddress: ShippingAddress = {
         fullName: fullName.trim(),
         phone,
+        alternatePhone: '',
         division,
         district,
         upazila,
         fullAddress: fullAddress.trim(),
+        deliveryNotes: '',
       };
 
-      // 1. Full bKash Online Payment Flow
-      if (paymentMode === 'bkash') {
-        sessionStorage.setItem('isar_pending_order', JSON.stringify({
-          userId: user?.uid || 'guest-user',
-          customerName: fullName.trim(),
-          customerEmail: email.trim(),
-          customerPhone: phone,
-          shippingAddress,
-          deliveryZone,
-          totalWeight,
-          cartItems: [{ product, quantity }],
-          subtotal,
-          deliveryFee,
-          discount: 0,
-          totalAmount,
-          paymentMethod: 'bkash',
-          paymentStatus: 'paid',
-          paidAmount: totalAmount,
-          dueAmount: 0,
-          orderNumber: generatedOrderNumber,
-        }));
-
-        const res = await fetch('/api/bkash', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'create-payment',
-            amount: totalAmount,
-            orderNumber: generatedOrderNumber,
-            callbackURL: `${window.location.origin}/checkout?bkash_callback=true`,
-          }),
-        });
-
-        const data = await res.json();
-        if (res.ok && data.success && data.bkashURL) {
-          window.location.assign(data.bkashURL);
-          return;
-        } else {
-          toast.error(data.message || 'Failed to connect to bKash Gateway.');
-          return;
-        }
-      }
-
-      // 2. Direct 1-Click Cash on Delivery (COD) Flow
+      // ১০০% ক্যাশ অন ডেলিভারি (COD) ফ্লো
       const order = await createOrder({
         userId: user?.uid || 'guest-user',
         customerName: fullName.trim(),
@@ -198,9 +154,11 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
         dueAmount: totalAmount,
       });
 
-      sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount);
-      sendOrderConfirmationEmail(order);
-      sendAdminOrderAlert(order);
+      await Promise.allSettled([
+        sendOrderConfirmationSMS(phone, order.orderNumber, totalAmount),
+        sendOrderConfirmationEmail(order),
+        sendAdminOrderAlert(order),
+      ]);
 
       toast.success(`Order placed successfully! Order ID: ${order.orderNumber}`);
       onClose();
@@ -410,68 +368,25 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
               </span>
             </div>
 
-            {/* Strict 2 Payment Methods */}
-            <div className="space-y-1 pt-0.5">
-              <span className="text-[10px] font-bold text-slate-700 block">
-                Payment Method:
-              </span>
-              
-              {/* Cash on Delivery (0 Advance) */}
-              <button
-                type="button"
-                onClick={() => setPaymentMode('cod')}
-                className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
-                  paymentMode === 'cod'
-                    ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-600/30'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                  <Banknote className="w-3 h-3" />
+            {/* 100% Cash on Delivery Only */}
+            <div className="p-2.5 rounded-xl border border-blue-600 bg-blue-50/70 shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <Banknote className="w-4 h-4" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-900">
-                      Cash on Delivery (COD)
-                    </span>
-                    <span className="text-[9px] font-extrabold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-slate-900">Cash on Delivery</span>
+                    <span className="text-[9px] font-extrabold bg-blue-600 text-white px-1.5 py-0.2 rounded">
                       Zero Advance
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                    Pay 0 BDT now. Pay total {totalAmount.toLocaleString()} BDT to delivery rider when parcel arrives.
+                  <span className="text-[10px] text-slate-600 block">
+                    পণ্য হাতে পেয়ে মূল্য পরিশোধ করুন।
                   </span>
                 </div>
-                {paymentMode === 'cod' && (
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                )}
-              </button>
-
-              {/* Full Online Payment (bKash) */}
-              <button
-                type="button"
-                onClick={() => setPaymentMode('bkash')}
-                className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
-                  paymentMode === 'bkash'
-                    ? 'border-[#E2136E] bg-pink-50/70 shadow-xs ring-1 ring-[#E2136E]/30'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <div className="w-5 h-5 rounded-md bg-[#E2136E] text-white flex items-center justify-center shrink-0 mt-0.5">
-                  <Zap className="w-3 h-3" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-black text-slate-900">
-                    Full Online Payment (bKash)
-                  </span>
-                  <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
-                    Pay total {totalAmount.toLocaleString()} BDT via official bKash portal now.
-                  </span>
-                </div>
-                {paymentMode === 'bkash' && (
-                  <CheckCircle2 className="w-4 h-4 text-[#E2136E] shrink-0 mt-0.5" />
-                )}
-              </button>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
             </div>
 
             {/* Bill Summary */}
@@ -495,9 +410,7 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full flex items-center justify-center gap-2 text-white font-black py-2.5 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md cursor-pointer hover:scale-[1.01] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed ${
-                paymentMode === 'bkash' ? 'bg-[#E2136E] hover:bg-[#c2105e]' : 'bg-slate-900 hover:bg-slate-800'
-              }`}
+              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-black py-2.5 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md cursor-pointer hover:scale-[1.01] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
@@ -505,17 +418,8 @@ export default function ExpressOrderModal({ product, isOpen, onClose }: ExpressO
                 </>
               ) : (
                 <>
-                  {paymentMode === 'bkash' ? (
-                    <>
-                      <Zap className="w-3.5 h-3.5 fill-white text-white" /> 
-                      <span>Pay {totalAmount.toLocaleString()} BDT with bKash</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Confirm Cash on Delivery ({totalAmount.toLocaleString()} BDT)</span>
-                    </>
-                  )}
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Confirm Cash on Delivery ({totalAmount.toLocaleString()} BDT)</span>
                 </>
               )}
             </button>
