@@ -14,12 +14,12 @@ import {
   Banknote, 
   Tag, 
   Sparkles, 
-  Plus,
-  Minus,
+  Plus, 
+  Minus, 
   X 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 import { db } from '../../firebase/config';
 import { useAuthStore } from '../../store/authStore';
@@ -133,7 +133,7 @@ export default function Checkout() {
     };
   }, [user?.uid]);
 
-  // Live dynamic weight & delivery charge calculation based on current items
+  // Live dynamic weight & delivery charge calculation
   const totalWeight = useMemo(() => {
     return items.reduce((sum, item) => {
       const weightPerItem = (item.product as { weightInKg?: number })?.weightInKg || 0.5;
@@ -159,6 +159,45 @@ export default function Checkout() {
       navigate('/cart');
     }
   }, [items, navigate]);
+
+  // 🔴 Abandoned Cart Auto-Save Engine: নাম ও ফোন নাম্বার লিখলে স্বয়ংক্রিয় ড্রাফট সেভ হবে
+  useEffect(() => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 11 || !fullName.trim() || items.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const cartKey = `draft_${cleanPhone}`;
+        const draftRef = doc(db, 'abandoned_carts', cartKey);
+
+        await setDoc(draftRef, {
+          id: cartKey,
+          customerName: fullName.trim(),
+          customerPhone: cleanPhone,
+          customerEmail: email.trim() || null,
+          items: items.map(i => ({
+            productId: i.product.id,
+            productName: i.product.name,
+            price: i.product.price,
+            quantity: i.quantity,
+            image: i.product.images?.[0] || '',
+          })),
+          subtotal,
+          deliveryFee,
+          totalAmount: total,
+          division,
+          district,
+          upazila,
+          fullAddress: fullAddress.trim() || null,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Abandoned cart auto-sync note:', err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [fullName, phone, email, items, total, subtotal, deliveryFee, division, district, upazila, fullAddress]);
 
   const handleDivisionChange = (newDivision: string) => {
     setDivision(newDivision);
@@ -260,12 +299,10 @@ export default function Checkout() {
     try {
       setIsSubmitting(true);
 
-      // email বাদ দিয়ে সঠিক ShippingAddress অবজেক্ট গঠন
       const shippingAddress: ShippingAddress = {
         fullName: fullName.trim(),
         phone: phone.trim(),
         alternatePhone: alternatePhone.trim() || '',
-      
         division,
         district,
         upazila,
@@ -293,6 +330,15 @@ export default function Checkout() {
         paidAmount: 0,
         dueAmount: total,
       });
+
+      // 🔴 অর্ডার সফল হলে Abandoned Cart ড্রাফট মুছে ফেলা
+      try {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const draftRef = doc(db, 'abandoned_carts', `draft_${cleanPhone}`);
+        await deleteDoc(draftRef);
+      } catch (delErr) {
+        console.warn('Draft cleanup note:', delErr);
+      }
 
       if ((appliedCoupon as { id?: string })?.id) {
         incrementCouponUsage((appliedCoupon as { id?: string }).id!);
@@ -505,7 +551,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Payment Methods Card - 100% Cash on Delivery Only */}
+            {/* Payment Method */}
             <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-modern border border-gray-100 space-y-4">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 font-bold">
@@ -518,7 +564,6 @@ export default function Checkout() {
               </div>
 
               <div className="space-y-3">
-                {/* Cash on Delivery Card (Selected by Default) */}
                 <div className="flex items-center justify-between p-4.5 rounded-2xl border-2 border-navy bg-slate-50 shadow-xs">
                   <div className="flex items-center gap-3.5">
                     <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
@@ -545,7 +590,7 @@ export default function Checkout() {
 
           </div>
 
-          {/* Right Column: Order Summary with Live Item Quantity Adjustments */}
+          {/* Right Column: Order Summary */}
           <div className="space-y-6">
             
             <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-modern border border-gray-100 space-y-4 sticky top-24">
@@ -557,7 +602,7 @@ export default function Checkout() {
                 </span>
               </div>
 
-              {/* Items List with Live + / - Quantity Controls */}
+              {/* Items List */}
               <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
                 {items.map((item, idx) => {
                   const maxStock = Math.max(1, item.product.stock || 1);
@@ -581,7 +626,6 @@ export default function Checkout() {
                           {item.product.price.toLocaleString()} BDT
                         </p>
                         
-                        {/* Live Quantity Adjustments */}
                         <div className="flex items-center gap-2 mt-1">
                           <div className="flex items-center border border-gray-200 rounded-lg bg-white shadow-2xs">
                             <button
@@ -633,7 +677,7 @@ export default function Checkout() {
                 })}
               </div>
 
-              {/* Coupon Input Box */}
+              {/* Coupon Box */}
               <div className="pt-2">
                 {!appliedCoupon ? (
                   <div className="space-y-2">
@@ -710,7 +754,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Confirm Order Button */}
+              {/* Confirm Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
