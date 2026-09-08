@@ -24,6 +24,26 @@ import type { CartItem } from '../store/cartStore';
 const ordersRef = collection(db, 'orders');
 
 /**
+ * ফায়ারস্টোরে undefined ফিল্ড যাওয়া চিরতরে বন্ধ করতে ক্লিন-ফিল্টার
+ */
+const sanitizeForFirestore = <T>(data: T): T => {
+  if (data === undefined) return null as unknown as T;
+  if (data === null || typeof data !== 'object') return data;
+  if (data instanceof Date) return data;
+  if (Array.isArray(data)) {
+    return data.map(sanitizeForFirestore) as unknown as T;
+  }
+
+  const cleanObject: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data as unknown as Record<string, unknown>)) {
+    if (value !== undefined) {
+      cleanObject[key] = sanitizeForFirestore(value);
+    }
+  }
+  return cleanObject as T;
+};
+
+/**
  * Steadfast Official Dynamic Delivery Fee Calculator
  */
 export const calculateDynamicDeliveryFee = (
@@ -69,7 +89,7 @@ export interface CreateOrderParams {
   cartItems: CartItem[];
   subtotal: number;
   deliveryFee: number;
-  discount: number;
+  discount?: number;
   couponCode?: string;
   couponId?: string;
   totalAmount: number;
@@ -84,7 +104,7 @@ export interface CreateOrderParams {
 }
 
 /**
- * অর্ডার তৈরি এবং সাথে সাথে ইনভেন্টরি থেকে স্বয়ংক্রিয় স্টক কাটার ইঞ্জিন
+ * অর্ডার তৈরি এবং স্টক সমন্বয়
  */
 export const createOrder = async (params: CreateOrderParams): Promise<Order> => {
   try {
@@ -93,15 +113,15 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
     const orderNumber = `ISAR-${Math.floor(100000 + Math.random() * 900000)}`;
 
     let calculatedWeight = 0;
-    const orderItems: OrderItem[] = params.cartItems.map((item) => {
+    const orderItems: OrderItem[] = (params.cartItems || []).map((item) => {
       const itemWeight = 0.5;
-      calculatedWeight += itemWeight * item.quantity;
+      calculatedWeight += itemWeight * (item.quantity || 1);
 
       return {
-        productId: item.product.id,
-        productName: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
+        productId: item.product.id || '',
+        productName: item.product.name || 'Product',
+        price: Number(item.product.price) || 0,
+        quantity: item.quantity || 1,
         image: item.product.images?.[0] || '',
         weightInKg: itemWeight,
         selectedVariantId: item.selectedVariantId || '',
@@ -113,7 +133,6 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
       ? params.totalWeight 
       : Math.max(calculatedWeight, 0.5);
 
-    // ২ মেথড পেমেন্ট হিসাব: COD তে পেইড ০, বাকি total। বিকাশে পেইড total, বাকি ০।
     let finalPaymentStatus: PaymentStatus = params.paymentStatus || 'pending';
     let finalPaidAmount = Number(params.paidAmount) || 0;
     let finalDueAmount = Number(params.dueAmount);
@@ -122,35 +141,51 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
       if (params.paymentMethod === 'cod') {
         finalPaymentStatus = 'pending';
         finalPaidAmount = 0;
-        finalDueAmount = params.totalAmount;
+        finalDueAmount = Number(params.totalAmount) || 0;
       } else {
         finalPaymentStatus = 'paid';
-        finalPaidAmount = params.totalAmount;
+        finalPaidAmount = Number(params.totalAmount) || 0;
         finalDueAmount = 0;
       }
     }
 
     const now = serverTimestamp();
 
-    const newOrderData: Record<string, unknown> = {
+    // safe address: alternatePhone ও alternativePhone দুটোরই undefined দূর করা হলো
+    const rawAddress = (params.shippingAddress || {}) as unknown as Record<string, unknown>;
+    const cleanShippingAddress = {
+      fullName: String(rawAddress.fullName || params.customerName || '').trim(),
+      email: String(rawAddress.email || params.customerEmail || '').trim(),
+      phone: String(rawAddress.phone || params.customerPhone || '').trim(),
+      alternatePhone: String(rawAddress.alternatePhone || rawAddress.alternativePhone || '').trim(),
+      alternativePhone: String(rawAddress.alternativePhone || rawAddress.alternatePhone || '').trim(),
+      division: String(rawAddress.division || '').trim(),
+      district: String(rawAddress.district || '').trim(),
+      thana: String(rawAddress.thana || rawAddress.upazila || '').trim(),
+      fullAddress: String(rawAddress.fullAddress || rawAddress.streetAddress || '').trim(),
+      deliveryNotes: String(rawAddress.deliveryNotes || '').trim(),
+    };
+
+    const rawOrderData: Record<string, unknown> = {
       id: orderId,
       orderNumber,
-      userId: params.userId,
-      customerName: params.customerName,
-      customerEmail: params.customerEmail,
-      customerPhone: params.customerPhone,
-      shippingAddress: params.shippingAddress,
+      userId: params.userId || 'guest',
+      customerName: params.customerName || cleanShippingAddress.fullName,
+      customerEmail: params.customerEmail || cleanShippingAddress.email,
+      customerPhone: params.customerPhone || cleanShippingAddress.phone,
+      shippingAddress: cleanShippingAddress,
       deliveryZone: params.deliveryZone || 'inside_dhaka',
       items: orderItems,
       totalWeight: Number(finalWeight.toFixed(2)),
-      subtotal: params.subtotal,
-      deliveryFee: params.deliveryFee,
-      discount: params.discount,
+      subtotal: Number(params.subtotal) || 0,
+      deliveryFee: Number(params.deliveryFee) || 0,
+      discount: Number(params.discount) || 0,
       couponCode: params.couponCode || null,
-      totalAmount: params.totalAmount,
+      couponId: params.couponId || null,
+      totalAmount: Number(params.totalAmount) || 0,
       paidAmount: finalPaidAmount,
       dueAmount: finalDueAmount,
-      paymentMethod: params.paymentMethod,
+      paymentMethod: params.paymentMethod || 'cod',
       paymentStatus: finalPaymentStatus,
       paymentId: params.paymentId || null,
       transactionId: params.transactionId || null,
@@ -168,10 +203,13 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
       updatedAt: now,
     };
 
-    // ১. ফায়ারস্টোরে অর্ডার সংরক্ষণ
-    await setDoc(orderDocRef, newOrderData);
+    // ফায়ারস্টোরের জন্য সব undefined ফিল্ড ফিল্টার করা
+    const sanitizedOrderData = sanitizeForFirestore(rawOrderData) as Record<string, unknown>;
 
-    // ২. ফায়ারস্টোরের আসল প্রোডাক্ট স্টক থেকে পরিমাণ মাইনাস করা
+    // ১. ফায়ারস্টোরে অর্ডার সংরক্ষণ
+    await setDoc(orderDocRef, sanitizedOrderData);
+
+    // ২. প্রোডাক্ট স্টক কমানো
     for (const item of orderItems) {
       if (item.productId) {
         try {
@@ -187,13 +225,13 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
     }
 
     return {
-      ...newOrderData,
+      ...sanitizedOrderData,
       createdAt: new Date(),
       updatedAt: new Date(),
     } as unknown as Order;
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error creating order in Firestore';
-    console.error("Error creating order in Firestore:", errorMsg);
+    console.error("[OrderService] Error creating order in Firestore:", errorMsg);
     throw new Error(errorMsg, { cause: error });
   }
 };
@@ -226,7 +264,7 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
     });
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error fetching user orders';
-    console.error("Error fetching user orders safely:", errorMsg);
+    console.error("[OrderService] Error fetching user orders safely:", errorMsg);
     throw new Error(errorMsg, { cause: error });
   }
 };
@@ -245,13 +283,13 @@ export const getOrderById = async (orderId: string): Promise<Order | null> => {
     return null;
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error fetching order by id';
-    console.error("Error fetching order by id:", errorMsg);
+    console.error("[OrderService] Error fetching order by id:", errorMsg);
     throw new Error(errorMsg, { cause: error });
   }
 };
 
 /**
- * অর্ডার ক্যান্সেল হলে স্টক আবার স্টোরে ফেরত দেওয়া (Auto-Restock)
+ * অর্ডার বাতিল এবং স্টক রি-স্টক ইঞ্জিন
  */
 export const cancelOrder = async (orderId: string, reason?: string): Promise<void> => {
   try {
@@ -261,14 +299,12 @@ export const cancelOrder = async (orderId: string, reason?: string): Promise<voi
     if (orderSnap.exists()) {
       const orderData = orderSnap.data() as Order;
 
-      // ১. অর্ডার স্ট্যাটাস 'cancelled' করা
       await updateDoc(docRef, {
         status: 'cancelled',
         cancelReason: reason || 'Cancelled by customer',
         updatedAt: serverTimestamp(),
       });
 
-      // ২. আইটেমগুলোর স্টক ফেরত দেওয়া (+quantity)
       if (orderData.items && Array.isArray(orderData.items)) {
         for (const item of orderData.items) {
           if (item.productId) {
@@ -287,7 +323,7 @@ export const cancelOrder = async (orderId: string, reason?: string): Promise<voi
     }
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error cancelling order';
-    console.error("Error cancelling order:", errorMsg);
+    console.error("[OrderService] Error cancelling order:", errorMsg);
     throw new Error(errorMsg, { cause: error });
   }
 };
