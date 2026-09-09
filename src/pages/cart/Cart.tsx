@@ -11,11 +11,13 @@ import {
   Tag,
   Sparkles,
   Loader2,
-  X
+  X,
+  Truck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useCartStore } from '../../store/cartStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { validateCouponCode } from '../../services/couponService';
 
 export default function Cart() {
@@ -33,12 +35,19 @@ export default function Cart() {
     removeCoupon,
   } = useCartStore();
 
+  const { freeShippingMinAmount } = useSettingsStore();
+
   const [couponInput, setCouponInput] = useState<string>('');
   const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
 
   const subtotal = getSubtotal();
   const discount = getDiscount();
   const total = Math.max(0, subtotal - discount);
+
+  // ফ্রি ডেলিভারি মাইলস্টোন হিসাব (#10)
+  const minFreeAmount = Number(freeShippingMinAmount) || 5000;
+  const freeShippingDifference = Math.max(0, minFreeAmount - subtotal);
+  const freeShippingProgress = Math.min(100, Math.round((subtotal / minFreeAmount) * 100));
 
   const handleApplyCoupon = async (e: FormEvent) => {
     e.preventDefault();
@@ -119,9 +128,10 @@ export default function Cart() {
         <title>{`Shopping Cart (${items.length}) | ISAR Marketplace`}</title>
       </Helmet>
 
-      <div className="container mx-auto px-4 max-w-6xl">
+      <div className="container mx-auto px-4 max-w-6xl space-y-6">
         
-        <div className="flex items-center justify-between mb-8">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between">
           <h1 className="text-2xl md:text-3xl font-black text-navy">Shopping Cart</h1>
           <button
             type="button"
@@ -130,6 +140,27 @@ export default function Cart() {
           >
             <Trash2 className="w-3.5 h-3.5" /> Clear All Items
           </button>
+        </div>
+
+        {/* Free Shipping Milestone Banner (#10) */}
+        <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-modern border border-gray-100 space-y-2">
+          <div className="flex items-center justify-between text-xs font-black text-navy flex-wrap gap-2">
+            <span className="flex items-center gap-2 text-brand-green">
+              <Truck className="w-4 h-4" /> Free Delivery Milestone
+            </span>
+            <span className="font-mono text-primary">
+              {freeShippingDifference === 0 
+                ? '🎉 Congratulations! You unlocked FREE Delivery!' 
+                : `Add ৳${freeShippingDifference.toLocaleString()} more to get Free Delivery!`}
+            </span>
+          </div>
+
+          <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+            <div 
+              style={{ width: `${freeShippingProgress}%` }}
+              className="h-full bg-linear-to-r from-primary to-brand-green rounded-full transition-all duration-500"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -146,7 +177,6 @@ export default function Cart() {
                   key={`${item.product.id}-${item.selectedVariantId || index}`}
                   className="bg-white rounded-3xl p-4 md:p-6 shadow-modern border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:shadow-modern-lg relative group"
                 >
-                  {/* Point 11: Prominent Cross (X) Delete Button */}
                   <button
                     type="button"
                     onClick={() => removeItem(item.product.id, item.selectedVariantId)}
@@ -177,7 +207,6 @@ export default function Cart() {
                       Unit Price: <span className="font-bold text-navy font-mono">{item.product.price.toLocaleString()} BDT</span>
                     </p>
 
-                    {/* Point 5: Quantity Lock (Min 1, Max stock) */}
                     <div className="flex items-center gap-3">
                       <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50">
                         <button
