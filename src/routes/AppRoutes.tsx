@@ -12,14 +12,12 @@ import ProductDetail from '../pages/products/ProductDetail';
 import Categories from '../pages/categories/Categories';
 import Cart from '../pages/cart/Cart';
 import Checkout from '../pages/checkout/Checkout';
-import Orders from '../pages/orders/Orders';
+import OrderSuccess from '../components/checkout/OrderSuccess';
 import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import Profile from '../pages/profile/Profile';
+import Orders from '../pages/orders/Orders';
 import LegalPage from '../pages/legal/LegalPage';
-
-// অর্ডার কনফার্মেশন ও ইনভয়েস পেজ
-import OrderSuccess from '../components/checkout/OrderSuccess';
 
 // সেলার মার্কেটপ্লেস পেজ
 import SellerDashboard from '../pages/seller/SellerDashboard';
@@ -47,7 +45,7 @@ const NotFound = () => (
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Main Layout এর আন্ডারে থাকা পাবলিক ও কাস্টমার রাউটস */}
+      {/* Main Layout এর আন্ডারে থাকা পাবলিক পেজসমূহ */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
@@ -68,7 +66,7 @@ export default function AppRoutes() {
         <Route path="/about-us" element={<LegalPage />} />
         <Route path="/faq" element={<LegalPage />} />
         
-        {/* প্রটেক্টেড কাস্টমার ও সেলার রাউটস */}
+        {/* 🔒 ১০০% প্রটেক্টেড ইউজার রাউটস (লগইন ছাড়া ঢোকা সম্পূর্ণ বন্ধ) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/profile" element={<Profile />} />
           <Route path="/orders" element={<Orders />} />
@@ -79,7 +77,7 @@ export default function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Route>
 
-      {/* সরাসরি ক্লিন অ্যাডমিন রাউটস (ডাবল আউলেটের জট সম্পূর্ণ মুক্ত) */}
+      {/* অ্যাডমিন রাউটস */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
         <Route path="orders" element={<AdminOrders />} />

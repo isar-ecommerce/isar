@@ -18,7 +18,8 @@ import {
   Search, 
   Printer, 
   ShieldCheck, 
-  Calendar 
+  Calendar,
+  ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -29,6 +30,7 @@ import type { Order, OrderStatus } from '../../types/order';
 export default function Orders() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -93,7 +95,6 @@ export default function Orders() {
     });
   };
 
-  // তারিখ ফরম্যাট হেল্পার
   const formatDate = (timestamp: unknown): string => {
     if (!timestamp) return 'Recent';
     try {
@@ -110,7 +111,6 @@ export default function Orders() {
     return 'Recent';
   };
 
-  // স্ট্যাটাস স্টেপ নাম্বার নির্ণয়
   const getStepProgress = (status: OrderStatus): number => {
     switch (status) {
       case 'pending':
@@ -169,7 +169,6 @@ export default function Orders() {
     }
   };
 
-  // সার্চ কুয়েরি অনুযায়ী ফিল্টার
   const filteredOrders = orders.filter((order) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
@@ -213,25 +212,27 @@ export default function Orders() {
           </button>
         </div>
 
-        {/* Live Search & Filter Bar */}
-        <div className="bg-white rounded-2xl p-4 shadow-modern border border-gray-100 flex items-center gap-3">
-          <Search className="w-5 h-5 text-gray-400 shrink-0 ml-1" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Order ID (e.g. ISAR-2026-XXXX) or Phone Number..."
-            className="w-full text-xs sm:text-sm text-navy bg-transparent focus:outline-none placeholder-gray-400 font-medium"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="text-xs font-bold text-gray-400 hover:text-navy px-2 py-1 cursor-pointer"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+        {/* Search Input for Account Orders */}
+        {orders.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 shadow-modern border border-gray-100 flex items-center gap-3">
+            <Search className="w-5 h-5 text-gray-400 shrink-0 ml-1" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search your orders by Order ID (e.g. ISAR-XXXXXX) or Phone..."
+              className="w-full text-xs sm:text-sm text-navy bg-transparent focus:outline-none placeholder-gray-400 font-medium"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-xs font-bold text-gray-400 hover:text-navy px-2 py-1 cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Orders List / Empty State */}
         {filteredOrders.length === 0 ? (
@@ -244,8 +245,8 @@ export default function Orders() {
             </h2>
             <p className="text-gray-500 text-xs sm:text-sm leading-relaxed">
               {searchQuery 
-                ? 'Please check your Order Tracking ID and try searching again.' 
-                : "You haven't placed any orders yet. Start shopping authentic products today!"}
+                ? 'Please check your search term and try again.' 
+                : "You haven't placed any orders yet. Start shopping our authentic products today!"}
             </p>
             {!searchQuery && (
               <Link
@@ -287,7 +288,7 @@ export default function Orders() {
                         <div className="flex items-center gap-2 text-xs text-gray-500 mt-1 flex-wrap">
                           <span>{order.items?.length || 0} Item(s)</span>
                           <span>•</span>
-                          <span className="font-bold text-primary">৳{order.totalAmount?.toLocaleString()}</span>
+                          <span className="font-bold text-primary font-mono">৳{order.totalAmount?.toLocaleString()}</span>
                           <span>•</span>
                           <span className="text-gray-400 flex items-center gap-1">
                             <Calendar className="w-3 h-3" /> {formatDate(order.createdAt)}
@@ -299,7 +300,7 @@ export default function Orders() {
                     <div className="flex items-center gap-3 ml-auto">
                       <div className="text-right hidden sm:block">
                         <span className="text-xs font-bold text-navy block uppercase">
-                          {order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'bKash Online'}
+                          {order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'}
                         </span>
                         <span className="text-[11px] text-gray-400 block font-medium">
                           {order.paymentStatus === 'paid' ? '✓ Paid' : 'Payment on Delivery'}
@@ -311,10 +312,28 @@ export default function Orders() {
                     </div>
                   </div>
 
-                  {/* Expanded Accordion Content */}
+                  {/* Expanded Content */}
                   {isExpanded && (
                     <div className="px-5 sm:px-8 pb-8 pt-4 border-t border-gray-100 bg-gray-50/40 space-y-6">
                       
+                      {/* Steadfast Live Tracking Code Link */}
+                      {order.trackingCode && (
+                        <div className="p-4 bg-purple-50 rounded-2xl border border-purple-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 text-purple-900 font-bold">
+                            <Truck className="w-4 h-4 text-purple-700 shrink-0" />
+                            <span>Steadfast Tracking Code: <strong className="font-mono text-purple-950">{order.trackingCode}</strong></span>
+                          </div>
+                          <a
+                            href={`https://steadfast.com.bd/t/${order.trackingCode}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors font-mono shadow-xs"
+                          >
+                            Live Courier Track <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+
                       {/* 1. Live Visual Order Tracking Timeline Stepper */}
                       {!isCancelled ? (
                         <div className="p-5 sm:p-6 bg-white rounded-2xl border border-gray-100 space-y-4">
@@ -327,7 +346,6 @@ export default function Orders() {
                             </span>
                           </div>
 
-                          {/* Stepper Graphic */}
                           <div className="grid grid-cols-4 gap-2 pt-2 text-center relative">
                             
                             {/* Step 1: Placed */}
@@ -371,7 +389,7 @@ export default function Orders() {
                                 <span className={`text-[11px] sm:text-xs font-bold block ${currentStep >= 3 ? 'text-navy' : 'text-gray-400'}`}>
                                   With Courier
                                 </span>
-                                <span className="text-[9px] text-gray-400 font-medium hidden sm:block">Steadfast/Pathao</span>
+                                <span className="text-[9px] text-gray-400 font-medium hidden sm:block">Steadfast</span>
                               </div>
                             </div>
 
