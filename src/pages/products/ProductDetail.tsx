@@ -20,39 +20,66 @@ import {
   Bell,
   X,
   Layers,
-  Box
+  Box,
+  Play,
+  HelpCircle,
+  MessageSquare,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 
 import { db } from '../../firebase/config';
-import { getProductById, getProductBySlug } from '../../services/productService';
+import { getProductById, getProductBySlug, getProducts } from '../../services/productService';
 import { useCartStore } from '../../store/cartStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useAuthStore } from '../../store/authStore';
 import type { Product } from '../../types/product';
 import ProductReviews from '../../components/product/ProductReviews';
+
+interface ProductQuestionItem {
+  id: string;
+  productId: string;
+  question: string;
+  answer?: string;
+  userName: string;
+  createdAt?: unknown;
+}
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+
   const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
-  const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
+  const [activeTab, setActiveTab] = useState<'description' | 'specifications' | 'qa'>('description');
 
-  // ১. এইচডি ইমেজ জুম স্টেট
+  // ১. এইচডি ইমেজ জুম স্টেট (#2)
   const [zoomStyle, setZoomStyle] = useState<{ display: string; backgroundPosition: string; backgroundSize: string }>({
     display: 'none',
     backgroundPosition: '0% 0%',
     backgroundSize: '220%',
   });
 
-  // ২. রিস্টক নোটিফিকেশন মোডাল স্টেট
+  // ২. রিস্টক নোটিফিকেশন মোডাল (#8)
   const [isRestockModalOpen, setIsRestockModalOpen] = useState<boolean>(false);
   const [restockPhone, setRestockPhone] = useState<string>('');
   const [isSubmittingRestock, setIsSubmittingRestock] = useState<boolean>(false);
+
+  // ৩. প্রোডাক্ট ভিডিও মোডাল (#3)
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState<boolean>(false);
+
+  // ৪. Frequently Bought Together বান্ডেল স্টেট (#7)
+  const [selectedBundleIds, setSelectedBundleIds] = useState<string[]>([]);
+
+  // ৫. প্রোডাক্ট প্রশ্নোত্তর (Q&A) স্টেট (#21)
+  const [questionsList, setQuestionsList] = useState<ProductQuestionItem[]>([]);
+  const [newQuestionText, setNewQuestionText] = useState<string>('');
+  const [isSubmittingQuestion, setIsSubmittingQuestion] = useState<boolean>(false);
 
   const { addItem: addItemToCart, clearCart } = useCartStore();
   const { freeShippingMinAmount } = useSettingsStore();
@@ -64,7 +91,7 @@ export default function ProductDetail() {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchProduct = async () => {
+    const fetchProductAndRelated = async () => {
       if (!id) return;
 
       try {
@@ -75,6 +102,25 @@ export default function ProductDetail() {
 
         if (isMounted && data) {
           setProduct(data);
+
+          // একই ক্যাটাগরির রিয়েল ক্রস-সেলিং প্রোডাক্ট ফেচ (#7)
+          try {
+            const allProducts = await getProducts({ categoryId: data.categoryId });
+            const filtered = allProducts.filter(p => p.id !== data.id && p.stock > 0).slice(0, 2);
+            setRelatedProducts(filtered);
+            setSelectedBundleIds(filtered.map(p => p.id));
+          } catch {
+            setRelatedProducts([]);
+          }
+
+          // ফায়ারস্টোর থেকে আসল প্রশ্নোত্তর ফেচ (#21)
+          try {
+            const qSnap = await getDocs(query(collection(db, 'product_questions'), where('productId', '==', data.id)));
+            const qList = qSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductQuestionItem[];
+            setQuestionsList(qList);
+          } catch {
+            setQuestionsList([]);
+          }
         }
       } catch (err) {
         console.error('Error loading product:', err);
@@ -85,18 +131,18 @@ export default function ProductDetail() {
       }
     };
 
-    fetchProduct();
+    fetchProductAndRelated();
 
     return () => {
       isMounted = false;
     };
   }, [id]);
 
-  // রিয়েল সিস্টেম টাইম ভিত্তিক ডিসপ্যাচ মেসেজ
+  // রিয়েল ডিসপ্যাচ মেসেজ (#5)
   const dispatchMessage = useMemo(() => {
     const now = new Date();
     const currentHour = now.getHours();
-    const cutoffHour = 14; // দুপুর ২টা পর্যন্ত আজকের ডিসপ্যাচ
+    const cutoffHour = 14;
 
     if (currentHour < cutoffHour) {
       const hoursLeft = cutoffHour - currentHour - 1;
@@ -106,13 +152,12 @@ export default function ProductDetail() {
     return `আজকের সব পার্সেল কুরিয়ারে চলে গেছে। এখন অর্ডার করলে আগামীকাল সকাল ১০টায় কুরিয়ারে যাবে!`;
   }, []);
 
-  // ফ্রি শিপিং প্রগ্রেস হিসাব
+  // ফ্রি শিপিং মাইলস্টোন হিসাব (#10)
   const minFreeAmount = Number(freeShippingMinAmount) || 5000;
   const currentTotal = (product?.price || 0) * quantity;
   const freeShippingDifference = Math.max(0, minFreeAmount - currentTotal);
   const freeShippingProgress = Math.min(100, Math.round((currentTotal / minFreeAmount) * 100));
 
-  // ইমেজ জুম হ্যান্ডলার
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - left) / width) * 100;
@@ -160,7 +205,33 @@ export default function ProductDetail() {
     });
   };
 
-  // রিয়েল রিস্টক অ্যালার্ট ফায়ারস্টোরে সেভ করা
+  // Frequently Bought Together বান্ডেল কার্টে যোগ করা (#7)
+  const handleAddBundleToCart = () => {
+    if (!product) return;
+    addItemToCart(product, 1);
+    relatedProducts
+      .filter(p => selectedBundleIds.includes(p.id))
+      .forEach(p => addItemToCart(p, 1));
+
+    toast.success('Awesome! Complete bundle package added to Cart!');
+  };
+
+  const toggleBundleSelection = (pId: string) => {
+    setSelectedBundleIds(prev => 
+      prev.includes(pId) ? prev.filter(id => id !== pId) : [...prev, pId]
+    );
+  };
+
+  const bundleTotal = useMemo(() => {
+    if (!product) return 0;
+    const base = product.price;
+    const extra = relatedProducts
+      .filter(p => selectedBundleIds.includes(p.id))
+      .reduce((sum, p) => sum + p.price, 0);
+    return base + extra;
+  }, [product, relatedProducts, selectedBundleIds]);
+
+  // রিস্টক অ্যালার্ট সাবমিট (#8)
   const handleRestockSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const cleanPhone = restockPhone.replace(/[^0-9]/g, '');
@@ -182,10 +253,36 @@ export default function ProductDetail() {
       setRestockPhone('');
       setIsRestockModalOpen(false);
     } catch (err) {
-      console.warn('Restock request note:', err);
-      toast.error('Could not submit request. Please try again.');
+      console.warn('Restock request error:', err);
+      toast.error('Could not submit alert request.');
     } finally {
       setIsSubmittingRestock(false);
+    }
+  };
+
+  // কাস্টমার প্রশ্ন সাবমিট (#21)
+  const handleSubmitQuestion = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newQuestionText.trim()) return;
+
+    try {
+      setIsSubmittingQuestion(true);
+      const newQ = {
+        productId: product?.id || '',
+        question: newQuestionText.trim(),
+        userName: user?.displayName || 'Customer',
+        createdAt: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, 'product_questions'), newQ);
+      toast.success('Your question has been submitted! Our team will answer shortly.');
+      setQuestionsList(prev => [{ ...newQ, id: `temp-${Date.now()}` }, ...prev]);
+      setNewQuestionText('');
+    } catch (err) {
+      console.error('Question submit error:', err);
+      toast.error('Failed to submit question.');
+    } finally {
+      setIsSubmittingQuestion(false);
     }
   };
 
@@ -230,6 +327,7 @@ export default function ProductDetail() {
   const hasReviews = (product.reviewCount || 0) > 0;
   const isOutOfStock = product.stock <= 0 || product.status === 'out-of-stock';
   const activeImage = product.images[selectedImageIndex] || product.images[0] || 'https://via.placeholder.com/600';
+  const hasProductVideo = Boolean((product as { videoUrl?: string })?.videoUrl);
 
   return (
     <div className="bg-secondary min-h-screen py-6 md:py-10">
@@ -238,10 +336,10 @@ export default function ProductDetail() {
         <meta name="description" content={product.shortDescription || product.name} />
       </Helmet>
 
-      <div className="container mx-auto px-4 max-w-6xl pb-12">
+      <div className="container mx-auto px-4 max-w-6xl pb-12 space-y-8">
         
         {/* Breadcrumb Trail (#37) */}
-        <nav className="flex items-center gap-2 text-xs md:text-sm text-gray-500 mb-6 flex-wrap font-medium">
+        <nav className="flex items-center gap-2 text-xs md:text-sm text-gray-500 mb-2 flex-wrap font-medium">
           <Link to="/" className="hover:text-primary transition-colors">Home</Link>
           <span>/</span>
           <Link to="/products" className="hover:text-primary transition-colors">Products</Link>
@@ -257,7 +355,7 @@ export default function ProductDetail() {
         </nav>
 
         {/* Main Product Card */}
-        <div className="bg-white rounded-3xl shadow-modern-lg p-5 sm:p-8 md:p-10 border border-gray-100 mb-10">
+        <div className="bg-white rounded-3xl shadow-modern-lg p-5 sm:p-8 md:p-10 border border-gray-100">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
             
             {/* Left Column: Image Gallery with HD Zoom Lens (#2) */}
@@ -267,14 +365,13 @@ export default function ProductDetail() {
                 onMouseLeave={handleMouseLeave}
                 className="relative aspect-square max-h-115 rounded-3xl overflow-hidden bg-gray-50/50 border border-gray-100 shadow-inner flex items-center justify-center p-6 group cursor-crosshair"
               >
-                {/* Regular Image */}
                 <img 
                   src={activeImage} 
                   alt={product.name} 
                   className="max-h-full max-w-full w-auto h-auto object-contain transition-transform duration-300 filter drop-shadow-md"
                 />
 
-                {/* HD Zoom Lens Box */}
+                {/* HD Zoom Lens */}
                 <div 
                   style={{
                     display: zoomStyle.display,
@@ -285,6 +382,18 @@ export default function ProductDetail() {
                   }}
                   className="absolute inset-0 z-20 pointer-events-none rounded-3xl bg-white transition-opacity duration-150 shadow-2xl"
                 />
+
+                {/* Video Play Button (#3) */}
+                {hasProductVideo && (
+                  <button
+                    type="button"
+                    onClick={() => setIsVideoModalOpen(true)}
+                    className="absolute bottom-4 left-4 px-3.5 py-1.5 bg-black/75 hover:bg-black text-white text-xs font-black rounded-xl shadow-lg backdrop-blur-xs flex items-center gap-1.5 transition-all z-30 cursor-pointer hover:scale-105"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current text-brand-gold" />
+                    <span>Watch Video</span>
+                  </button>
+                )}
                 
                 <button 
                   type="button"
@@ -296,7 +405,7 @@ export default function ProductDetail() {
                 </button>
               </div>
 
-              {/* Thumbnail Selector */}
+              {/* Thumbnails */}
               {product.images.length > 1 && (
                 <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1">
                   {product.images.map((img, idx) => (
@@ -317,7 +426,7 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Right Column: Product Information & Interactive Purchasing */}
+            {/* Right Column */}
             <div className="flex flex-col space-y-5">
               
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -357,7 +466,7 @@ export default function ProductDetail() {
               ) : (
                 <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
                   <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
-                  <span>Verified Authentic • 100% Original Brand Warranty</span>
+                  <span>Verified Authentic • 100% Original Brand QC</span>
                 </div>
               )}
 
@@ -384,7 +493,7 @@ export default function ProductDetail() {
                 <span>{dispatchMessage}</span>
               </div>
 
-              {/* Free Shipping Milestone Progress Bar (#10) */}
+              {/* Free Shipping Milestone (#10) */}
               <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200/80 space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-black text-emerald-950">
                   <span className="flex items-center gap-1.5">
@@ -464,7 +573,7 @@ export default function ProductDetail() {
                 </p>
               )}
 
-              {/* Quantity Selector & Action Buttons */}
+              {/* Action Buttons */}
               <div className="space-y-4 pt-1">
                 <div className="flex items-center gap-4">
                   <span className="text-xs font-bold text-navy uppercase tracking-wider">Quantity:</span>
@@ -525,7 +634,7 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* 3 Genuine Bangladeshi Trust & Guarantee Boxes (#20, #22, #23) */}
+              {/* 3 Genuine Bangladeshi Guarantee Boxes (#20, #22, #23) */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-4 border-t border-gray-100">
                 <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-2.5 text-left">
                   <div className="w-8 h-8 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center shrink-0">
@@ -563,8 +672,70 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Tabs Section */}
-        <div className="bg-white rounded-3xl shadow-modern border border-gray-100 overflow-hidden mb-10">
+        {/* Frequently Bought Together Cross-Sell (#7) */}
+        {relatedProducts.length > 0 && !isOutOfStock && (
+          <div className="bg-white rounded-3xl shadow-modern border border-gray-100 p-6 sm:p-8 space-y-4">
+            <div className="flex items-center gap-2 text-navy font-black text-base sm:text-lg">
+              <Sparkles className="w-5 h-5 text-brand-gold" />
+              <span>Frequently Bought Together (একসাথে কিনুন ও সাশ্রয় করুন)</span>
+            </div>
+
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pt-2">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                {/* Main Product */}
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-200">
+                  <img src={product.images[0]} alt={product.name} className="w-12 h-12 rounded-xl object-contain bg-white p-1" />
+                  <div>
+                    <p className="text-xs font-extrabold text-navy truncate max-w-40">{product.name}</p>
+                    <p className="text-xs font-bold text-primary font-mono">{product.price.toLocaleString()} BDT</p>
+                  </div>
+                </div>
+
+                {/* Related Items */}
+                {relatedProducts.map((rel) => {
+                  const isChecked = selectedBundleIds.includes(rel.id);
+
+                  return (
+                    <div key={rel.id} className="flex items-center gap-2">
+                      <span className="text-gray-400 font-black">+</span>
+                      <label className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${isChecked ? 'bg-primary/5 border-primary shadow-2xs' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleBundleSelection(rel.id)}
+                          className="w-4 h-4 text-primary rounded cursor-pointer"
+                        />
+                        <img src={rel.images[0]} alt={rel.name} className="w-12 h-12 rounded-xl object-contain bg-white p-1" />
+                        <div>
+                          <p className="text-xs font-extrabold text-navy truncate max-w-36">{rel.name}</p>
+                          <p className="text-xs font-bold text-primary font-mono">{rel.price.toLocaleString()} BDT</p>
+                        </div>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bundle Action */}
+              <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-200 w-full lg:w-auto justify-between lg:justify-end">
+                <div>
+                  <span className="text-[11px] text-gray-500 font-bold block">Total Bundle Price:</span>
+                  <span className="text-xl font-black text-primary font-mono">{bundleTotal.toLocaleString()} BDT</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddBundleToCart}
+                  className="px-6 py-3 bg-navy hover:bg-slate-800 text-white font-black text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer hover:scale-102"
+                >
+                  <ShoppingBag className="w-4 h-4" /> Add Bundle to Cart
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tabs Section with Q&A (#21) */}
+        <div className="bg-white rounded-3xl shadow-modern border border-gray-100 overflow-hidden">
           <div className="flex border-b border-gray-100 bg-gray-50/50">
             <button
               type="button"
@@ -590,15 +761,28 @@ export default function ProductDetail() {
                 Specifications
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setActiveTab('qa')}
+              className={`px-6 py-4 font-extrabold text-xs sm:text-sm transition-colors border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'qa' 
+                  ? 'border-primary text-primary bg-white' 
+                  : 'border-transparent text-gray-500 hover:text-navy'
+              }`}
+            >
+              <HelpCircle className="w-4 h-4" /> Questions & Answers ({questionsList.length})
+            </button>
           </div>
 
           <div className="p-6 md:p-8">
-            {activeTab === 'description' ? (
+            {activeTab === 'description' && (
               <div 
                 className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: product.description || '<p>No detailed description available for this product.</p>' }}
               />
-            ) : (
+            )}
+
+            {activeTab === 'specifications' && (
               <div className="max-w-2xl">
                 <table className="w-full text-xs sm:text-sm text-left">
                   <tbody>
@@ -610,6 +794,58 @@ export default function ProductDetail() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {activeTab === 'qa' && (
+              <div className="space-y-6 max-w-3xl">
+                <form onSubmit={handleSubmitQuestion} className="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-200">
+                  <label className="text-xs font-black text-navy flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4 text-primary" /> Have a question about this product? Ask below:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={newQuestionText}
+                      onChange={(e) => setNewQuestionText(e.target.value)}
+                      placeholder="e.g. Is this bag waterproof? / Can it fit a 15.6 inch laptop?"
+                      className="flex-1 px-3.5 py-2.5 border border-gray-200 rounded-xl bg-white text-xs text-navy focus:outline-none focus:border-primary"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSubmittingQuestion}
+                      className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmittingQuestion ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Ask Question'}
+                    </button>
+                  </div>
+                </form>
+
+                <div className="space-y-3">
+                  {questionsList.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-6">No questions asked yet. Be the first to ask!</p>
+                  ) : (
+                    questionsList.map((q) => (
+                      <div key={q.id} className="p-4 rounded-2xl border border-gray-100 space-y-2 bg-gray-50/60">
+                        <div className="flex items-start gap-2 text-xs font-black text-navy">
+                          <span className="text-primary font-bold">Q:</span>
+                          <p>{q.question}</p>
+                        </div>
+                        {q.answer ? (
+                          <div className="flex items-start gap-2 text-xs text-gray-700 bg-white p-3 rounded-xl border border-gray-100 mt-1">
+                            <span className="text-brand-green font-bold">A:</span>
+                            <p className="leading-relaxed">{q.answer}</p>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-amber-600 font-semibold italic pl-4">
+                            ⌛ Answer pending from ISAR store team...
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -667,6 +903,30 @@ export default function ProductDetail() {
                 {isSubmittingRestock ? <Loader2 className="w-4 h-4 animate-spin" /> : 'অ্যালার্ট নিশ্চিত করুন'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Product Video Modal (#3) */}
+      {isVideoModalOpen && (product as { videoUrl?: string })?.videoUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-4 max-w-2xl w-full shadow-2xl relative border border-gray-100">
+            <button
+              type="button"
+              onClick={() => setIsVideoModalOpen(false)}
+              className="absolute -top-3 -right-3 p-1.5 bg-white text-navy rounded-full shadow-md hover:bg-gray-100 cursor-pointer z-10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="aspect-video rounded-2xl overflow-hidden bg-black">
+              <iframe
+                src={(product as { videoUrl?: string }).videoUrl}
+                title="Product Video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full border-0"
+              />
+            </div>
           </div>
         </div>
       )}
