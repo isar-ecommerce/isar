@@ -14,7 +14,7 @@ export default function Footer() {
   } = useSettingsStore();
 
   return (
-    <footer className="bg-[#0f172a] text-white pt-10 md:pt-14 pb-8 pb-safe-bottom print:hidden border-t border-slate-800 transition-colors">
+    <footer className="bg-navy text-white pt-10 md:pt-14 pb-8 pb-safe-bottom print:hidden border-t border-slate-800 transition-colors">
       <div className="container mx-auto px-4 max-w-6xl">
         
         {/* Footer Grid */}
