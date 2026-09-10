@@ -62,7 +62,6 @@ export default function Header() {
   const [showSearchDropdown, setShowSearchDropdown] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
-  // 🌙 থিম সিঙ্ক স্টেট
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('isar_theme') === 'dark';
@@ -177,7 +176,7 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white dark:bg-slate-900 border-b border-gray-200/80 dark:border-slate-800 shadow-xs transition-colors duration-200">
+    <header className="sticky top-0 z-50 w-full bg-white dark:bg-[#070a0f] border-b border-gray-200/80 dark:border-[#1e2638] shadow-xs transition-colors duration-200">
       <div className="container mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-6">
         
         {/* Left: Brand Logo */}
@@ -195,7 +194,7 @@ export default function Header() {
                 onChange={handleInputChange}
                 onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
                 placeholder={t.searchPlaceholder}
-                className="w-full h-11 pl-4 pr-12 rounded-full border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-primary transition-all text-sm text-navy dark:text-white placeholder:text-gray-400"
+                className="w-full h-11 pl-4 pr-12 rounded-full border border-gray-300 dark:border-[#273142] bg-gray-50 dark:bg-[#141b26] focus:bg-white dark:focus:bg-[#0f141c] focus:outline-none focus:border-primary transition-all text-sm text-navy dark:text-white placeholder:text-gray-400"
               />
               {searchQuery ? (
                 <button
@@ -216,7 +215,7 @@ export default function Header() {
             </form>
 
             {showSearchDropdown && (
-              <div className="absolute top-12 left-0 right-0 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute top-12 left-0 right-0 bg-white dark:bg-[#0f141c] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#1e2638] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 {isSearching ? (
                   <div className="p-4 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 text-primary animate-spin" /> Searching products...
@@ -226,8 +225,8 @@ export default function Header() {
                     No products found for "{searchQuery}"
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-100 dark:divide-slate-700">
-                    <div className="px-4 py-2 bg-gray-50 dark:bg-slate-900 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="divide-y divide-gray-100 dark:divide-[#1e2638]">
+                    <div className="px-4 py-2 bg-gray-50 dark:bg-[#141b26] text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                       Instant Search Results
                     </div>
                     {searchResults.map((product) => (
@@ -235,12 +234,12 @@ export default function Header() {
                         key={product.id}
                         to={`/products/${product.id}`}
                         onClick={() => setShowSearchDropdown(false)}
-                        className="p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group cursor-pointer"
+                        className="p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-[#141b26] transition-colors group cursor-pointer"
                       >
                         <img
                           src={product.images[0] || 'https://via.placeholder.com/60'}
                           alt={product.name}
-                          className="w-10 h-10 rounded-lg object-cover bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-700 shrink-0"
+                          className="w-10 h-10 rounded-lg object-contain bg-gray-50 dark:bg-[#141b26] border border-gray-200 dark:border-[#273142] shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold text-navy dark:text-white group-hover:text-primary transition-colors line-clamp-1">
@@ -257,7 +256,7 @@ export default function Header() {
                     ))}
                     <button
                       onClick={handleSearch}
-                      className="w-full p-2.5 bg-gray-50 dark:bg-slate-900 hover:bg-primary hover:text-white text-xs font-bold text-navy dark:text-white text-center transition-colors block cursor-pointer"
+                      className="w-full p-2.5 bg-gray-50 dark:bg-[#141b26] hover:bg-primary hover:text-white text-xs font-bold text-navy dark:text-white text-center transition-colors block cursor-pointer"
                     >
                       View All Results for "{searchQuery}"
                     </button>
@@ -277,15 +276,15 @@ export default function Header() {
           </div>
         )}
 
-        {/* Right: Theme Toggle, Language & Cart */}
+        {/* Right Controls */}
         <div className="flex items-center gap-2.5 sm:gap-4">
           
-          {/* 🌙 / ☀️ থিম সুইচ (#4) */}
+          {/* ☀️ / 🌙 থিম বাটন */}
           <button
             type="button"
             onClick={toggleTheme}
-            className="p-2 rounded-full border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-white text-navy dark:text-brand-gold transition-all cursor-pointer shadow-2xs"
-            title={isDarkMode ? 'লাইট মোড অন করুন' : 'ডার্ক মোড অন করুন'}
+            className="p-2 rounded-full border border-gray-200 dark:border-[#273142] bg-gray-50 dark:bg-[#141b26] hover:bg-white text-navy dark:text-brand-gold transition-all cursor-pointer shadow-2xs"
+            title={isDarkMode ? 'সান মোড অন করুন' : 'মুন মোড অন করুন'}
             aria-label="Toggle theme"
           >
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-navy" />}
@@ -295,7 +294,7 @@ export default function Header() {
           <button
             type="button"
             onClick={toggleLanguage}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 hover:border-primary bg-gray-50 dark:bg-slate-800 hover:bg-white text-xs font-black text-navy dark:text-white transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-[#273142] hover:border-primary bg-gray-50 dark:bg-[#141b26] hover:bg-white text-xs font-black text-navy dark:text-white transition-all cursor-pointer shadow-2xs"
             title="Switch language / ভাষা পরিবর্তন করুন"
           >
             <Globe className="w-3.5 h-3.5 text-primary" />
@@ -325,8 +324,8 @@ export default function Header() {
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-modern-lg border border-gray-100 dark:border-slate-700 py-2 z-50 transform origin-top-right transition-all">
-                  <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 mb-2">
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#0f141c] rounded-2xl shadow-modern-lg border border-gray-200 dark:border-[#1e2638] py-2 z-50 transform origin-top-right transition-all">
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-[#1e2638] mb-2">
                     <p className="text-sm font-bold text-navy dark:text-white truncate">{user.displayName || 'User'}</p>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
                   </div>
@@ -335,7 +334,7 @@ export default function Header() {
                     <Link
                       to="/admin"
                       onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 transition-colors"
+                      className="flex items-center gap-3 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-slate-800 transition-colors"
                     >
                       {t.adminDashboard}
                     </Link>
@@ -353,7 +352,7 @@ export default function Header() {
                   <Link
                     to="/profile"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#141b26] hover:text-primary transition-colors"
                   >
                     <User className="w-4 h-4" /> {t.myProfile}
                   </Link>
@@ -361,16 +360,16 @@ export default function Header() {
                   <Link
                     to="/orders"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#141b26] hover:text-primary transition-colors"
                   >
                     <Package className="w-4 h-4" /> {t.myOrders}
                   </Link>
                   
-                  <div className="h-px bg-gray-100 dark:bg-slate-700 my-2"></div>
+                  <div className="h-px bg-gray-100 dark:bg-[#1e2638] my-2"></div>
                   
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" /> {t.logout}
                   </button>
@@ -384,7 +383,7 @@ export default function Header() {
               to="/login" 
               className="hidden sm:flex items-center gap-2 text-sm font-medium text-navy dark:text-white hover:text-primary transition-colors group"
             >
-              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-[#141b26] flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                 <User className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-primary" />
               </div>
               <span className="hidden lg:block font-bold">{t.loginSignUp}</span>
@@ -400,7 +399,7 @@ export default function Header() {
             >
               <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7" />
               {itemCount > 0 && (
-                <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-primary rounded-full border-2 border-white dark:border-slate-900 transform translate-x-1/4 -translate-y-1/4 shadow-2xs">
+                <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-primary rounded-full border-2 border-white dark:border-[#070a0f] transform translate-x-1/4 -translate-y-1/4 shadow-2xs">
                   {itemCount}
                 </span>
               )}
@@ -419,7 +418,7 @@ export default function Header() {
               value={searchQuery}
               onChange={handleInputChange}
               placeholder={t.searchPlaceholder}
-              className="w-full h-10 pl-4 pr-10 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-primary transition-all text-xs text-navy dark:text-white placeholder:text-gray-400"
+              className="w-full h-10 pl-4 pr-10 rounded-xl border border-gray-200 dark:border-[#273142] bg-gray-50 dark:bg-[#141b26] focus:bg-white dark:focus:bg-[#0f141c] focus:outline-none focus:border-primary transition-all text-xs text-navy dark:text-white placeholder:text-gray-400"
             />
             <button
               type="submit"
