@@ -35,7 +35,7 @@ const DEFAULT_BANNERS: HeroBannerItem[] = [
     description: 'Discover premium backpacks, travel gear & everyday accessories across Bangladesh.',
     buttonText: 'Shop Collection',
     linkUrl: '/products',
-    bgGradient: 'from-navy via-slate-900 to-primary/90',
+    bgGradient: 'from-slate-950 via-slate-900 to-blue-900',
   },
   {
     id: 'banner-2',
@@ -55,7 +55,7 @@ const DEFAULT_BANNERS: HeroBannerItem[] = [
     description: 'Enjoy pure Cash on Delivery to all 64 districts with verified quality inspection.',
     buttonText: 'View All Products',
     linkUrl: '/products',
-    bgGradient: 'from-navy via-navy-light to-slate-900',
+    bgGradient: 'from-slate-950 via-slate-900 to-primary',
   },
 ];
 
@@ -198,7 +198,6 @@ export default function Home() {
 
   const activeBanner = banners[currentBannerIndex] || DEFAULT_BANNERS[0];
 
-  // 🖼️ মাল্টি-ইমেজ হোভার ও ব্যাজ সহ প্রোডাক্ট কার্ড (#5, #7)
   const renderProductCard = (product: Product) => {
     const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
     const discountPercent = (product.originalPrice && product.originalPrice > product.price)
@@ -212,34 +211,30 @@ export default function Home() {
     return (
       <div 
         key={product.id} 
-        className="w-44 sm:w-52 md:w-60 bg-white rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 flex flex-col shrink-0"
+        className="w-44 sm:w-52 md:w-60 bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-100 dark:border-slate-700 flex flex-col shrink-0"
       >
-        <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 p-2.5 flex items-center justify-center">
+        <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/50 dark:bg-slate-900/50 p-2.5 flex items-center justify-center">
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-20">
-              <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white/95">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center z-20">
+              <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white">
                 SOLD OUT
               </span>
             </div>
           )}
 
-          {/* New Tag (#5) */}
           {!isOutOfStock && product.isNewArrival && (
             <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
               New
             </span>
           )}
 
-          {/* Discount Tag */}
           {!isOutOfStock && discountPercent > 0 && (
             <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-2xs">
               -{discountPercent}%
             </span>
           )}
 
-          {/* 🖼️ মাল্টি-ইমেজ হোভার সোয়াপ (#7) */}
           <div className="w-full h-full relative flex items-center justify-center">
-            {/* মেইন ইমেজ */}
             <img 
               src={firstImage} 
               alt={product.name} 
@@ -247,7 +242,6 @@ export default function Home() {
                 product.images.length > 1 ? 'group-hover:opacity-0 group-hover:scale-95' : 'group-hover:scale-105'
               }`}
             />
-            {/* হোভার করলে ২য় ইমেজ ফেড-ইন হবে */}
             {product.images.length > 1 && (
               <img 
                 src={secondImage} 
@@ -258,11 +252,11 @@ export default function Home() {
           </div>
         </Link>
 
-        <div className="p-3 flex flex-col grow">
+        <div className="p-3.5 flex flex-col grow">
           {hasReviews ? (
             <div className="flex items-center gap-1 mb-1 text-amber-500">
               <Star className="w-3 h-3 fill-current" />
-              <span className="text-[11px] font-bold text-navy">{product.rating}</span>
+              <span className="text-[11px] font-bold text-navy dark:text-white">{product.rating}</span>
               <span className="text-[9px] text-gray-400 font-medium">({product.reviewCount})</span>
             </div>
           ) : (
@@ -271,7 +265,7 @@ export default function Home() {
             </div>
           )}
 
-          <Link to={`/products/${product.slug || product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy mb-1.5 grow leading-snug">
+          <Link to={`/products/${product.slug || product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy dark:text-white mb-1.5 grow leading-snug">
             {product.name}
           </Link>
           
@@ -282,7 +276,7 @@ export default function Home() {
             )}
           </div>
           
-          <div className="mt-auto pt-2 border-t border-gray-100">
+          <div className="mt-auto pt-2 border-t border-gray-100 dark:border-slate-700">
             {isOutOfStock ? (
               <button 
                 type="button"
@@ -305,7 +299,7 @@ export default function Home() {
                 <button 
                   type="button"
                   onClick={(e) => handleAddToCart(e, product)}
-                  className="py-1.5 px-1 bg-white hover:bg-gray-50 text-navy border border-gray-200 hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                  className="py-1.5 px-1 bg-white dark:bg-slate-800 hover:bg-gray-50 text-navy dark:text-white border border-gray-200 dark:border-slate-700 hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                 >
                   <ShoppingBag className="w-3 h-3 text-primary" />
                   <span>Cart</span>
@@ -329,11 +323,11 @@ export default function Home() {
         />
       </Helmet>
 
-      {/* Hero Banner Section */}
-      <section className="bg-white pt-2 sm:pt-4">
+      {/* 🚀 Hero Banner Section (Deep Navy & Luxury Gold) */}
+      <section className="bg-white dark:bg-slate-900 pt-2 sm:pt-4 transition-colors">
         <div className="container mx-auto px-3 sm:px-4">
           <div 
-            className="relative rounded-3xl overflow-hidden shadow-modern-lg min-h-55 sm:min-h-80 md:min-h-95 flex items-center group transition-all"
+            className="relative rounded-3xl overflow-hidden shadow-2xl min-h-60 sm:min-h-80 md:min-h-96 flex items-center group transition-all"
             onMouseEnter={() => setIsBannerHovered(true)}
             onMouseLeave={() => setIsBannerHovered(false)}
           >
@@ -347,18 +341,19 @@ export default function Home() {
               </Link>
             ) : (
               <>
-                <div className={`absolute inset-0 bg-linear-to-r ${activeBanner.bgGradient || 'from-navy via-slate-900 to-primary/90'} transition-all duration-700 z-0`} />
+                {/* Deep Luxury Gradient */}
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 transition-all duration-700 z-0" />
 
                 <Link 
                   to={activeBanner.linkUrl || '/products'}
                   className="relative z-10 w-full h-full p-6 sm:p-10 md:p-14 flex flex-col md:flex-row items-center justify-between gap-6 cursor-pointer focus:outline-none"
                 >
                   <div className="w-full md:w-3/5 space-y-2.5 sm:space-y-4 text-center md:text-left">
-                    <span className="inline-block py-1 px-3 rounded-full bg-primary/25 text-brand-gold text-[10px] sm:text-xs font-black border border-brand-gold/30 tracking-wider uppercase">
+                    <span className="inline-block py-1 px-3.5 rounded-full bg-blue-500/20 text-brand-gold text-[10px] sm:text-xs font-black border border-brand-gold/40 tracking-wider uppercase shadow-2xs">
                       {activeBanner.badge || 'Special Offer'}
                     </span>
 
-                    <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white leading-tight">
+                    <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white leading-tight drop-shadow-sm">
                       {activeBanner.title} <br className="hidden sm:inline" />
                       <span className="text-brand-gold">{activeBanner.highlightText}</span>
                     </h1>
@@ -368,7 +363,7 @@ export default function Home() {
                     </p>
 
                     <div className="pt-2">
-                      <span className="inline-flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-6 sm:px-8 py-2.5 sm:py-3.5 rounded-full font-black text-xs sm:text-sm transition-all shadow-md group-hover:scale-105 active:scale-95">
+                      <span className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 sm:px-8 py-2.5 sm:py-3.5 rounded-full font-black text-xs sm:text-sm transition-all shadow-lg group-hover:scale-105 active:scale-95">
                         <ShoppingBag className="w-4 h-4" />
                         {activeBanner.buttonText || 'Shop Collection'}
                         <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
@@ -376,14 +371,15 @@ export default function Home() {
                     </div>
                   </div>
 
+                  {/* Right Card */}
                   <div className="hidden md:flex w-2/5 justify-end">
-                    <div className="w-48 h-48 lg:w-56 lg:h-56 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex flex-col items-center justify-center p-6 text-center shadow-2xl group-hover:scale-102 transition-transform">
-                      <div className="w-12 h-12 rounded-2xl bg-brand-gold/20 flex items-center justify-center text-brand-gold mb-3">
+                    <div className="w-52 h-52 lg:w-60 lg:h-60 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex flex-col items-center justify-center p-6 text-center shadow-2xl group-hover:scale-102 transition-transform">
+                      <div className="w-12 h-12 rounded-2xl bg-brand-gold/20 flex items-center justify-center text-brand-gold mb-3 shadow-inner">
                         <Sparkles className="w-6 h-6" />
                       </div>
                       <span className="text-2xl font-black text-white tracking-widest uppercase">{siteName || 'ISAR'}</span>
                       <span className="text-[10px] text-brand-gold font-bold uppercase tracking-widest mt-1">Official Flagship Store</span>
-                      <span className="text-[9px] text-gray-300 mt-2">100% Genuine • Fast Nationwide Shipping</span>
+                      <span className="text-[10px] text-gray-300 mt-2">100% Genuine • Fast Nationwide Shipping</span>
                     </div>
                   </div>
                 </Link>
@@ -393,7 +389,7 @@ export default function Home() {
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); goToPrevBanner(); }}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 hover:bg-black text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
               aria-label="Previous Banner"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -402,7 +398,7 @@ export default function Home() {
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); goToNextBanner(); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 hover:bg-black text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
               aria-label="Next Banner"
             >
               <ChevronRight className="w-5 h-5" />
@@ -426,45 +422,45 @@ export default function Home() {
       </section>
 
       {/* Trust Badges */}
-      <section className="bg-white border-y border-gray-100 py-3">
+      <section className="bg-white dark:bg-slate-900 border-y border-gray-100 dark:border-slate-800 py-3 transition-colors">
         <div className="container mx-auto px-3 sm:px-4">
           <div className="flex sm:grid sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 sm:bg-transparent">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-slate-800 sm:bg-transparent">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 <Truck className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy whitespace-nowrap">Fast Delivery</h4>
+                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Fast Delivery</h4>
                 <p className="text-[10px] text-gray-400 whitespace-nowrap">Nationwide 64 Districts</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 sm:bg-transparent">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-slate-800 sm:bg-transparent">
               <div className="w-8 h-8 rounded-xl bg-brand-gold/10 flex items-center justify-center text-brand-gold shrink-0">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy whitespace-nowrap">100% Authentic</h4>
+                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">100% Authentic</h4>
                 <p className="text-[10px] text-gray-400 whitespace-nowrap">Verified Quality QC</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 sm:bg-transparent">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-slate-800 sm:bg-transparent">
               <div className="w-8 h-8 rounded-xl bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
                 <CreditCard className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy whitespace-nowrap">Cash on Delivery</h4>
+                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Cash on Delivery</h4>
                 <p className="text-[10px] text-gray-400 whitespace-nowrap">0 BDT Advance</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 sm:bg-transparent">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-slate-800 sm:bg-transparent">
               <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy whitespace-nowrap">Dedicated Support</h4>
+                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Dedicated Support</h4>
                 <p className="text-[10px] text-gray-400 whitespace-nowrap">Helpline Care</p>
               </div>
             </div>
@@ -481,7 +477,7 @@ export default function Home() {
       {categories.length > 0 && (
         <section className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base sm:text-lg font-black text-navy flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-2">
               <Layers className="w-4 h-4 text-primary" /> Product Categories
             </h2>
             <Link 
@@ -501,12 +497,12 @@ export default function Home() {
                 <Link 
                   key={category.id} 
                   to={`/products?category=${encodeURIComponent(categoryTarget)}`}
-                  className="bg-white rounded-2xl p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-modern hover:shadow-modern-lg transition-all border border-gray-100 group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/40"
+                  className="bg-white dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-modern hover:shadow-modern-lg transition-all border border-gray-100 dark:border-slate-700 group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/40"
                 >
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-2xs`}>
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <span className="text-[11px] sm:text-xs font-bold text-navy text-center line-clamp-1">{category.name}</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-navy dark:text-white text-center line-clamp-1">{category.name}</span>
                 </Link>
               );
             })}
@@ -518,7 +514,7 @@ export default function Home() {
       <section className="container mx-auto px-3 sm:px-4 pt-2">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="text-base sm:text-lg font-black text-navy flex items-center gap-1.5">
+            <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-1.5">
               <Flame className="w-4 h-4 text-amber-500" /> Trending Products
             </h2>
             <p className="text-[11px] text-gray-500">Popular & frequently purchased gear</p>
@@ -528,7 +524,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => scrollSlider(trendingSliderRef, 'left')}
-              className="p-1.5 rounded-xl bg-white hover:bg-primary hover:text-white border border-gray-200 text-navy transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+              className="p-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-primary hover:text-white border border-gray-200 dark:border-slate-700 text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
               aria-label="Scroll left"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -536,7 +532,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => scrollSlider(trendingSliderRef, 'right')}
-              className="p-1.5 rounded-xl bg-white hover:bg-primary hover:text-white border border-gray-200 text-navy transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+              className="p-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-primary hover:text-white border border-gray-200 dark:border-slate-700 text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
               aria-label="Scroll right"
             >
               <ChevronRight className="w-4 h-4" />
@@ -549,7 +545,7 @@ export default function Home() {
         </div>
 
         {loading ? (
-          <div className="py-12 flex flex-col items-center justify-center bg-white rounded-3xl border border-gray-100">
+          <div className="py-12 flex flex-col items-center justify-center bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
             <span className="text-xs text-gray-500 font-medium">Loading live products...</span>
           </div>
@@ -569,7 +565,7 @@ export default function Home() {
           <div className="bg-linear-to-r from-amber-500/10 via-rose-500/5 to-primary/10 rounded-3xl p-4 sm:p-6 border border-amber-500/20 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base sm:text-lg font-black text-navy flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500" /> Best of Mega Deals
                 </h2>
                 <p className="text-[11px] text-gray-500">Biggest discounts & special price drops</p>
@@ -579,7 +575,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => scrollSlider(megaDealsSliderRef, 'left')}
-                  className="p-1.5 rounded-xl bg-white hover:bg-primary hover:text-white border border-gray-200 text-navy transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  className="p-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-primary hover:text-white border border-gray-200 dark:border-slate-700 text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
                   aria-label="Scroll left"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -587,7 +583,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => scrollSlider(megaDealsSliderRef, 'right')}
-                  className="p-1.5 rounded-xl bg-white hover:bg-primary hover:text-white border border-gray-200 text-navy transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  className="p-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-primary hover:text-white border border-gray-200 dark:border-slate-700 text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
                   aria-label="Scroll right"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -614,7 +610,7 @@ export default function Home() {
         <section className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base sm:text-lg font-black text-navy flex items-center gap-1.5">
+              <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-brand-green" /> New Arrivals
               </h2>
               <p className="text-[11px] text-gray-500">Freshly added inventory items</p>
@@ -636,7 +632,7 @@ export default function Home() {
         <section key={section.title} className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base sm:text-lg font-black text-navy flex items-center gap-1.5">
+              <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-primary" /> {section.title}
               </h2>
               <p className="text-[11px] text-gray-500">Special curated collection</p>
