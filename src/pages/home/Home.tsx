@@ -197,6 +197,8 @@ export default function Home() {
   }, [products]);
 
   const activeBanner = banners[currentBannerIndex] || DEFAULT_BANNERS[0];
+  const hasCustomImage = Boolean(activeBanner.imageUrl);
+  const hasOverlayText = Boolean(activeBanner.title || activeBanner.highlightText || activeBanner.badge);
 
   const renderProductCard = (product: Product) => {
     const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
@@ -323,23 +325,59 @@ export default function Home() {
         />
       </Helmet>
 
-      {/* Hero Banner Section */}
+      {/* 🚀 Hero Banner Section (100% Clickable & Responsive) */}
       <section className="bg-transparent pt-2 sm:pt-4">
         <div className="container mx-auto px-3 sm:px-4">
           <div 
-            className="relative rounded-3xl overflow-hidden shadow-2xl min-h-60 sm:min-h-80 md:min-h-96 flex items-center group transition-all border border-slate-800/80"
+            className="relative rounded-3xl overflow-hidden shadow-2xl min-h-60 sm:min-h-80 md:min-h-96 flex items-center group transition-all border border-slate-800/80 bg-black"
             onMouseEnter={() => setIsBannerHovered(true)}
             onMouseLeave={() => setIsBannerHovered(false)}
           >
-            {activeBanner.imageUrl ? (
-              <Link to={activeBanner.linkUrl || '/products'} className="w-full h-full absolute inset-0 z-10 cursor-pointer">
+            {/* ১. যদি কাস্টম ব্যানার ইমেজ আপলোড করা থাকে */}
+            {hasCustomImage ? (
+              <Link to={activeBanner.linkUrl || '/products'} className="w-full h-full absolute inset-0 z-10 block cursor-pointer">
                 <img 
                   src={activeBanner.imageUrl} 
-                  alt={activeBanner.title || 'Promotional Banner'} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-101"
+                  alt={activeBanner.title || 'ISAR Hero Banner'} 
+                  className="w-full h-full object-cover sm:object-fill transition-transform duration-700 group-hover:scale-[1.01]"
                 />
+                
+                {/* যদি ছবির ওপর টেক্সটও দেওয়া থাকে */}
+                {hasOverlayText && (
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[0.5px] p-6 sm:p-10 md:p-14 flex flex-col justify-center items-start text-left z-20">
+                    {activeBanner.badge && (
+                      <span className="inline-block py-1 px-3.5 rounded-full bg-blue-500/20 text-brand-gold text-[10px] sm:text-xs font-black border border-brand-gold/40 tracking-wider uppercase mb-2 shadow-2xs">
+                        {activeBanner.badge}
+                      </span>
+                    )}
+
+                    {activeBanner.title && (
+                      <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white leading-tight drop-shadow-md">
+                        {activeBanner.title} <br className="hidden sm:inline" />
+                        {activeBanner.highlightText && <span className="text-brand-gold">{activeBanner.highlightText}</span>}
+                      </h1>
+                    )}
+
+                    {activeBanner.description && (
+                      <p className="text-gray-200 text-xs sm:text-sm max-w-md line-clamp-2 mt-2 leading-relaxed drop-shadow-xs">
+                        {activeBanner.description}
+                      </p>
+                    )}
+
+                    {activeBanner.buttonText && (
+                      <div className="pt-3">
+                        <span className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 sm:px-8 py-2.5 sm:py-3.5 rounded-full font-black text-xs sm:text-sm transition-all shadow-lg group-hover:scale-105 active:scale-95">
+                          <ShoppingBag className="w-4 h-4" />
+                          {activeBanner.buttonText}
+                          <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </Link>
             ) : (
+              /* ২. যদি ছবি না দিয়ে শুধু গ্র্যাডিয়েন্ট ও টেক্সট ব্যানার দেওয়া থাকে */
               <>
                 <div className="absolute inset-0 bg-linear-to-r from-black via-[#090d16] to-navy transition-all duration-700 z-0" />
 
@@ -353,12 +391,12 @@ export default function Home() {
                     </span>
 
                     <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white leading-tight drop-shadow-sm">
-                      {activeBanner.title} <br className="hidden sm:inline" />
-                      <span className="text-brand-gold">{activeBanner.highlightText}</span>
+                      {activeBanner.title || 'Upgrade Your Lifestyle'} <br className="hidden sm:inline" />
+                      <span className="text-brand-gold">{activeBanner.highlightText || 'Everyday Carry'}</span>
                     </h1>
 
                     <p className="text-gray-300 text-xs sm:text-sm max-w-md mx-auto md:mx-0 line-clamp-2 sm:line-clamp-none leading-relaxed">
-                      {activeBanner.description}
+                      {activeBanner.description || 'Discover premium backpacks, travel gear & everyday accessories across Bangladesh.'}
                     </p>
 
                     <div className="pt-2">
@@ -384,37 +422,42 @@ export default function Home() {
               </>
             )}
 
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); goToPrevBanner(); }}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
-              aria-label="Previous Banner"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); goToNextBanner(); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
-              aria-label="Next Banner"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-              {banners.map((_, idx) => (
+            {/* স্লাইডার কন্ট্রোল বাটন */}
+            {banners.length > 1 && (
+              <>
                 <button
-                  key={idx}
                   type="button"
-                  onClick={(e) => { e.preventDefault(); setCurrentBannerIndex(idx); }}
-                  className={`h-2 rounded-full transition-all cursor-pointer ${
-                    currentBannerIndex === idx ? 'w-6 bg-brand-gold' : 'w-2 bg-white/40 hover:bg-white/80'
-                  }`}
-                  aria-label={`Slide ${idx + 1}`}
-                />
-              ))}
-            </div>
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); goToPrevBanner(); }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 cursor-pointer shadow-md"
+                  aria-label="Previous Banner"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); goToNextBanner(); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-xs flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 cursor-pointer shadow-md"
+                  aria-label="Next Banner"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30">
+                  {banners.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCurrentBannerIndex(idx); }}
+                      className={`h-2 rounded-full transition-all cursor-pointer ${
+                        currentBannerIndex === idx ? 'w-6 bg-brand-gold' : 'w-2 bg-white/40 hover:bg-white/80'
+                      }`}
+                      aria-label={`Slide ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
