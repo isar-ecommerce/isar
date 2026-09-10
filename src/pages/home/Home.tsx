@@ -146,7 +146,7 @@ export default function Home() {
       toast.error('This item is currently sold out');
       return;
     }
-    clearCart(); // 🔴 আগের সব কার্ট আইটেম মুছে ফেলবে
+    clearCart();
     addItemToCart(product, 1);
     navigate('/checkout', {
       state: { from: product.name, path: `/products/${product.slug || product.id}` },
@@ -198,6 +198,7 @@ export default function Home() {
 
   const activeBanner = banners[currentBannerIndex] || DEFAULT_BANNERS[0];
 
+  // 🖼️ মাল্টি-ইমেজ হোভার ও ব্যাজ সহ প্রোডাক্ট কার্ড (#5, #7)
   const renderProductCard = (product: Product) => {
     const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
     const discountPercent = (product.originalPrice && product.originalPrice > product.price)
@@ -205,6 +206,8 @@ export default function Home() {
       : 0;
 
     const hasReviews = (product.reviewCount || 0) > 0;
+    const firstImage = product.images[0] || 'https://via.placeholder.com/350';
+    const secondImage = product.images[1] || firstImage;
 
     return (
       <div 
@@ -220,23 +223,39 @@ export default function Home() {
             </div>
           )}
 
+          {/* New Tag (#5) */}
           {!isOutOfStock && product.isNewArrival && (
             <span className="absolute top-2 left-2 z-10 bg-brand-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
               New
             </span>
           )}
 
+          {/* Discount Tag */}
           {!isOutOfStock && discountPercent > 0 && (
             <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-2xs">
               -{discountPercent}%
             </span>
           )}
 
-          <img 
-            src={product.images[0] || 'https://via.placeholder.com/350'} 
-            alt={product.name} 
-            className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
-          />
+          {/* 🖼️ মাল্টি-ইমেজ হোভার সোয়াপ (#7) */}
+          <div className="w-full h-full relative flex items-center justify-center">
+            {/* মেইন ইমেজ */}
+            <img 
+              src={firstImage} 
+              alt={product.name} 
+              className={`max-h-full max-w-full object-contain transition-all duration-300 ${
+                product.images.length > 1 ? 'group-hover:opacity-0 group-hover:scale-95' : 'group-hover:scale-105'
+              }`}
+            />
+            {/* হোভার করলে ২য় ইমেজ ফেড-ইন হবে */}
+            {product.images.length > 1 && (
+              <img 
+                src={secondImage} 
+                alt={`${product.name} alternate`} 
+                className="max-h-full max-w-full object-contain absolute inset-0 m-auto opacity-0 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300 pointer-events-none"
+              />
+            )}
+          </div>
         </Link>
 
         <div className="p-3 flex flex-col grow">
@@ -410,7 +429,6 @@ export default function Home() {
       <section className="bg-white border-y border-gray-100 py-3">
         <div className="container mx-auto px-3 sm:px-4">
           <div className="flex sm:grid sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto no-scrollbar">
-            
             <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 sm:bg-transparent">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 <Truck className="w-4 h-4" />
@@ -447,10 +465,9 @@ export default function Home() {
               </div>
               <div>
                 <h4 className="text-xs font-bold text-navy whitespace-nowrap">Dedicated Support</h4>
-                <p className="text-[10px] text-gray-400 whitespace-nowrap">Helpline Care & WhatsApp</p>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">Helpline Care</p>
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -614,7 +631,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* Point 4: Dynamic Custom Sections created by Admin */}
+      {/* Dynamic Custom Sections created by Admin */}
       {dynamicCustomSections.map((section) => (
         <section key={section.title} className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">

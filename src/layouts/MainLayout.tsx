@@ -1,51 +1,20 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import MobileNav from '../components/layout/MobileNav';
-import FloatingContact from '../components/common/FloatingContact';
+import ScrollToTop from '../components/common/ScrollToTop';
 
 export default function MainLayout() {
-  const location = useLocation();
-
-  const isHomePage = location.pathname === '/';
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
-  const isCheckoutPage = location.pathname === '/checkout';
-  
-  // Strictly hide bottom floating widgets on Auth and Checkout pages across all devices
-  const shouldHideFloatingWidgets = isAuthPage || isCheckoutPage;
-
   return (
-    <div className="flex flex-col min-h-screen bg-secondary print:bg-white">
-      {/* Global Header */}
-      <div className="print:hidden">
-        <Header />
-      </div>
-
-      {/* Main Content Area */}
-      <main className={`grow ${shouldHideFloatingWidgets ? 'pb-4 md:pb-0' : 'pb-16 md:pb-0'} print:pb-0 print:m-0`}>
+    <div className="min-h-screen flex flex-col bg-secondary">
+      <Header />
+      <main className="flex-1 pb-16 md:pb-0">
         <Outlet />
       </main>
-
-      {/* Floating WhatsApp Widget: Strictly hidden on Login, Register and Checkout */}
-      {!shouldHideFloatingWidgets && (
-        <div className="print:hidden">
-          <FloatingContact />
-        </div>
-      )}
-
-      {/* Footer strictly on Homepage ONLY */}
-      {isHomePage && (
-        <div className="print:hidden">
-          <Footer />
-        </div>
-      )}
-      
-      {/* Mobile Bottom Navigation: Strictly hidden on Login, Register and Checkout to prevent glitches */}
-      {!shouldHideFloatingWidgets && (
-        <div className="print:hidden">
-          <MobileNav />
-        </div>
-      )}
+      <Footer />
+      <MobileNav />
+      {/* ফ্লোটিং অটো-স্ক্রোল বাটন (#8) */}
+      <ScrollToTop />
     </div>
   );
 }
