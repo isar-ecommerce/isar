@@ -24,10 +24,11 @@ import {
   Play, 
   HelpCircle, 
   MessageSquare,
-  Rocket
+  Rocket,
+  Send
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 
 import { db } from '../../firebase/config';
 import { getProductById, getProductBySlug, getProducts } from '../../services/productService';
@@ -50,6 +51,8 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -77,12 +80,14 @@ export default function ProductDetail() {
   // ৪. Frequently Bought Together বান্ডেল স্টেট (#7)
   const [selectedBundleIds, setSelectedBundleIds] = useState<string[]>([]);
 
-  // ৫. প্রোডাক্ট প্রশ্নোত্তর (Q&A) স্টেট (#21)
+  // ৫. প্রোডাক্ট প্রশ্নোত্তর (Q&A) স্টেট ও অ্যাডমিন উত্তর ইনপুট (#21)
   const [questionsList, setQuestionsList] = useState<ProductQuestionItem[]>([]);
   const [newQuestionText, setNewQuestionText] = useState<string>('');
   const [isSubmittingQuestion, setIsSubmittingQuestion] = useState<boolean>(false);
+  const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
+  const [updatingQuestionId, setUpdatingQuestionId] = useState<string | null>(null);
 
-  // ⏳ ৬. কামিং সুন লঞ্চিং কাউন্টডাউন স্টেট (#11)
+  // ৬. কামিং সুন লঞ্চিং কাউন্টডাউন স্টেট (#11)
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number; isLaunched: boolean }>({
     days: 0,
     hours: 0,
@@ -146,7 +151,7 @@ export default function ProductDetail() {
     };
   }, [id]);
 
-  // ⏳ কামিং সুন রিয়েল কাউন্টডাউন টাইমার ইঞ্জিন (#11)
+  // কামিং সুন কাউন্টডাউন টাইমার
   useEffect(() => {
     const launchDateStr = (product as { launchDate?: string })?.launchDate;
     if (!launchDateStr) return;
@@ -295,6 +300,7 @@ export default function ProductDetail() {
     }
   };
 
+  // কাস্টমার প্রশ্ন সাবমিট
   const handleSubmitQuestion = async (e: FormEvent) => {
     e.preventDefault();
     if (!newQuestionText.trim()) return;
@@ -308,15 +314,42 @@ export default function ProductDetail() {
         createdAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'product_questions'), newQ);
+      const docRef = await addDoc(collection(db, 'product_questions'), newQ);
       toast.success('Your question has been submitted! Our team will answer shortly.');
-      setQuestionsList(prev => [{ ...newQ, id: `temp-${Date.now()}` }, ...prev]);
+      setQuestionsList(prev => [{ ...newQ, id: docRef.id }, ...prev]);
       setNewQuestionText('');
     } catch (err) {
       console.error('Question submit error:', err);
       toast.error('Failed to submit question.');
     } finally {
       setIsSubmittingQuestion(false);
+    }
+  };
+
+  // 💬 অ্যাডমিন সরাসরি প্রশ্নের উত্তর দেওয়ার হ্যান্ডলার (#21)
+  const handleAdminReplySubmit = async (questionId: string) => {
+    const replyText = replyInputs[questionId]?.trim();
+    if (!replyText) {
+      toast.error('Please write an answer before submitting');
+      return;
+    }
+
+    try {
+      setUpdatingQuestionId(questionId);
+      const qRef = doc(db, 'product_questions', questionId);
+      await updateDoc(qRef, {
+        answer: replyText,
+        answeredAt: serverTimestamp(),
+      });
+
+      setQuestionsList(prev => prev.map(q => q.id === questionId ? { ...q, answer: replyText } : q));
+      setReplyInputs(prev => ({ ...prev, [questionId]: '' }));
+      toast.success('Official reply published successfully!');
+    } catch (err) {
+      console.error('Admin reply error:', err);
+      toast.error('Failed to publish answer.');
+    } finally {
+      setUpdatingQuestionId(null);
     }
   };
 
@@ -526,7 +559,7 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {/* ⏳ কামিং সুন রিয়েল লঞ্চিং কাউন্টডাউন বক্স (#11) */}
+              {/* কামিং সুন কাউন্টডাউন */}
               {isComingSoonActive && (
                 <div className="p-4 bg-linear-to-r from-amber-500/15 via-primary/10 to-brand-gold/15 rounded-2xl border border-amber-400/50 space-y-2.5">
                   <div className="flex items-center justify-between">
@@ -717,7 +750,7 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* 3 Genuine Bangladeshi Guarantee Boxes (#20, #22, #23) */}
+              {/* 3 Genuine Bangladeshi Guarantee Boxes */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-4 border-t border-gray-100">
                 <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-2.5 text-left">
                   <div className="w-8 h-8 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center shrink-0">
@@ -814,7 +847,7 @@ export default function ProductDetail() {
           </div>
         )}
 
-        {/* Tabs Section with Q&A (#21) */}
+        {/* Tabs Section with Q&A and 💬 Admin Direct Reply Engine (#21) */}
         <div className="bg-white rounded-3xl shadow-modern border border-gray-100 overflow-hidden">
           <div className="flex border-b border-gray-100 bg-gray-50/50">
             <button
@@ -877,6 +910,7 @@ export default function ProductDetail() {
               </div>
             )}
 
+            {/* Q&A সেকশন এবং অ্যাডমিন সরাসরি রিপ্লাই দেওয়ার বক্স */}
             {activeTab === 'qa' && (
               <div className="space-y-6 max-w-3xl">
                 <form onSubmit={handleSubmitQuestion} className="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-200">
@@ -902,25 +936,53 @@ export default function ProductDetail() {
                   </div>
                 </form>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {questionsList.length === 0 ? (
                     <p className="text-xs text-gray-400 text-center py-6">No questions asked yet. Be the first to ask!</p>
                   ) : (
                     questionsList.map((q) => (
-                      <div key={q.id} className="p-4 rounded-2xl border border-gray-100 space-y-2 bg-gray-50/60">
+                      <div key={q.id} className="p-4 rounded-2xl border border-gray-100 space-y-3 bg-gray-50/60">
                         <div className="flex items-start gap-2 text-xs font-black text-navy">
                           <span className="text-primary font-bold">Q:</span>
                           <p>{q.question}</p>
                         </div>
+                        
                         {q.answer ? (
-                          <div className="flex items-start gap-2 text-xs text-gray-700 bg-white p-3 rounded-xl border border-gray-100 mt-1">
+                          <div className="flex items-start gap-2 text-xs text-gray-700 bg-white p-3 rounded-xl border border-gray-100">
                             <span className="text-brand-green font-bold">A:</span>
-                            <p className="leading-relaxed">{q.answer}</p>
+                            <div>
+                              <p className="leading-relaxed font-medium">{q.answer}</p>
+                              <span className="text-[10px] font-bold text-brand-green mt-1 flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" /> Official ISAR Response
+                              </span>
+                            </div>
                           </div>
                         ) : (
                           <p className="text-[11px] text-amber-600 font-semibold italic pl-4">
                             ⌛ Answer pending from ISAR store team...
                           </p>
+                        )}
+
+                        {/* 💬 অ্যাডমিন সরাসরি উত্তর দেওয়ার বক্স (শুধু অ্যাডমিন দেখতে পাবে) */}
+                        {isAdmin && !q.answer && (
+                          <div className="mt-2 pt-2 border-t border-gray-200 flex gap-2">
+                            <input
+                              type="text"
+                              value={replyInputs[q.id] || ''}
+                              onChange={(e) => setReplyInputs({ ...replyInputs, [q.id]: e.target.value })}
+                              placeholder="অ্যাডমিন হিসেবে এই প্রশ্নের উত্তর লিখুন..."
+                              className="flex-1 px-3 py-1.5 border border-primary/40 rounded-xl bg-white text-xs text-navy focus:outline-none focus:border-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAdminReplySubmit(q.id)}
+                              disabled={updatingQuestionId === q.id}
+                              className="px-4 py-1.5 bg-brand-green hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            >
+                              {updatingQuestionId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                              <span>Reply</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     ))
