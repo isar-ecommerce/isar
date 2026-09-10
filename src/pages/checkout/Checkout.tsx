@@ -27,6 +27,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
 import { createOrder, calculateDynamicDeliveryFee } from '../../services/orderService';
 import { validateCouponCode, incrementCouponUsage } from '../../services/couponService';
+import { trackMetaEvent } from '../../services/pixelService';
 import { 
   sendOrderConfirmationSMS, 
   sendOrderConfirmationEmail, 
@@ -60,7 +61,6 @@ export default function Checkout() {
   const subtotal = getSubtotal();
   const discount = getDiscount();
 
-  // ফর্ম স্টেট (লোকালস্টোরেজ ড্রাফট অটো-রিস্টোর সহ - #14)
   const [fullName, setFullName] = useState<string>(() => localStorage.getItem('isar_draft_name') || '');
   const [email, setEmail] = useState<string>(() => user?.email || localStorage.getItem('isar_draft_email') || '');
   const [phone, setPhone] = useState<string>(() => localStorage.getItem('isar_draft_phone') || '');
@@ -72,7 +72,6 @@ export default function Checkout() {
   const [fullAddress, setFullAddress] = useState<string>(() => localStorage.getItem('isar_draft_address') || '');
   const [deliveryNotes, setDeliveryNotes] = useState<string>('');
 
-  // 🎁 গিফট বক্স ও মেসেজ স্টেট (#16, #17)
   const [isGiftWrap, setIsGiftWrap] = useState<boolean>(false);
   const [giftMessage, setGiftMessage] = useState<string>('');
 
@@ -95,7 +94,6 @@ export default function Checkout() {
     navigate(backButtonPath);
   };
 
-  // 💾 ইনপুট ড্রাফট অটো-সেভ (#14)
   useEffect(() => {
     if (fullName) localStorage.setItem('isar_draft_name', fullName);
     if (email) localStorage.setItem('isar_draft_email', email);
@@ -103,7 +101,6 @@ export default function Checkout() {
     if (fullAddress) localStorage.setItem('isar_draft_address', fullAddress);
   }, [fullName, email, phone, fullAddress]);
 
-  // Auto-fill address from User Profile if logged in
   useEffect(() => {
     let isMounted = true;
     if (!user?.uid) return;
@@ -147,7 +144,6 @@ export default function Checkout() {
     };
   }, [user?.uid]);
 
-  // ওজনের ওপর ভিত্তি করে ডেলিভারি চার্জ
   const totalWeight = useMemo(() => {
     return items.reduce((sum, item) => {
       const weightPerItem = (item.product as { weightInKg?: number })?.weightInKg || 0.5;
@@ -175,7 +171,6 @@ export default function Checkout() {
     }
   }, [items, navigate]);
 
-  // Abandoned Cart ড্রাফট সেভ
   useEffect(() => {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     if (cleanPhone.length < 11 || !fullName.trim() || items.length === 0) return;
@@ -291,7 +286,6 @@ export default function Checkout() {
       return false;
     }
 
-    // 🇧🇩 রিয়েল-টাইম বাংলাদেশি সব অপারেটরের ১১ ডিজিট ভ্যালিডেশন (#19)
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const bdPhoneRegex = /^(?:\+88|88)?(01[3-9]\d{8})$/;
     if (!bdPhoneRegex.test(cleanPhone)) {
@@ -316,7 +310,6 @@ export default function Checkout() {
     try {
       setIsSubmitting(true);
 
-      // 📱 কাস্টমার ডিভাইস ডিটেকশন (#23) - কোনো অনুমতি ব্যতিরেকে
       const detectedDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent) 
         ? 'Apple iOS' 
         : /Android/i.test(navigator.userAgent) 
@@ -353,13 +346,20 @@ export default function Checkout() {
         paymentStatus: 'pending',
         paidAmount: 0,
         dueAmount: total,
-        // নতুন প্যারামিটারসমূহ
         isGiftWrap,
         giftMessage: isGiftWrap ? giftMessage : undefined,
         deviceInfo: detectedDevice,
       });
 
-      // ড্রাফট ও লোকালস্টোরেজ ক্লিয়ার
+      // 🎯 মেটা পিক্সেল (ফেসবুক ও ইনস্টাগ্রাম) পারচেজ ইভেন্ট ফায়ার (#39)
+      trackMetaEvent('Purchase', {
+        value: total,
+        currency: 'BDT',
+        orderNumber: order.orderNumber,
+        phone: phone.trim(),
+        email: email.trim(),
+      });
+
       try {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
         await deleteDoc(doc(db, 'abandoned_carts', `draft_${cleanPhone}`));
@@ -575,7 +575,7 @@ export default function Checkout() {
                     type="text"
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
-                    placeholder="e.g. Call before delivery / 5pm er por delivery din"
+                    placeholder="e.g. Call before delivery"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -583,7 +583,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* 🎁 Gift Wrap & Personal Greeting Card Option (#16, #17) */}
+            {/* Gift Wrap Option */}
             <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-modern border border-gray-100 space-y-3">
               <label className="flex items-center justify-between cursor-pointer select-none">
                 <div className="flex items-center gap-3">
@@ -702,7 +702,7 @@ export default function Checkout() {
                               type="button"
                               onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.selectedVariantId)}
                               disabled={isAtMin}
-                              className="w-5 h-5 flex items-center justify-center text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              className="p-1.5 text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                               aria-label="Decrease quantity"
                               title="Decrease quantity"
                             >
@@ -719,7 +719,7 @@ export default function Checkout() {
                                 }
                               }}
                               disabled={isAtMax}
-                              className="w-5 h-5 flex items-center justify-center text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              className="p-1.5 text-navy hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                               aria-label="Increase quantity"
                               title="Increase quantity"
                             >
@@ -831,7 +831,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Confirm Order Button with Double Click Guard (#24) */}
+              {/* Confirm Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
