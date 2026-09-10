@@ -11,11 +11,11 @@ import {
   CreditCard, 
   Clock, 
   Star, 
-  Loader2,
-  Zap,
-  Flame,
-  Sparkles,
-  Layers
+  Loader2, 
+  Zap, 
+  Flame, 
+  Sparkles, 
+  Layers 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -35,7 +35,7 @@ const DEFAULT_BANNERS: HeroBannerItem[] = [
     description: 'Discover premium backpacks, travel gear & everyday accessories across Bangladesh.',
     buttonText: 'Shop Collection',
     linkUrl: '/products',
-    bgGradient: 'from-black via-[#090d16] to-[#0f172a]',
+    bgGradient: 'from-black via-[#090d16] to-navy',
   },
   {
     id: 'banner-2',
@@ -45,7 +45,7 @@ const DEFAULT_BANNERS: HeroBannerItem[] = [
     description: 'High-speed chargers, sleek smartphone gear and audio essentials at unbeatable prices.',
     buttonText: 'Explore Gadgets',
     linkUrl: '/products?category=smart-phone',
-    bgGradient: 'from-black via-[#090d16] to-[#0f172a]',
+    bgGradient: 'from-black via-[#090d16] to-navy',
   },
   {
     id: 'banner-3',
@@ -55,7 +55,7 @@ const DEFAULT_BANNERS: HeroBannerItem[] = [
     description: 'Enjoy pure Cash on Delivery to all 64 districts with verified quality inspection.',
     buttonText: 'View All Products',
     linkUrl: '/products',
-    bgGradient: 'from-black via-[#090d16] to-[#0f172a]',
+    bgGradient: 'from-black via-[#090d16] to-navy',
   },
 ];
 
@@ -212,11 +212,11 @@ export default function Home() {
     return (
       <div 
         key={product.id} 
-        className="w-44 sm:w-52 md:w-60 bg-white dark:bg-[#0f141c] rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all group border border-gray-200/80 dark:border-[#1e2638] flex flex-col shrink-0"
+        className="w-44 sm:w-52 md:w-60 bg-white dark:bg-[#0f141c] rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all group border border-slate-200/90 dark:border-[#1e2638] flex flex-col shrink-0"
       >
-        <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/60 dark:bg-[#141b26] p-2.5 flex items-center justify-center">
+        <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-[#f0f2f5] dark:bg-[#141b26] p-2.5 flex items-center justify-center">
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center z-20">
+            <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex items-center justify-center z-20">
               <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white">
                 SOLD OUT
               </span>
@@ -300,7 +300,7 @@ export default function Home() {
                 <button 
                   type="button"
                   onClick={(e) => handleAddToCart(e, product)}
-                  className="py-1.5 px-1 bg-white dark:bg-[#141b26] hover:bg-gray-50 text-navy dark:text-white border border-gray-200 dark:border-[#273142] hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                  className="py-1.5 px-1 bg-[#f0f2f5] dark:bg-[#141b26] hover:bg-gray-100 text-navy dark:text-white border border-gray-200 dark:border-[#273142] hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                 >
                   <ShoppingBag className="w-3 h-3 text-primary" />
                   <span>Cart</span>
@@ -324,7 +324,7 @@ export default function Home() {
         />
       </Helmet>
 
-      {/* Hero Banner Section */}
+      {/* 🚀 Hero Banner Section (Clean Matte Obsidian Black) */}
       <section className="bg-transparent pt-2 sm:pt-4">
         <div className="container mx-auto px-3 sm:px-4">
           <div 
@@ -420,49 +420,51 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Trust Badges */}
+      {/* 🛡️ Trust Badges Bar (সান মোডে সফট ক্রিস্প হোয়াইট বক্স) */}
       <section className="container mx-auto px-3 sm:px-4">
-        <div className="bg-white dark:bg-[#0f141c] rounded-3xl p-3 sm:p-4 shadow-sm border border-gray-200/80 dark:border-[#1e2638]">
+        <div className="bg-white dark:bg-[#0f141c] rounded-3xl p-3.5 sm:p-4 shadow-sm border border-slate-200/80 dark:border-[#1e2638]">
           <div className="flex sm:grid sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-[#141b26] sm:bg-transparent">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
+              <div className="w-9 h-9 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 <Truck className="w-4 h-4" />
               </div>
               <div>
                 <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Fast Delivery</h4>
-                <p className="text-[10px] text-gray-400 whitespace-nowrap">Nationwide 64 Districts</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">Nationwide 64 Districts</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-[#141b26] sm:bg-transparent">
-              <div className="w-8 h-8 rounded-xl bg-brand-gold/10 flex items-center justify-center text-brand-gold shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
+              <div className="w-9 h-9 rounded-2xl bg-brand-gold/15 flex items-center justify-center text-brand-gold shrink-0">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
                 <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">100% Authentic</h4>
-                <p className="text-[10px] text-gray-400 whitespace-nowrap">Verified Quality QC</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">Verified Quality QC</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-[#141b26] sm:bg-transparent">
-              <div className="w-8 h-8 rounded-xl bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
+              <div className="w-9 h-9 rounded-2xl bg-brand-green/15 flex items-center justify-center text-brand-green shrink-0">
                 <CreditCard className="w-4 h-4" />
               </div>
               <div>
                 <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Cash on Delivery</h4>
-                <p className="text-[10px] text-gray-400 whitespace-nowrap">0 BDT Advance</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">0 BDT Advance</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50/80 dark:bg-[#141b26] sm:bg-transparent">
-              <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
+              <div className="w-9 h-9 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
                 <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Dedicated Support</h4>
-                <p className="text-[10px] text-gray-400 whitespace-nowrap">Helpline Care</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">Helpline Care</p>
               </div>
             </div>
+
           </div>
         </div>
       </section>
@@ -496,7 +498,7 @@ export default function Home() {
                 <Link 
                   key={category.id} 
                   to={`/products?category=${encodeURIComponent(categoryTarget)}`}
-                  className="bg-white dark:bg-[#0f141c] rounded-2xl p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-sm hover:shadow-md transition-all border border-gray-200/80 dark:border-[#1e2638] group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/50"
+                  className="bg-white dark:bg-[#0f141c] rounded-2xl p-3.5 flex flex-col items-center justify-center text-center gap-1.5 shadow-sm hover:shadow-md transition-all border border-slate-200/80 dark:border-[#1e2638] group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/50"
                 >
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-2xs`}>
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -558,10 +560,10 @@ export default function Home() {
         )}
       </section>
 
-      {/* Section 2: Mega Deals */}
+      {/* Section 2: Mega Deals (সফট লাক্সারি হোয়াইট কার্ড) */}
       {discountedMegaDeals.length > 0 && (
         <section className="container mx-auto px-3 sm:px-4 pt-2">
-          <div className="bg-amber-500/5 dark:bg-[#0f141c] rounded-3xl p-4 sm:p-6 border border-amber-500/20 dark:border-amber-500/30 space-y-3">
+          <div className="bg-white dark:bg-[#0f141c] rounded-3xl p-4 sm:p-6 border border-amber-500/30 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-2">
@@ -574,7 +576,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => scrollSlider(megaDealsSliderRef, 'left')}
-                  className="p-1.5 rounded-xl bg-white dark:bg-[#141b26] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#273142] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  className="p-1.5 rounded-xl bg-[#f0f2f5] dark:bg-[#141b26] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#273142] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
                   aria-label="Scroll left"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -582,7 +584,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => scrollSlider(megaDealsSliderRef, 'right')}
-                  className="p-1.5 rounded-xl bg-white dark:bg-[#141b26] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#273142] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  className="p-1.5 rounded-xl bg-[#f0f2f5] dark:bg-[#141b26] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#273142] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
                   aria-label="Scroll right"
                 >
                   <ChevronRight className="w-4 h-4" />
