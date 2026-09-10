@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { 
   ShoppingCart, 
@@ -14,7 +14,10 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertCircle,
-  Printer
+  Printer,
+  CheckSquare,
+  Square,
+  Package
 } from 'lucide-react';
 import { collection, getDocs, doc, updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -42,6 +45,10 @@ export default function AdminOrders() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [dispatchingId, setDispatchingId] = useState<string | null>(null);
 
+  // 📦 বাল্ক সিলেকশন ও ডিসপ্যাচ স্টেট (#25)
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [isBulkDispatching, setIsBulkDispatching] = useState<boolean>(false);
+
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
@@ -53,6 +60,7 @@ export default function AdminOrders() {
       })) as Order[];
 
       setOrders(list);
+      setSelectedOrderIds([]);
     } catch (error) {
       console.error('Error fetching admin orders:', error);
       toast.error('Failed to load orders');
@@ -72,6 +80,28 @@ export default function AdminOrders() {
       isMounted = false;
     };
   }, [fetchOrders]);
+
+  // ⚖️ কুরিয়ার কালেকশন ব্যালেন্স রিকনসিলিয়েশন হিসেব (#27)
+  const reconciliationStats = useMemo(() => {
+    let inTransitCOD = 0;
+    let deliveredCOD = 0;
+    let pendingStoreCOD = 0;
+
+    orders.forEach((order) => {
+      if (order.status === 'cancelled') return;
+
+      const cod = getCollectableCOD(order);
+      if (order.status === 'shipped' || order.status === 'out_for_delivery') {
+        inTransitCOD += cod;
+      } else if (order.status === 'delivered') {
+        deliveredCOD += cod;
+      } else if (order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') {
+        pendingStoreCOD += cod;
+      }
+    });
+
+    return { inTransitCOD, deliveredCOD, pendingStoreCOD };
+  }, [orders]);
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -100,6 +130,7 @@ export default function AdminOrders() {
     }
   };
 
+  // ১-ক্লিক সিঙ্গেল ডিসপ্যাচ
   const handleDispatchCourier = async (order: Order) => {
     try {
       setDispatchingId(order.id);
@@ -137,6 +168,79 @@ export default function AdminOrders() {
     } finally {
       setDispatchingId(null);
     }
+  };
+
+  // 📦 বাল্ক ১-ক্লিক কুরিয়ার ডিসপ্যাচ (#25)
+  const handleBulkDispatch = async () => {
+    const ordersToDispatch = orders.filter(
+      (o) => selectedOrderIds.includes(o.id) && o.status !== 'shipped' && o.status !== 'delivered' && o.status !== 'cancelled'
+    );
+
+    if (ordersToDispatch.length === 0) {
+      toast.error('Please select at least one pending order to dispatch');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to dispatch ${ordersToDispatch.length} parcels to Steadfast Courier?`)) {
+      return;
+    }
+
+    try {
+      setIsBulkDispatching(true);
+      let successCount = 0;
+
+      for (const order of ordersToDispatch) {
+        try {
+          const result = await sendOrderToCourier(order, 'Steadfast');
+          const updatedFields = {
+            status: 'shipped' as OrderStatus,
+            courierName: 'Steadfast',
+            trackingCode: result.trackingCode,
+            consignmentId: result.consignmentId,
+            shippedAt: new Date().toISOString(),
+          };
+
+          const orderRef = doc(db, 'orders', order.id);
+          await updateDoc(orderRef, {
+            ...updatedFields,
+            updatedAt: serverTimestamp(),
+          });
+
+          setOrders((prev) =>
+            prev.map((o) => (o.id === order.id ? { ...o, ...updatedFields } : o))
+          );
+          successCount++;
+        } catch (dispatchErr) {
+          console.warn(`Failed to dispatch order ${order.orderNumber}:`, dispatchErr);
+        }
+      }
+
+      setSelectedOrderIds([]);
+      toast.success(`Successfully dispatched ${successCount} out of ${ordersToDispatch.length} orders to Steadfast!`);
+    } catch (err) {
+      console.error('Bulk dispatch error:', err);
+      toast.error('Bulk dispatch encountered an error');
+    } finally {
+      setIsBulkDispatching(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    const dispatchableOrders = filteredOrders.filter(
+      (o) => o.status !== 'shipped' && o.status !== 'delivered' && o.status !== 'cancelled'
+    );
+
+    if (selectedOrderIds.length === dispatchableOrders.length && dispatchableOrders.length > 0) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(dispatchableOrders.map((o) => o.id));
+    }
+  };
+
+  const toggleSelectOrder = (orderId: string) => {
+    setSelectedOrderIds((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
   };
 
   const filteredOrders = orders.filter((order) => {
@@ -179,7 +283,7 @@ export default function AdminOrders() {
     if (order.paymentStatus === 'paid' || order.paymentMethod === 'bkash' || codDue === 0) {
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-brand-green bg-brand-green/10 border border-brand-green/20 px-2 py-0.5 rounded-md">
-          <CheckCircle2 className="w-3 h-3 shrink-0" /> Full Paid (bKash)
+          <CheckCircle2 className="w-3 h-3 shrink-0" /> Full Paid
         </span>
       );
     }
@@ -200,9 +304,9 @@ export default function AdminOrders() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-navy">Order Management & Dispatch</h1>
+          <h1 className="text-2xl font-black text-navy">Order Management & Bulk Dispatch</h1>
           <p className="text-xs text-gray-500 mt-1">
-            Monitor cash on delivery collections and 1-click dispatch to Steadfast Courier
+            Monitor cash on delivery collections and batch dispatch parcels to Steadfast Courier
           </p>
         </div>
 
@@ -214,7 +318,40 @@ export default function AdminOrders() {
         </button>
       </div>
 
-      {/* Controls Bar */}
+      {/* ⚖️ কুরিয়ার কালেকশন ব্যালেন্স রিকনসিলিয়েশন কার্ডস (#27) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 bg-white rounded-2xl shadow-modern border border-gray-100 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-gray-400 block">কুরিয়ারে আটকে থাকা টাকা (In Transit)</span>
+            <span className="text-xl font-black text-purple-700 font-mono">৳{reconciliationStats.inTransitCOD.toLocaleString()}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+            <Truck className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 bg-white rounded-2xl shadow-modern border border-gray-100 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-gray-400 block">কুরিয়ারে সংগৃহীত টাকা (Delivered)</span>
+            <span className="text-xl font-black text-brand-green font-mono">৳{reconciliationStats.deliveredCOD.toLocaleString()}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 bg-white rounded-2xl shadow-modern border border-gray-100 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-gray-400 block">দোকানে পাঠানোর অপেক্ষায় (Pending)</span>
+            <span className="text-xl font-black text-amber-800 font-mono">৳{reconciliationStats.pendingStoreCOD.toLocaleString()}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+            <Package className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Controls Bar & Bulk Dispatch Action */}
       <div className="bg-white rounded-2xl p-4 shadow-modern border border-gray-100 flex flex-wrap items-center justify-between gap-4">
         <div className="relative flex-1 min-w-60">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -227,22 +364,37 @@ export default function AdminOrders() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="orderStatusFilter" className="text-xs font-bold text-gray-500">Status:</label>
-          <select
-            id="orderStatusFilter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-gray-50 border border-gray-200 text-navy text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+        <div className="flex items-center gap-3">
+          {/* 📦 বাল্ক ডিসপ্যাচ বাটন (#25) */}
+          {selectedOrderIds.length > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkDispatch}
+              disabled={isBulkDispatching}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 transition-all cursor-pointer animate-in fade-in"
+            >
+              {isBulkDispatching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              <span>Dispatch ({selectedOrderIds.length}) to Steadfast</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="orderStatusFilter" className="text-xs font-bold text-gray-500">Status:</label>
+            <select
+              id="orderStatusFilter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-gray-50 border border-gray-200 text-navy text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="processing">Processing</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -264,38 +416,61 @@ export default function AdminOrders() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50 text-gray-400 uppercase font-black text-[10px]">
-                  <th className="py-3 px-4">Order ID</th>
-                  <th className="py-3 px-4">Customer & Address</th>
-                  <th className="py-3 px-4">Total Value</th>
-                  <th className="py-3 px-4">Payment & COD Due</th>
-                  <th className="py-3 px-4">Status & Tracking</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-3 w-8">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="p-1 hover:text-navy cursor-pointer"
+                      title="Select all pending orders"
+                    >
+                      {selectedOrderIds.length > 0 ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
+                    </button>
+                  </th>
+                  <th className="py-3 px-3">Order ID</th>
+                  <th className="py-3 px-3">Customer & Address</th>
+                  <th className="py-3 px-3">Total Value</th>
+                  <th className="py-3 px-3">Payment & COD Due</th>
+                  <th className="py-3 px-3">Status & Tracking</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredOrders.map((order) => {
                   const collectable = getCollectableCOD(order);
+                  const isSelectable = order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'cancelled';
+                  const isChecked = selectedOrderIds.includes(order.id);
 
                   return (
                     <tr key={order.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="py-4 px-4 font-mono font-black text-navy">
+                      {/* Checkbox */}
+                      <td className="py-4 px-3">
+                        {isSelectable ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectOrder(order.id)}
+                            className="p-1 hover:text-navy cursor-pointer"
+                          >
+                            {isChecked ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4 text-gray-300" />}
+                          </button>
+                        ) : null}
+                      </td>
+
+                      <td className="py-4 px-3 font-mono font-black text-navy">
                         <div>{order.orderNumber}</div>
-                        {order.transactionId && (
-                          <span className="text-[9px] text-[#E2136E] font-bold block">
-                            Trx: {order.transactionId}
-                          </span>
+                        {(order as { isGiftWrap?: boolean }).isGiftWrap && (
+                          <span className="text-[9px] text-pink-600 font-bold block">🎁 Gift Wrapped</span>
                         )}
                       </td>
 
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-3">
                         <span className="font-bold text-navy block">{order.customerName}</span>
                         <span className="text-[10px] text-gray-400 block font-mono">{order.customerPhone}</span>
-                        <span className="text-[10px] text-gray-500 block truncate max-w-48">
+                        <span className="text-[10px] text-gray-500 block truncate max-w-44">
                           {order.shippingAddress?.district}, {order.shippingAddress?.division}
                         </span>
                       </td>
 
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-3">
                         <span className="font-black text-slate-900 font-mono block">
                           {order.totalAmount?.toLocaleString()} BDT
                         </span>
@@ -304,11 +479,11 @@ export default function AdminOrders() {
                         </span>
                       </td>
 
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-3">
                         {getPaymentBadge(order)}
                       </td>
 
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
                             {getStatusBadge(order.status)}
@@ -330,9 +505,9 @@ export default function AdminOrders() {
                         </div>
                       </td>
 
-                      <td className="py-4 px-4 text-right">
+                      <td className="py-4 px-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                          {isSelectable && (
                             <button
                               onClick={() => handleDispatchCourier(order)}
                               disabled={dispatchingId === order.id}
@@ -435,6 +610,11 @@ export default function AdminOrders() {
                   <p className="font-bold text-navy">{selectedOrder.customerName}</p>
                   <p className="text-gray-600 font-mono">{selectedOrder.customerPhone}</p>
                   <p className="text-gray-500 truncate">{selectedOrder.customerEmail}</p>
+                  {(selectedOrder as { deviceInfo?: string }).deviceInfo && (
+                    <p className="text-[10px] text-gray-400 font-bold mt-1">
+                      📱 Device: {(selectedOrder as { deviceInfo?: string }).deviceInfo}
+                    </p>
+                  )}
                 </div>
 
                 <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 space-y-1.5">
@@ -448,6 +628,18 @@ export default function AdminOrders() {
                   </p>
                 </div>
               </div>
+
+              {/* 🎁 গিফট মেসেজ যদি থাকে (#16, #17) */}
+              {(selectedOrder as { isGiftWrap?: boolean }).isGiftWrap && (
+                <div className="p-3.5 bg-pink-50 rounded-2xl border border-pink-200 text-xs space-y-1">
+                  <span className="font-black text-pink-900 flex items-center gap-1">
+                    🎁 Gift Package & Printed Note:
+                  </span>
+                  <p className="italic text-gray-700 font-medium">
+                    "{(selectedOrder as { giftMessage?: string }).giftMessage || 'Happy Gift'}"
+                  </p>
+                </div>
+              )}
 
               <div>
                 <h4 className="font-black text-navy text-[11px] uppercase tracking-wider mb-2">Purchased Items</h4>
@@ -481,19 +673,6 @@ export default function AdminOrders() {
                   <span>Delivery Charge:</span>
                   <span className="font-mono font-bold">{selectedOrder.deliveryFee?.toLocaleString()} BDT</span>
                 </div>
-
-                {(selectedOrder.paidAmount && selectedOrder.paidAmount > 0) && (
-                  <div className="flex justify-between text-[#E2136E] font-bold pt-1 border-t border-slate-800">
-                    <span>Paid Online (bKash):</span>
-                    <span className="font-mono">-{selectedOrder.paidAmount?.toLocaleString()} BDT</span>
-                  </div>
-                )}
-
-                {selectedOrder.transactionId && (
-                  <div className="text-[11px] text-pink-300 font-mono">
-                    bKash TrxID: {selectedOrder.transactionId}
-                  </div>
-                )}
 
                 <div className="flex justify-between text-sm font-black text-white pt-2 border-t border-slate-700">
                   <span className="flex items-center gap-1.5 text-amber-400">

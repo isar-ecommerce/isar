@@ -13,7 +13,9 @@ import {
   ImageIcon,
   Edit,
   Scale,
-  Sparkles
+  Sparkles,
+  Globe,
+  Video
 } from 'lucide-react';
 import { 
   collection, 
@@ -51,13 +53,17 @@ export default function AdminAddProduct() {
   
   const [price, setPrice] = useState<number | ''>('');
   const [originalPrice, setOriginalPrice] = useState<number | ''>('');
+  // 💵 সাপ্লায়ার কেনা দাম (#34)
+  const [supplierCost, setSupplierCost] = useState<number | ''>('');
   const [weightInKg, setWeightInKg] = useState<number | ''>(0.5);
   const [stock, setStock] = useState<number | ''>(10);
   const [lowStockAlert, setLowStockAlert] = useState<number | ''>(2);
   const [sku, setSku] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string>('');
 
-  // Point 4: Custom Section Name State (Unlimited / Infinity Naming)
+  // 🎥 প্রোডাক্ট ভিডিও URL (#3)
+  const [videoUrl, setVideoUrl] = useState<string>('');
+
   const [customSection, setCustomSection] = useState<string>('');
 
   // Images State
@@ -72,7 +78,6 @@ export default function AdminAddProduct() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // 1. Fetch categories from Firestore
   useEffect(() => {
     let isMounted = true;
 
@@ -102,7 +107,6 @@ export default function AdminAddProduct() {
     };
   }, [isEditMode, categoryId]);
 
-  // 2. Fetch existing product details if Edit Mode
   useEffect(() => {
     let isMounted = true;
     if (!id) return;
@@ -121,12 +125,14 @@ export default function AdminAddProduct() {
           setDescription(data.description || '');
           setPrice(data.price ?? '');
           setOriginalPrice(data.originalPrice ?? '');
+          setSupplierCost(data.supplierCost ?? '');
           setWeightInKg(data.weightInKg ?? 0.5);
           setStock(data.stock ?? 10);
           setLowStockAlert(data.lowStockAlert ?? 2);
           setSku(data.sku || '');
           setCategoryId(data.categoryId || '');
           setCustomSection(data.customSection || '');
+          setVideoUrl(data.videoUrl || '');
           setImages(data.images || []);
           setStatus(data.status || 'active');
           setIsFeatured(data.isFeatured || false);
@@ -234,6 +240,7 @@ export default function AdminAddProduct() {
         description: description.trim() || `<p>${name.trim()}</p>`,
         price: Number(price),
         originalPrice: originalPrice !== '' ? Number(originalPrice) : null,
+        supplierCost: supplierCost !== '' ? Number(supplierCost) : null,
         weightInKg: weightInKg !== '' ? Number(weightInKg) : 0.5,
         stock: Number(stock) || 0,
         lowStockAlert: Number(lowStockAlert) || 2,
@@ -242,6 +249,7 @@ export default function AdminAddProduct() {
         categoryName: categoryName,
         categorySlug: categorySlug,
         customSection: customSection.trim() || null,
+        videoUrl: videoUrl.trim() || null,
         images: images,
         status: status,
         isFeatured: isFeatured,
@@ -320,8 +328,6 @@ export default function AdminAddProduct() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* Title */}
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-bold text-navy">Product Title *</label>
               <input
@@ -334,7 +340,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Slug */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Product Slug (URL)</label>
               <input
@@ -346,7 +351,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Category */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Category *</label>
               <select
@@ -365,7 +369,6 @@ export default function AdminAddProduct() {
               </select>
             </div>
 
-            {/* Short Summary */}
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-bold text-navy">Short Summary</label>
               <input
@@ -377,7 +380,6 @@ export default function AdminAddProduct() {
               />
             </div>
 
-            {/* Description */}
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-bold text-navy">Full Description (HTML or Plain Text)</label>
               <textarea
@@ -388,18 +390,16 @@ export default function AdminAddProduct() {
                 className="w-full p-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors resize-none"
               />
             </div>
-
           </div>
         </div>
 
-        {/* Pricing, Weight & Inventory */}
+        {/* Pricing, Supplier Cost & Inventory */}
         <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
           <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-brand-green" /> Pricing, Weight & Inventory
+            <DollarSign className="w-4 h-4 text-brand-green" /> Pricing, Profit & Inventory
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
-            
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-bold text-navy">Selling Price (BDT) *</label>
               <input
@@ -423,6 +423,20 @@ export default function AdminAddProduct() {
                 placeholder="6000"
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors font-mono"
               />
+            </div>
+
+            {/* 💵 সাপ্লায়ার কেনা দাম (#34) */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-navy">কেনা দাম / Cost Price (৳)</label>
+              <input
+                type="number"
+                min="0"
+                value={supplierCost}
+                onChange={(e) => setSupplierCost(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="e.g. 2800"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm font-bold text-brand-green focus:bg-white focus:outline-none focus:border-primary transition-colors font-mono"
+              />
+              <span className="text-[10px] text-gray-400">নিট লাভ হিসাব রাখতে সাহায্য করে</span>
             </div>
 
             <div className="space-y-1">
@@ -465,18 +479,6 @@ export default function AdminAddProduct() {
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors font-mono"
               />
             </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-navy">Product SKU</label>
-              <input
-                type="text"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                placeholder="ISAR-BAG-01"
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors uppercase font-mono"
-              />
-            </div>
-
           </div>
         </div>
 
@@ -545,15 +547,49 @@ export default function AdminAddProduct() {
           </div>
         </div>
 
-        {/* Visibility, Badges & Point 4: Custom Homepage Section Control */}
+        {/* 🎥 প্রোডাক্ট ভিডিও লিঙ্ক (#3) */}
+        <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-3">
+          <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
+            <Video className="w-4 h-4 text-rose-500" /> Product Video / Reels (Optional)
+          </h2>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-navy">YouTube / Video Embed URL</label>
+            <input
+              type="url"
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder="https://www.youtube.com/embed/XXXXXX"
+              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary font-mono"
+            />
+            <p className="text-[11px] text-gray-400">প্রোডাক্ট পেজে কাস্টমারদের জন্য "Watch Video" বাটন যোগ করতে সাহায্য করে।</p>
+          </div>
+        </div>
+
+        {/* 🌐 গুগল সার্চ এসইও (SEO) লাইভ প্রিভিউ কার্ড (#10) */}
+        <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-3">
+          <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-blue-600" /> Google Search SEO Live Preview (#10)
+          </h2>
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-1">
+            <span className="text-[11px] text-gray-400 font-mono block">
+              https://isar-8pek.vercel.app/products/{slug || 'product-url'}
+            </span>
+            <h4 className="text-sm font-bold text-blue-700 hover:underline cursor-pointer line-clamp-1">
+              {name ? `${name} | ISAR` : 'Product Title | ISAR'}
+            </h4>
+            <p className="text-xs text-gray-600 line-clamp-2">
+              {shortDescription || 'Discover authentic backpacks, travel gear & everyday accessories across Bangladesh at ISAR.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Visibility, Badges & Custom Sections */}
         <div className="bg-white rounded-3xl p-6 shadow-modern border border-gray-100 space-y-4">
           <h2 className="text-base font-black text-navy pb-3 border-b border-gray-100 flex items-center gap-2">
             <Layers className="w-4 h-4 text-brand-gold" /> Visibility & Section Controls
           </h2>
 
           <div className="space-y-4">
-            
-            {/* Status & Checkbox Badges */}
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div className="flex items-center gap-3">
                 <label className="text-xs font-bold text-navy">Status:</label>
@@ -600,14 +636,13 @@ export default function AdminAddProduct() {
               </div>
             </div>
 
-            {/* Point 4: Infinity Homepage Custom Section Input */}
             <div className="pt-4 border-t border-gray-100 space-y-2">
               <div>
                 <label className="text-xs font-bold text-navy flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" /> Homepage Custom Section (Unlimited / Infinity)
+                  <Sparkles className="w-3.5 h-3.5 text-primary" /> Homepage Custom Section
                 </label>
                 <p className="text-[11px] text-gray-400 mt-0.5">
-                  Type any custom section name to group this product on the homepage (e.g. Mega Deals, Flash Sale, Eid Special).
+                  Type any custom section name to group this product on the homepage.
                 </p>
               </div>
 
@@ -619,7 +654,6 @@ export default function AdminAddProduct() {
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold text-navy focus:bg-white focus:outline-none focus:border-primary transition-colors"
               />
 
-              {/* Quick-Click Presets */}
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 {PRESET_SECTIONS.map((preset) => (
                   <button
@@ -635,18 +669,8 @@ export default function AdminAddProduct() {
                     + {preset}
                   </button>
                 ))}
-                {customSection && (
-                  <button
-                    type="button"
-                    onClick={() => setCustomSection('')}
-                    className="text-[10px] font-bold px-2 py-1 text-red-500 hover:underline cursor-pointer"
-                  >
-                    Clear Section
-                  </button>
-                )}
               </div>
             </div>
-
           </div>
         </div>
 
