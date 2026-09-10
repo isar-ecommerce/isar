@@ -211,11 +211,11 @@ export default function Home() {
     return (
       <div 
         key={product.id} 
-        className="w-44 sm:w-52 md:w-60 bg-white dark:bg-[#0f141c] rounded-3xl overflow-hidden shadow-modern hover:shadow-modern-lg transition-all group border border-gray-200/70 dark:border-[#1e2638] flex flex-col shrink-0"
+        className="w-44 sm:w-52 md:w-60 bg-white dark:bg-[#0f141c] rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all group border border-gray-200/90 dark:border-[#1e2638] flex flex-col shrink-0"
       >
         <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-gray-50/70 dark:bg-[#141b26] p-2.5 flex items-center justify-center">
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex items-center justify-center z-20">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center z-20">
               <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white">
                 SOLD OUT
               </span>
@@ -323,7 +323,7 @@ export default function Home() {
         />
       </Helmet>
 
-      {/* 🚀 Hero Banner Section (Clean Matte Obsidian Black) */}
+      {/* Hero Banner Section */}
       <section className="bg-transparent pt-2 sm:pt-4">
         <div className="container mx-auto px-3 sm:px-4">
           <div 
@@ -421,7 +421,7 @@ export default function Home() {
 
       {/* Trust Badges */}
       <section className="container mx-auto px-3 sm:px-4">
-        <div className="bg-white dark:bg-[#0f141c] rounded-3xl p-3 sm:p-4 shadow-modern border border-gray-200/70 dark:border-[#1e2638]">
+        <div className="bg-white dark:bg-[#0f141c] rounded-3xl p-3 sm:p-4 shadow-sm border border-gray-200/90 dark:border-[#1e2638]">
           <div className="flex sm:grid sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-[#141b26] sm:bg-transparent">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
@@ -495,7 +495,7 @@ export default function Home() {
                 <Link 
                   key={category.id} 
                   to={`/products?category=${encodeURIComponent(categoryTarget)}`}
-                  className="bg-white dark:bg-[#0f141c] rounded-2xl p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-modern hover:shadow-modern-lg transition-all border border-gray-200/70 dark:border-[#1e2638] group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/50"
+                  className="bg-white dark:bg-[#0f141c] rounded-2xl p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-sm hover:shadow-md transition-all border border-gray-200/90 dark:border-[#1e2638] group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/50"
                 >
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-2xs`}>
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -625,7 +625,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* Dynamic Custom Sections created by Admin */}
+      {/* Dynamic Custom Sections */}
       {dynamicCustomSections.map((section) => (
         <section key={section.title} className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">

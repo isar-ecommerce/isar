@@ -62,7 +62,7 @@ export default function Header() {
   const [showSearchDropdown, setShowSearchDropdown] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
-  // 🌙 ডার্ক / লাইট মোড সুইচ স্টেট (#4)
+  // 🌙 থিম সিঙ্ক স্টেট
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('isar_theme') === 'dark';
@@ -177,7 +177,7 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 shadow-xs transition-colors duration-200">
+    <header className="sticky top-0 z-50 w-full bg-white dark:bg-slate-900 border-b border-gray-200/80 dark:border-slate-800 shadow-xs transition-colors duration-200">
       <div className="container mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-6">
         
         {/* Left: Brand Logo */}
@@ -280,12 +280,12 @@ export default function Header() {
         {/* Right: Theme Toggle, Language & Cart */}
         <div className="flex items-center gap-2.5 sm:gap-4">
           
-          {/* 🌙 ডার্ক / লাইট মোড সুইচ (#4) */}
+          {/* 🌙 / ☀️ থিম সুইচ (#4) */}
           <button
             type="button"
             onClick={toggleTheme}
             className="p-2 rounded-full border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-white text-navy dark:text-brand-gold transition-all cursor-pointer shadow-2xs"
-            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            title={isDarkMode ? 'লাইট মোড অন করুন' : 'ডার্ক মোড অন করুন'}
             aria-label="Toggle theme"
           >
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-navy" />}
