@@ -1,27 +1,101 @@
 @import "tailwindcss";
 
-@theme {
-  /* Colors */
-  --color-primary: #0056b3;
-  --color-primary-light: #3378c2;
-  --color-primary-dark: #004494;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
 
-  --color-navy: #0B192C;
-  --color-navy-light: #1E3E62;
+  body {
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+}
 
-  --color-secondary: #F8F9FA;
-  --color-secondary-dark: #E9ECEF;
+/* =========================================================
+   🌙 UNIVERSAL FULL-WEBSITE DARK MODE ENGINE (#4)
+   পুরো ওয়েবসাইটকে এক ক্লিকে প্রিমিয়াম ডার্ক থিমে রূপান্তর করার রুলস
+   ========================================================= */
 
-  --color-brand-gold: #D4AF37;
-  --color-brand-green: #28A745;
+html.dark {
+  color-scheme: dark;
+}
 
-  --color-surface: #FFFFFF;
+html.dark body {
+  background-color: #0b1120 !important; /* প্রিমিয়াম ডিপ নেভি ব্ল্যাক */
+  color: #f8fafc !important;
+}
 
-  /* Box Shadows */
-  --shadow-modern: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-modern-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+/* ১. সব ব্যাকগ্রাউন্ড ডার্ক করা */
+html.dark .bg-secondary {
+  background-color: #0b1120 !important;
+}
 
-  /* Fonts */
-  --font-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  --font-bengali: "Noto Sans Bengali", sans-serif;
+html.dark .bg-white {
+  background-color: #0f172a !important; /* কার্ড ও বক্স ব্যাকগ্রাউন্ড */
+  border-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+html.dark .bg-gray-50,
+html.dark .bg-gray-50\/50,
+html.dark .bg-gray-50\/70,
+html.dark .bg-gray-50\/80 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* ২. টেক্সট ও শিরোনাম উজ্জ্বল করা */
+html.dark .text-navy {
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-gray-500,
+html.dark .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+/* ৩. বর্ডার ও ডিভাইডার ডার্ক করা */
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-slate-100,
+html.dark .border-slate-200 {
+  border-color: #1e293b !important;
+}
+
+html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b !important;
+}
+
+/* ৪. ইনপুট বক্স, টেক্সট এরিয়া ও ড্রপডাউন */
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* ৫. শ্যাডো সফট করা */
+html.dark .shadow-modern,
+html.dark .shadow-modern-lg,
+html.dark .shadow-md,
+html.dark .shadow-lg {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
 }
