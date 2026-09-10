@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, } from 'react';
+import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, 
@@ -10,9 +10,7 @@ import {
   X, 
   Loader2,
   Globe,
-  ArrowLeft,
-  Sun,
-  Moon
+  ArrowLeft
 } from 'lucide-react';
 
 import { useAuthStore } from '../../store/authStore';
@@ -62,14 +60,6 @@ export default function Header() {
   const [showSearchDropdown, setShowSearchDropdown] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
-  // 🌙 ডার্ক মোড / লাইট মোড স্টেট (#4)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('isar_theme') === 'dark';
-    }
-    return false;
-  });
-
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -79,20 +69,13 @@ export default function Header() {
   const { language, setLanguage } = useSettingsStore();
   const t = translations[language] || translations.en;
 
-  // ডার্ক মোড ক্লাস টগল
+  // ব্রাউজার থেকে ডার্ক ক্লাস থাকলে তা মুছে ফেলা
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('isar_theme', 'dark');
-    } else {
+    if (typeof window !== 'undefined') {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('isar_theme', 'light');
+      localStorage.removeItem('isar_theme');
     }
-  }, [isDarkMode]);
-
-  const toggleTheme = () => {
-    setIsDarkMode((prev) => !prev);
-  };
+  }, []);
 
   const toggleLanguage = () => {
     setLanguage(language === 'en' ? 'bn' : 'en');
@@ -165,7 +148,7 @@ export default function Header() {
   };
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: globalThis.MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
@@ -178,7 +161,7 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 shadow-xs transition-colors duration-200">
+    <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-xs transition-colors">
       <div className="container mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-6">
         
         {/* Left: Brand Logo */}
@@ -196,13 +179,13 @@ export default function Header() {
                 onChange={handleInputChange}
                 onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
                 placeholder={t.searchPlaceholder}
-                className="w-full h-11 pl-4 pr-12 rounded-full border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-primary transition-all text-sm text-navy dark:text-white placeholder:text-gray-400"
+                className="w-full h-11 pl-4 pr-12 rounded-full border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-all text-sm text-navy placeholder:text-gray-400"
               />
               {searchQuery ? (
                 <button
                   type="button"
                   onClick={() => { setSearchQuery(''); setShowSearchDropdown(false); }}
-                  className="absolute right-12 top-0 h-11 w-8 flex items-center justify-center text-gray-400 hover:text-navy dark:hover:text-white cursor-pointer"
+                  className="absolute right-12 top-0 h-11 w-8 flex items-center justify-center text-gray-400 hover:text-navy cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -217,18 +200,18 @@ export default function Header() {
             </form>
 
             {showSearchDropdown && (
-              <div className="absolute top-12 left-0 right-0 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute top-12 left-0 right-0 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 {isSearching ? (
                   <div className="p-4 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 text-primary animate-spin" /> Searching products...
                   </div>
                 ) : searchResults.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                  <div className="p-4 text-center text-xs text-gray-500">
                     No products found for "{searchQuery}"
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-100 dark:divide-slate-700">
-                    <div className="px-4 py-2 bg-gray-50 dark:bg-slate-900 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="divide-y divide-gray-100">
+                    <div className="px-4 py-2 bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                       Instant Search Results
                     </div>
                     {searchResults.map((product) => (
@@ -236,15 +219,15 @@ export default function Header() {
                         key={product.id}
                         to={`/products/${product.id}`}
                         onClick={() => setShowSearchDropdown(false)}
-                        className="p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group cursor-pointer"
+                        className="p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors group cursor-pointer"
                       >
                         <img
                           src={product.images[0] || 'https://via.placeholder.com/60'}
                           alt={product.name}
-                          className="w-10 h-10 rounded-lg object-cover bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-700 shrink-0"
+                          className="w-10 h-10 rounded-lg object-cover bg-gray-50 border border-gray-100 shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-navy dark:text-white group-hover:text-primary transition-colors line-clamp-1">
+                          <p className="text-xs font-bold text-navy group-hover:text-primary transition-colors line-clamp-1">
                             {product.name}
                           </p>
                           <p className="text-[11px] text-gray-400 capitalize">
@@ -258,7 +241,7 @@ export default function Header() {
                     ))}
                     <button
                       onClick={handleSearch}
-                      className="w-full p-2.5 bg-gray-50 dark:bg-slate-900 hover:bg-primary hover:text-white text-xs font-bold text-navy dark:text-white text-center transition-colors block cursor-pointer"
+                      className="w-full p-2.5 bg-gray-50 hover:bg-primary hover:text-white text-xs font-bold text-navy text-center transition-colors block cursor-pointer"
                     >
                       View All Results for "{searchQuery}"
                     </button>
@@ -278,30 +261,19 @@ export default function Header() {
           </div>
         )}
 
-        {/* Right: Theme Toggle, Language Switcher, Account & Cart */}
+        {/* Right: Language Switcher, Account & Cart */}
         <div className="flex items-center gap-2.5 sm:gap-4">
           
-          {/* 🌙 ডার্ক / লাইট মোড টগল বাটন (#4) */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="p-2 rounded-full border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-white text-navy dark:text-brand-gold transition-all cursor-pointer shadow-2xs"
-            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label="Toggle theme"
-          >
-            {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-navy" />}
-          </button>
-
           {/* Language Switcher */}
           <button
             type="button"
             onClick={toggleLanguage}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 hover:border-primary bg-gray-50 dark:bg-slate-800 hover:bg-white text-xs font-black text-navy dark:text-white transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-gray-200 hover:border-primary bg-gray-50 hover:bg-white text-xs font-black text-navy transition-all cursor-pointer shadow-2xs"
             title="Switch language / ভাষা পরিবর্তন করুন"
           >
             <Globe className="w-3.5 h-3.5 text-primary" />
             <span className={language === 'en' ? 'text-primary font-black' : 'text-gray-400 font-bold'}>EN</span>
-            <span className="text-gray-300 dark:text-slate-600">/</span>
+            <span className="text-gray-300">/</span>
             <span className={language === 'bn' ? 'text-brand-green font-black' : 'text-gray-400 font-bold'}>বাং</span>
           </button>
 
@@ -310,7 +282,7 @@ export default function Header() {
             <div className="relative hidden sm:block" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2 text-sm font-medium text-navy dark:text-white hover:text-primary transition-colors focus:outline-none cursor-pointer"
+                className="flex items-center gap-2 text-sm font-medium text-navy hover:text-primary transition-colors focus:outline-none cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 overflow-hidden">
                   {user.photoURL ? (
@@ -326,9 +298,9 @@ export default function Header() {
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-modern-lg border border-gray-100 dark:border-slate-700 py-2 z-50 transform origin-top-right transition-all">
-                  <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 mb-2">
-                    <p className="text-sm font-bold text-navy dark:text-white truncate">{user.displayName || 'User'}</p>
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-modern-lg border border-gray-100 py-2 z-50 transform origin-top-right transition-all">
+                  <div className="px-4 py-3 border-b border-gray-100 mb-2">
+                    <p className="text-sm font-bold text-navy truncate">{user.displayName || 'User'}</p>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
                   </div>
                   
@@ -336,7 +308,7 @@ export default function Header() {
                     <Link
                       to="/admin"
                       onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 transition-colors"
+                      className="flex items-center gap-3 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
                     >
                       {t.adminDashboard}
                     </Link>
@@ -354,7 +326,7 @@ export default function Header() {
                   <Link
                     to="/profile"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
                   >
                     <User className="w-4 h-4" /> {t.myProfile}
                   </Link>
@@ -362,16 +334,16 @@ export default function Header() {
                   <Link
                     to="/orders"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
                   >
                     <Package className="w-4 h-4" /> {t.myOrders}
                   </Link>
                   
-                  <div className="h-px bg-gray-100 dark:bg-slate-700 my-2"></div>
+                  <div className="h-px bg-gray-100 my-2"></div>
                   
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" /> {t.logout}
                   </button>
@@ -383,10 +355,10 @@ export default function Header() {
           {!isAuthenticated && !isAuthPage && (
             <Link 
               to="/login" 
-              className="hidden sm:flex items-center gap-2 text-sm font-medium text-navy dark:text-white hover:text-primary transition-colors group"
+              className="hidden sm:flex items-center gap-2 text-sm font-medium text-navy hover:text-primary transition-colors group"
             >
-              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                <User className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-primary" />
+              <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                <User className="w-5 h-5 text-gray-600 group-hover:text-primary" />
               </div>
               <span className="hidden lg:block font-bold">{t.loginSignUp}</span>
             </Link>
@@ -396,12 +368,12 @@ export default function Header() {
           {!isAuthPage && (
             <Link 
               to="/cart" 
-              className="relative p-2 text-navy dark:text-white hover:text-primary transition-colors group cursor-pointer"
+              className="relative p-2 text-navy hover:text-primary transition-colors group cursor-pointer"
               aria-label="Cart"
             >
               <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7" />
               {itemCount > 0 && (
-                <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-primary rounded-full border-2 border-white dark:border-slate-900 transform translate-x-1/4 -translate-y-1/4 shadow-2xs">
+                <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-primary rounded-full border-2 border-white transform translate-x-1/4 -translate-y-1/4 shadow-2xs">
                   {itemCount}
                 </span>
               )}
@@ -420,7 +392,7 @@ export default function Header() {
               value={searchQuery}
               onChange={handleInputChange}
               placeholder={t.searchPlaceholder}
-              className="w-full h-10 pl-4 pr-10 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-primary transition-all text-xs text-navy dark:text-white placeholder:text-gray-400"
+              className="w-full h-10 pl-4 pr-10 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-primary transition-all text-xs text-navy placeholder:text-gray-400"
             />
             <button
               type="submit"
