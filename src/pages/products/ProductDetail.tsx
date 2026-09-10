@@ -14,16 +14,17 @@ import {
   Share2, 
   Zap, 
   Tag, 
-  RotateCcw,
-  Sparkles,
-  Clock,
-  Bell,
-  X,
-  Layers,
-  Box,
-  Play,
-  HelpCircle,
+  RotateCcw, 
+  Sparkles, 
+  Clock, 
+  Bell, 
+  X, 
+  Layers, 
+  Box, 
+  Play, 
+  HelpCircle, 
   MessageSquare,
+  Rocket
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
@@ -81,6 +82,15 @@ export default function ProductDetail() {
   const [newQuestionText, setNewQuestionText] = useState<string>('');
   const [isSubmittingQuestion, setIsSubmittingQuestion] = useState<boolean>(false);
 
+  // ⏳ ৬. কামিং সুন লঞ্চিং কাউন্টডাউন স্টেট (#11)
+  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number; isLaunched: boolean }>({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    isLaunched: true,
+  });
+
   const { addItem: addItemToCart, clearCart } = useCartStore();
   const { freeShippingMinAmount } = useSettingsStore();
 
@@ -103,7 +113,6 @@ export default function ProductDetail() {
         if (isMounted && data) {
           setProduct(data);
 
-          // একই ক্যাটাগরির রিয়েল ক্রস-সেলিং প্রোডাক্ট ফেচ (#7)
           try {
             const allProducts = await getProducts({ categoryId: data.categoryId });
             const filtered = allProducts.filter(p => p.id !== data.id && p.stock > 0).slice(0, 2);
@@ -113,7 +122,6 @@ export default function ProductDetail() {
             setRelatedProducts([]);
           }
 
-          // ফায়ারস্টোর থেকে আসল প্রশ্নোত্তর ফেচ (#21)
           try {
             const qSnap = await getDocs(query(collection(db, 'product_questions'), where('productId', '==', data.id)));
             const qList = qSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductQuestionItem[];
@@ -137,6 +145,35 @@ export default function ProductDetail() {
       isMounted = false;
     };
   }, [id]);
+
+  // ⏳ কামিং সুন রিয়েল কাউন্টডাউন টাইমার ইঞ্জিন (#11)
+  useEffect(() => {
+    const launchDateStr = (product as { launchDate?: string })?.launchDate;
+    if (!launchDateStr) return;
+
+    const targetTime = new Date(launchDateStr).getTime();
+    if (isNaN(targetTime)) return;
+
+    const updateCountdown = () => {
+      const difference = targetTime - Date.now();
+
+      if (difference <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isLaunched: true });
+        return;
+      }
+
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((difference / 1000 / 60) % 60);
+      const seconds = Math.floor((difference / 1000) % 60);
+
+      setTimeLeft({ days, hours, minutes, seconds, isLaunched: false });
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [product]);
 
   // রিয়েল ডিসপ্যাচ মেসেজ (#5)
   const dispatchMessage = useMemo(() => {
@@ -205,7 +242,6 @@ export default function ProductDetail() {
     });
   };
 
-  // Frequently Bought Together বান্ডেল কার্টে যোগ করা (#7)
   const handleAddBundleToCart = () => {
     if (!product) return;
     addItemToCart(product, 1);
@@ -231,7 +267,6 @@ export default function ProductDetail() {
     return base + extra;
   }, [product, relatedProducts, selectedBundleIds]);
 
-  // রিস্টক অ্যালার্ট সাবমিট (#8)
   const handleRestockSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const cleanPhone = restockPhone.replace(/[^0-9]/g, '');
@@ -260,7 +295,6 @@ export default function ProductDetail() {
     }
   };
 
-  // কাস্টমার প্রশ্ন সাবমিট (#21)
   const handleSubmitQuestion = async (e: FormEvent) => {
     e.preventDefault();
     if (!newQuestionText.trim()) return;
@@ -328,6 +362,7 @@ export default function ProductDetail() {
   const isOutOfStock = product.stock <= 0 || product.status === 'out-of-stock';
   const activeImage = product.images[selectedImageIndex] || product.images[0] || 'https://via.placeholder.com/600';
   const hasProductVideo = Boolean((product as { videoUrl?: string })?.videoUrl);
+  const isComingSoonActive = Boolean((product as { isComingSoon?: boolean })?.isComingSoon) && !timeLeft.isLaunched;
 
   return (
     <div className="bg-secondary min-h-screen py-6 md:py-10">
@@ -436,8 +471,12 @@ export default function ProductDetail() {
                 >
                   <Tag className="w-3.5 h-3.5" /> {categoryTag}
                 </Link>
-                
-                {!isOutOfStock ? (
+
+                {isComingSoonActive ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-black text-amber-900 bg-amber-100 px-3.5 py-1 rounded-full border border-amber-300">
+                    <Rocket className="w-3.5 h-3.5 text-amber-600" /> Coming Soon
+                  </span>
+                ) : !isOutOfStock ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-green bg-brand-green/10 px-3.5 py-1 rounded-full border border-brand-green/20">
                     <Check className="w-3.5 h-3.5" /> In Stock ({product.stock} Pcs)
                   </span>
@@ -487,11 +526,46 @@ export default function ProductDetail() {
                 )}
               </div>
 
+              {/* ⏳ কামিং সুন রিয়েল লঞ্চিং কাউন্টডাউন বক্স (#11) */}
+              {isComingSoonActive && (
+                <div className="p-4 bg-linear-to-r from-amber-500/15 via-primary/10 to-brand-gold/15 rounded-2xl border border-amber-400/50 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-navy uppercase tracking-wider flex items-center gap-1.5">
+                      <Rocket className="w-4 h-4 text-amber-600" /> Launching In (লঞ্চ হতে বাকি):
+                    </span>
+                    <span className="text-[10px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-md uppercase">
+                      Official Launch
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2 text-center font-mono">
+                    <div className="bg-white p-2 rounded-xl border border-amber-200">
+                      <span className="text-lg font-black text-navy block">{timeLeft.days}</span>
+                      <span className="text-[9px] text-gray-400 font-bold uppercase">Days</span>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-amber-200">
+                      <span className="text-lg font-black text-navy block">{timeLeft.hours}</span>
+                      <span className="text-[9px] text-gray-400 font-bold uppercase">Hours</span>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-amber-200">
+                      <span className="text-lg font-black text-navy block">{timeLeft.minutes}</span>
+                      <span className="text-[9px] text-gray-400 font-bold uppercase">Mins</span>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-amber-200">
+                      <span className="text-lg font-black text-amber-600 block">{timeLeft.seconds}</span>
+                      <span className="text-[9px] text-gray-400 font-bold uppercase">Secs</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Real-time Dispatch Cutoff Badge (#5) */}
-              <div className="p-3 bg-blue-50/80 rounded-2xl border border-blue-200/80 flex items-center gap-2.5 text-xs text-blue-950 font-bold">
-                <Clock className="w-4 h-4 text-primary shrink-0" />
-                <span>{dispatchMessage}</span>
-              </div>
+              {!isComingSoonActive && (
+                <div className="p-3 bg-blue-50/80 rounded-2xl border border-blue-200/80 flex items-center gap-2.5 text-xs text-blue-950 font-bold">
+                  <Clock className="w-4 h-4 text-primary shrink-0" />
+                  <span>{dispatchMessage}</span>
+                </div>
+              )}
 
               {/* Free Shipping Milestone (#10) */}
               <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200/80 space-y-1.5">
@@ -514,7 +588,7 @@ export default function ProductDetail() {
               </div>
 
               {/* Tiered Quantity Bundle Selector (#1) */}
-              {!isOutOfStock && product.stock >= 2 && (
+              {!isOutOfStock && !isComingSoonActive && product.stock >= 2 && (
                 <div className="space-y-2 pt-1">
                   <span className="text-xs font-black text-navy uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-primary" /> Select Package & Save More:
@@ -581,7 +655,7 @@ export default function ProductDetail() {
                     <button 
                       type="button"
                       onClick={() => handleQuantityChange('decrease')}
-                      disabled={quantity <= 1 || isOutOfStock}
+                      disabled={quantity <= 1 || isOutOfStock || isComingSoonActive}
                       className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors cursor-pointer"
                       aria-label="Decrease quantity"
                     >
@@ -591,7 +665,7 @@ export default function ProductDetail() {
                     <button 
                       type="button"
                       onClick={() => handleQuantityChange('increase')}
-                      disabled={quantity >= product.stock || isOutOfStock}
+                      disabled={quantity >= product.stock || isOutOfStock || isComingSoonActive}
                       className="p-2.5 text-navy hover:text-primary disabled:opacity-40 transition-colors cursor-pointer"
                       aria-label="Increase quantity"
                     >
@@ -601,7 +675,16 @@ export default function ProductDetail() {
                 </div>
 
                 <div className="space-y-3 pt-1">
-                  {!isOutOfStock ? (
+                  {isComingSoonActive ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsRestockModalOpen(true)}
+                      className="w-full flex items-center justify-center gap-2.5 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-lg transition-all cursor-pointer hover:scale-[1.01]"
+                    >
+                      <Rocket className="w-5 h-5" />
+                      <span>Pre-Book / Notify When Launched</span>
+                    </button>
+                  ) : !isOutOfStock ? (
                     <>
                       <button
                         type="button"
@@ -673,7 +756,7 @@ export default function ProductDetail() {
         </div>
 
         {/* Frequently Bought Together Cross-Sell (#7) */}
-        {relatedProducts.length > 0 && !isOutOfStock && (
+        {relatedProducts.length > 0 && !isOutOfStock && !isComingSoonActive && (
           <div className="bg-white rounded-3xl shadow-modern border border-gray-100 p-6 sm:p-8 space-y-4">
             <div className="flex items-center gap-2 text-navy font-black text-base sm:text-lg">
               <Sparkles className="w-5 h-5 text-brand-gold" />
@@ -682,7 +765,6 @@ export default function ProductDetail() {
 
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pt-2">
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                {/* Main Product */}
                 <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-200">
                   <img src={product.images[0]} alt={product.name} className="w-12 h-12 rounded-xl object-contain bg-white p-1" />
                   <div>
@@ -691,7 +773,6 @@ export default function ProductDetail() {
                   </div>
                 </div>
 
-                {/* Related Items */}
                 {relatedProducts.map((rel) => {
                   const isChecked = selectedBundleIds.includes(rel.id);
 
@@ -716,7 +797,6 @@ export default function ProductDetail() {
                 })}
               </div>
 
-              {/* Bundle Action */}
               <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-200 w-full lg:w-auto justify-between lg:justify-end">
                 <div>
                   <span className="text-[11px] text-gray-500 font-bold block">Total Bundle Price:</span>

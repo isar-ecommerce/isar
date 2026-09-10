@@ -9,12 +9,13 @@ export interface CartItem {
 }
 
 export interface Coupon {
-  id?: string;                  // 🔴 ফিক্স: কুপনের ফায়ারস্টোর ডকুমেন্ট আইডি সংরক্ষণ করার জন্য
+  id?: string;
   code: string;
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   minOrderAmount?: number;
   maxDiscount?: number;
+  expiryDate?: string;
 }
 
 interface CartState {
@@ -53,7 +54,6 @@ export const useCartStore = create<CartState>()(
       feeOutsideDhaka: 130,
       selectedDeliveryZone: 'inside',
 
-      // ১. কার্টে নতুন প্রোডাক্ট যুক্ত করা (স্টক চেক সহ)
       addItem: (product, quantity = 1, selectedVariantId) => {
         const currentItems = get().items;
         const existingIndex = currentItems.findIndex(
@@ -75,33 +75,50 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      // ২. আইটেম রিমুভ করা
+      // ২. আইটেম মুছলে কুপন নিয়ম অটো-ভ্যালিডেট হওয়া (#22)
       removeItem: (productId, selectedVariantId) => {
+        const remainingItems = get().items.filter(
+          (item) => !(item.product.id === productId && item.selectedVariantId === selectedVariantId)
+        );
+        const newSubtotal = remainingItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+
+        const currentCoupon = get().appliedCoupon;
+        // যদি আইটেম মুছে ফেলার পর সাবটোটাল কুপনের মিনিমাম টাকার নিচে নেমে যায়, কুপন নিজে থেকেই সরে যাবে
+        const validCoupon = currentCoupon && currentCoupon.minOrderAmount && newSubtotal < currentCoupon.minOrderAmount
+          ? null 
+          : currentCoupon;
+
         set({
-          items: get().items.filter(
-            (item) => !(item.product.id === productId && item.selectedVariantId === selectedVariantId)
-          ),
+          items: remainingItems,
+          appliedCoupon: validCoupon,
         });
       },
 
-      // ৩. কোয়ান্টিটি আপডেট: মিনিমাম ১ থাকবে, ম্যাক্সিমাম স্টকের সমান হবে
+      // ৩. কোয়ান্টিটি পরিবর্তনের সাথে কুপনের শর্ত অটো-ভ্যালিডেট হওয়া (#22)
       updateQuantity: (productId, quantity, selectedVariantId) => {
+        const updatedItems = get().items.map((item) => {
+          if (item.product.id === productId && item.selectedVariantId === selectedVariantId) {
+            const maxStock = Math.max(1, item.product.stock || 1);
+            const safeQuantity = Math.max(1, Math.min(quantity, maxStock));
+            return { ...item, quantity: safeQuantity };
+          }
+          return item;
+        });
+
+        const newSubtotal = updatedItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+        const currentCoupon = get().appliedCoupon;
+        const validCoupon = currentCoupon && currentCoupon.minOrderAmount && newSubtotal < currentCoupon.minOrderAmount
+          ? null 
+          : currentCoupon;
+
         set({
-          items: get().items.map((item) => {
-            if (item.product.id === productId && item.selectedVariantId === selectedVariantId) {
-              const maxStock = Math.max(1, item.product.stock || 1);
-              const safeQuantity = Math.max(1, Math.min(quantity, maxStock));
-              return { ...item, quantity: safeQuantity };
-            }
-            return item;
-          }),
+          items: updatedItems,
+          appliedCoupon: validCoupon,
         });
       },
 
-      // ৪. কার্ট খালি করা
       clearCart: () => set({ items: [], appliedCoupon: null }),
 
-      // ৫. কুপন এপ্লাই
       applyCoupon: (coupon) => {
         const subtotal = get().getSubtotal();
         if (coupon.minOrderAmount && subtotal < coupon.minOrderAmount) {
@@ -111,19 +128,15 @@ export const useCartStore = create<CartState>()(
         return true;
       },
 
-      // ৬. কুপন রিমুভ
       removeCoupon: () => set({ appliedCoupon: null }),
 
-      // ৭. ডেলিভারি চার্জ সরাসরি সেট করা
       setDeliveryFee: (fee) => set({ deliveryFee: fee }),
 
-      // ৮. ডেলিভারি জোন পরিবর্তন
       setDeliveryZone: (zone) => {
         const fee = zone === 'inside' ? get().feeInsideDhaka : get().feeOutsideDhaka;
         set({ selectedDeliveryZone: zone, deliveryFee: fee });
       },
 
-      // ৯. ডেলিভারি রেট সিঙ্ক
       syncDeliveryRates: (inside, outside) => {
         const currentZone = get().selectedDeliveryZone;
         const fee = currentZone === 'inside' ? inside : outside;
@@ -134,17 +147,21 @@ export const useCartStore = create<CartState>()(
         });
       },
 
-      // ১০. সাবটোটাল হিসাব
       getSubtotal: () => {
         return get().items.reduce((total, item) => total + item.product.price * item.quantity, 0);
       },
 
-      // ১১. ডিসকাউন্ট হিসাব
+      // কুপন ডিসকাউন্ট হিসাব (#22)
       getDiscount: () => {
         const subtotal = get().getSubtotal();
         const coupon = get().appliedCoupon;
 
         if (!coupon) return 0;
+
+        // মিনিমাম টাকার নিচে থাকলে ডিসকাউন্ট ০
+        if (coupon.minOrderAmount && subtotal < coupon.minOrderAmount) {
+          return 0;
+        }
 
         let discount = 0;
         if (coupon.discountType === 'percentage') {
@@ -159,7 +176,6 @@ export const useCartStore = create<CartState>()(
         return Math.min(discount, subtotal);
       },
 
-      // ১২. সর্বমোট টাকা
       getTotal: () => {
         const subtotal = get().getSubtotal();
         const discount = get().getDiscount();
@@ -167,7 +183,6 @@ export const useCartStore = create<CartState>()(
         return Math.max(0, subtotal - discount + (subtotal > 0 ? deliveryFee : 0));
       },
 
-      // ১৩. মোট আইটেম সংখ্যা
       getItemCount: () => {
         return get().items.reduce((total, item) => total + item.quantity, 0);
       },
