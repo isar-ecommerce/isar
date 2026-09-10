@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, Link, useNavigate, Navigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -16,17 +16,30 @@ import {
   FileText,
   Ticket,
   PhoneCall,
-  Loader2
+  Loader2,
+  Bell,
+  Download,
+  AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { collection, getDocs } from 'firebase/firestore';
+
+import { db } from '../firebase/config';
 import { useAuthStore } from '../store/authStore';
 import { logoutUser } from '../firebase/auth';
 import BrandLogo from '../components/common/BrandLogo';
+import type { Product } from '../types/product';
 
 export default function AdminLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const { user, isAuthenticated, isLoading } = useAuthStore();
   const navigate = useNavigate();
+
+  // 🔔 লো-স্টক নোটিফিকেশন স্টেট (#29)
+  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const [isBellOpen, setIsBellOpen] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const bellDropdownRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
@@ -36,12 +49,85 @@ export default function AdminLayout() {
     }
   }, [isLoading, isAuthenticated, isAdmin]);
 
+  // ফায়ারস্টোর থেকে লো-স্টক প্রোডাক্ট চেক (#29)
+  useEffect(() => {
+    let isMounted = true;
+    if (!isAdmin) return;
+
+    const checkLowStock = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'products'));
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Product[];
+        const lowList = list.filter(p => p.stock <= (p.lowStockAlert || 5));
+        if (isMounted) {
+          setLowStockProducts(lowList);
+        }
+      } catch (err) {
+        console.warn('Low stock check note:', err);
+      }
+    };
+
+    checkLowStock();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAdmin]);
+
+  // ক্লিক আউটসাইড ড্রপডাউন ক্লোজ
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bellDropdownRef.current && !bellDropdownRef.current.contains(e.target as Node)) {
+        setIsBellOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = async () => {
     await logoutUser();
     navigate('/login');
   };
 
-  // ১. অথেনটিকেশন লোডিং চেক
+  // 💾 ওয়ান-ক্লিক ডাটাবেজ ব্যাকআপ (#60)
+  const handleExportBackup = async () => {
+    try {
+      setIsExporting(true);
+      const toastId = toast.loading('Exporting database backup...');
+
+      const [productsSnap, ordersSnap, categoriesSnap] = await Promise.all([
+        getDocs(collection(db, 'products')),
+        getDocs(collection(db, 'orders')),
+        getDocs(collection(db, 'categories')),
+      ]);
+
+      const backupData = {
+        exportedAt: new Date().toISOString(),
+        site: 'ISAR Marketplace',
+        products: productsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        orders: ordersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        categories: categoriesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      };
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `ISAR_Database_Backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      toast.dismiss(toastId);
+      toast.success('Database backup downloaded successfully!');
+    } catch (err) {
+      console.error('Backup error:', err);
+      toast.error('Failed to export backup');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-secondary">
@@ -50,12 +136,10 @@ export default function AdminLayout() {
     );
   }
 
-  // ২. লগইন না থাকলে লগইন পেজে পাঠান
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // ৩. অ্যাডমিন না হলে হোমপেজে পাঠান
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
@@ -180,8 +264,80 @@ export default function AdminLayout() {
             <h1 className="text-lg font-bold text-navy hidden sm:block">Control Panel</h1>
           </div>
 
-          {/* User Profile */}
-          <div className="flex items-center gap-4">
+          {/* Action Items: Backup, Low-Stock Bell & Profile */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            
+            {/* 💾 One-Click Database Backup (#60) */}
+            <button
+              type="button"
+              onClick={handleExportBackup}
+              disabled={isExporting}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-navy transition-all cursor-pointer disabled:opacity-50"
+              title="Download entire database backup (JSON)"
+            >
+              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 text-primary" />}
+              <span>Backup Data</span>
+            </button>
+
+            {/* 🔔 Low Stock Notification Bell Dropdown (#29) */}
+            <div className="relative" ref={bellDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsBellOpen(!isBellOpen)}
+                className="p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-navy transition-all relative cursor-pointer"
+                title="Low Stock Notifications"
+              >
+                <Bell className="w-5 h-5 text-gray-600" />
+                {lowStockProducts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-xs">
+                    {lowStockProducts.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown Menu */}
+              {isBellOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-500" />
+                      <h4 className="text-xs font-black text-navy uppercase tracking-wider">Inventory Stock Alerts</h4>
+                    </div>
+                    <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                      {lowStockProducts.length} Alert(s)
+                    </span>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 py-1">
+                    {lowStockProducts.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-6">All products have sufficient inventory! 🎉</p>
+                    ) : (
+                      lowStockProducts.map((prod) => (
+                        <Link
+                          key={prod.id}
+                          to={`/admin/products/edit/${prod.id}`}
+                          onClick={() => setIsBellOpen(false)}
+                          className="p-2.5 flex items-center justify-between gap-3 hover:bg-gray-50 rounded-xl transition-colors group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <img src={prod.images[0] || 'https://via.placeholder.com/40'} alt={prod.name} className="w-9 h-9 rounded-lg object-contain bg-white border border-gray-100 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-navy group-hover:text-primary transition-colors truncate max-w-44">{prod.name}</p>
+                              <p className="text-[10px] text-gray-400 font-mono">SKU: {prod.sku || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${prod.stock <= 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-800'}`}>
+                            {prod.stock <= 0 ? 'Out of stock' : `${prod.stock} left`}
+                          </span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User Profile */}
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-bold text-sm">
                 {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
@@ -204,7 +360,7 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        {/* Page View Container (সরাসরি কন্টেন্ট লোড হবে) */}
+        {/* Page View Container */}
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
           <Outlet />
         </main>
