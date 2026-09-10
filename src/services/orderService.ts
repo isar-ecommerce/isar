@@ -44,7 +44,7 @@ const sanitizeForFirestore = <T>(data: T): T => {
 };
 
 /**
- * Steadfast Official Dynamic Delivery Fee Calculator
+ * Steadfast Official Dynamic Delivery Fee Calculator (#21)
  */
 export const calculateDynamicDeliveryFee = (
   district: string,
@@ -60,6 +60,7 @@ export const calculateDynamicDeliveryFee = (
   );
 
   const effectiveWeight = Math.max(totalWeightInKg, 0.5);
+  // ওজনের দশমিক মান পরবর্তী কেজিতে রাউন্ড করা
   const extraWeight = Math.max(0, Math.ceil(effectiveWeight - 1));
 
   if (normalizedDistrict === 'dhaka' && !isSubUrban) {
@@ -101,20 +102,54 @@ export interface CreateOrderParams {
   transactionId?: string;
   totalWeight?: number;
   deliveryZone?: DeliveryZone;
+  // নতুন রিয়েল প্যারামিটারসমূহ
+  isGiftWrap?: boolean;
+  giftMessage?: string;
+  deviceInfo?: string;
 }
 
 /**
- * অর্ডার তৈরি এবং স্টক সমন্বয়
+ * অর্ডার তৈরি, ডুপ্লিকেট ব্লকার এবং স্টক কাটার ইঞ্জিন
  */
 export const createOrder = async (params: CreateOrderParams): Promise<Order> => {
   try {
+    const cleanPhone = params.customerPhone.replace(/[^0-9]/g, '');
+
+    // ১. 🚨 ডুপ্লিকেট অর্ডার ব্লকার (#18): একই ফোন থেকে ২ মিনিটের মধ্যে ডাবল অর্ডার চেক
+    try {
+      const recentQuery = query(
+        ordersRef, 
+        where('customerPhone', '==', cleanPhone),
+        where('status', '==', 'pending')
+      );
+      const recentSnap = await getDocs(recentQuery);
+      
+      const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+      const isDuplicate = recentSnap.docs.some((d) => {
+        const data = d.data();
+        let createdMs = 0;
+        if (data.createdAt && typeof data.createdAt === 'object' && 'toDate' in data.createdAt) {
+          createdMs = data.createdAt.toDate().getTime();
+        }
+        return createdMs > twoMinutesAgo;
+      });
+
+      if (isDuplicate) {
+        throw new Error('Duplicate Order Detected: আপনি এইমাত্র একটি অর্ডার করেছেন। কিছুক্ষণ অপেক্ষা করুন অথবা প্রয়োজনে আমাদের কল করুন।');
+      }
+    } catch (dupErr) {
+      if (dupErr instanceof Error && dupErr.message.includes('Duplicate Order')) {
+        throw dupErr;
+      }
+    }
+
     const orderDocRef = doc(ordersRef);
     const orderId = orderDocRef.id;
     const orderNumber = `ISAR-${Math.floor(100000 + Math.random() * 900000)}`;
 
     let calculatedWeight = 0;
     const orderItems: OrderItem[] = (params.cartItems || []).map((item) => {
-      const itemWeight = 0.5;
+      const itemWeight = (item.product as { weightInKg?: number })?.weightInKg || 0.5;
       calculatedWeight += itemWeight * (item.quantity || 1);
 
       return {
@@ -133,46 +168,36 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
       ? params.totalWeight 
       : Math.max(calculatedWeight, 0.5);
 
-    let finalPaymentStatus: PaymentStatus = params.paymentStatus || 'pending';
-    let finalPaidAmount = Number(params.paidAmount) || 0;
-    let finalDueAmount = Number(params.dueAmount);
+    const giftFee = params.isGiftWrap ? 100 : 0;
+    const finalTotal = Number(params.totalAmount) + giftFee;
 
-    if (isNaN(finalDueAmount)) {
-      if (params.paymentMethod === 'cod') {
-        finalPaymentStatus = 'pending';
-        finalPaidAmount = 0;
-        finalDueAmount = Number(params.totalAmount) || 0;
-      } else {
-        finalPaymentStatus = 'paid';
-        finalPaidAmount = Number(params.totalAmount) || 0;
-        finalDueAmount = 0;
-      }
-    }
+    const finalPaymentStatus: PaymentStatus = 'pending';
+    const finalPaidAmount = 0;
+    const finalDueAmount = finalTotal;
 
     const now = serverTimestamp();
 
-    // safe address: alternatePhone ও alternativePhone দুটোরই undefined দূর করা হলো
     const rawAddress = (params.shippingAddress || {}) as unknown as Record<string, unknown>;
     const cleanShippingAddress = {
       fullName: String(rawAddress.fullName || params.customerName || '').trim(),
       email: String(rawAddress.email || params.customerEmail || '').trim(),
-      phone: String(rawAddress.phone || params.customerPhone || '').trim(),
-      alternatePhone: String(rawAddress.alternatePhone || rawAddress.alternativePhone || '').trim(),
-      alternativePhone: String(rawAddress.alternativePhone || rawAddress.alternatePhone || '').trim(),
+      phone: cleanPhone,
+      alternatePhone: String(rawAddress.alternatePhone || '').trim(),
       division: String(rawAddress.division || '').trim(),
       district: String(rawAddress.district || '').trim(),
       thana: String(rawAddress.thana || rawAddress.upazila || '').trim(),
-      fullAddress: String(rawAddress.fullAddress || rawAddress.streetAddress || '').trim(),
+      upazila: String(rawAddress.upazila || rawAddress.thana || '').trim(),
+      fullAddress: String(rawAddress.fullAddress || '').trim(),
       deliveryNotes: String(rawAddress.deliveryNotes || '').trim(),
     };
 
     const rawOrderData: Record<string, unknown> = {
       id: orderId,
       orderNumber,
-      userId: params.userId || 'guest',
-      customerName: params.customerName || cleanShippingAddress.fullName,
-      customerEmail: params.customerEmail || cleanShippingAddress.email,
-      customerPhone: params.customerPhone || cleanShippingAddress.phone,
+      userId: params.userId || 'guest-user',
+      customerName: cleanShippingAddress.fullName,
+      customerEmail: cleanShippingAddress.email,
+      customerPhone: cleanPhone,
       shippingAddress: cleanShippingAddress,
       deliveryZone: params.deliveryZone || 'inside_dhaka',
       items: orderItems,
@@ -182,34 +207,34 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
       discount: Number(params.discount) || 0,
       couponCode: params.couponCode || null,
       couponId: params.couponId || null,
-      totalAmount: Number(params.totalAmount) || 0,
+      totalAmount: finalTotal,
       paidAmount: finalPaidAmount,
       dueAmount: finalDueAmount,
-      paymentMethod: params.paymentMethod || 'cod',
+      paymentMethod: 'cod',
       paymentStatus: finalPaymentStatus,
-      paymentId: params.paymentId || null,
-      transactionId: params.transactionId || null,
       status: 'pending',
+      // নতুন স্মার্ট ফিল্ডসমূহ
+      isGiftWrap: Boolean(params.isGiftWrap),
+      giftWrapFee: giftFee,
+      giftMessage: params.giftMessage?.trim() || null,
+      deviceInfo: params.deviceInfo || 'Unknown Device',
       statusHistory: [
         {
           status: 'pending',
           updatedAt: new Date().toISOString(),
-          note: params.paymentMethod === 'cod' 
-            ? `Order placed via Cash on Delivery. Total due: ${finalDueAmount} BDT.`
-            : `Order confirmed with full bKash payment: ${finalPaidAmount} BDT.`,
+          note: `Order placed via Cash on Delivery. Total due: ${finalDueAmount} BDT.${params.isGiftWrap ? ' (Gift Wrap Added)' : ''}`,
         },
       ],
       createdAt: now,
       updatedAt: now,
     };
 
-    // ফায়ারস্টোরের জন্য সব undefined ফিল্ড ফিল্টার করা
     const sanitizedOrderData = sanitizeForFirestore(rawOrderData) as Record<string, unknown>;
 
-    // ১. ফায়ারস্টোরে অর্ডার সংরক্ষণ
+    // ফায়ারস্টোরে অর্ডার সংরক্ষণ
     await setDoc(orderDocRef, sanitizedOrderData);
 
-    // ২. প্রোডাক্ট স্টক কমানো
+    // প্রোডাক্ট স্টক থেকে মাইনাস করা
     for (const item of orderItems) {
       if (item.productId) {
         try {
@@ -231,8 +256,46 @@ export const createOrder = async (params: CreateOrderParams): Promise<Order> => 
     } as unknown as Order;
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error creating order in Firestore';
-    console.error("[OrderService] Error creating order in Firestore:", errorMsg);
+    console.error("[OrderService] Error creating order:", errorMsg);
     throw new Error(errorMsg, { cause: error });
+  }
+};
+
+/**
+ * ⏰ অর্ডার এডিট উইন্ডো (#20): ১০ মিনিটের মধ্যে কাস্টমারের ঠিকানা ও ফোন নম্বর সংশোধন
+ */
+export const updateOrderCustomerAddress = async (
+  orderId: string, 
+  updatedAddress: { fullName: string; phone: string; fullAddress: string; upazila: string; district: string; division: string; deliveryNotes?: string }
+): Promise<void> => {
+  try {
+    const docRef = doc(db, 'orders', orderId);
+    const snap = await getDoc(docRef);
+
+    if (!snap.exists()) {
+      throw new Error('Order not found');
+    }
+
+    const orderData = snap.data();
+    if (orderData.status !== 'pending') {
+      throw new Error('Order is already in processing. Address cannot be modified.');
+    }
+
+    await updateDoc(docRef, {
+      customerName: updatedAddress.fullName.trim(),
+      customerPhone: updatedAddress.phone.trim(),
+      'shippingAddress.fullName': updatedAddress.fullName.trim(),
+      'shippingAddress.phone': updatedAddress.phone.trim(),
+      'shippingAddress.fullAddress': updatedAddress.fullAddress.trim(),
+      'shippingAddress.upazila': updatedAddress.upazila.trim(),
+      'shippingAddress.district': updatedAddress.district.trim(),
+      'shippingAddress.division': updatedAddress.division.trim(),
+      'shippingAddress.deliveryNotes': updatedAddress.deliveryNotes?.trim() || '',
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Failed to update order address';
+    throw new Error(msg, { cause: error });
   }
 };
 
@@ -264,7 +327,7 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
     });
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error fetching user orders';
-    console.error("[OrderService] Error fetching user orders safely:", errorMsg);
+    console.error("[OrderService] Error fetching user orders:", errorMsg);
     throw new Error(errorMsg, { cause: error });
   }
 };
@@ -289,7 +352,7 @@ export const getOrderById = async (orderId: string): Promise<Order | null> => {
 };
 
 /**
- * অর্ডার বাতিল এবং স্টক রি-স্টক ইঞ্জিন
+ * অটোমেটিক রিটার্ন স্টক রি-ইঞ্জেকশন (#26)
  */
 export const cancelOrder = async (orderId: string, reason?: string): Promise<void> => {
   try {
@@ -305,6 +368,7 @@ export const cancelOrder = async (orderId: string, reason?: string): Promise<voi
         updatedAt: serverTimestamp(),
       });
 
+      // আইটেমগুলোর স্টক স্বয়ংক্রিয়ভাবে ইনভেন্টরিতে রি-ইঞ্জেক্ট করা (+quantity)
       if (orderData.items && Array.isArray(orderData.items)) {
         for (const item of orderData.items) {
           if (item.productId) {

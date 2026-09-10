@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useLocation, useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -13,12 +13,17 @@ import {
   Loader2,
   Copy,
   Check,
-  Sparkles
+  Sparkles,
+  Edit,
+  Clock,
+  X,
+  Gift
 } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 import { db } from '../../firebase/config';
+import { updateOrderCustomerAddress } from '../../services/orderService';
 import BrandLogo from '../common/BrandLogo';
 import type { Order } from '../../types/order';
 
@@ -33,9 +38,16 @@ export default function OrderSuccess() {
   const [isLoading, setIsLoading] = useState<boolean>(!stateOrder && Boolean(orderNumberParam));
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
+  // ১০ মিনিট এডিট উইন্ডো স্টেট (#20)
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [editFullName, setEditFullName] = useState<string>('');
+  const [editPhone, setEditPhone] = useState<string>('');
+  const [editAddress, setEditAddress] = useState<string>('');
+  const [editNotes, setEditNotes] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // ১. পেজ রিফ্রেশ দিলেও ফায়ারস্টোর থেকে আসল অর্ডার লোড করা
   useEffect(() => {
     let isMounted = true;
     if (stateOrder || !orderNumberParam) return;
@@ -67,7 +79,7 @@ export default function OrderSuccess() {
     };
   }, [orderNumberParam, stateOrder]);
 
-  // ২. লাইটওয়েট কনফেটি ক্যানন সেলিব্রেশন অ্যানিমেশন (#16)
+  // কনফেটি ক্যানন অ্যানিমেশন
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -155,6 +167,63 @@ export default function OrderSuccess() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const openEditModal = () => {
+    if (!orderData) return;
+    setEditFullName(orderData.customerName || '');
+    setEditPhone(orderData.customerPhone || '');
+    setEditAddress(orderData.shippingAddress?.fullAddress || '');
+    setEditNotes(orderData.shippingAddress?.deliveryNotes || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditedAddress = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!orderData) return;
+
+    if (!editFullName.trim() || !editPhone.trim() || !editAddress.trim()) {
+      toast.error('Name, phone, and address are required.');
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      await updateOrderCustomerAddress(orderData.id, {
+        fullName: editFullName.trim(),
+        phone: editPhone.trim(),
+        fullAddress: editAddress.trim(),
+        upazila: orderData.shippingAddress?.upazila || '',
+        district: orderData.shippingAddress?.district || '',
+        division: orderData.shippingAddress?.division || '',
+        deliveryNotes: editNotes.trim(),
+      });
+
+      setOrderData((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          customerName: editFullName.trim(),
+          customerPhone: editPhone.trim(),
+          shippingAddress: {
+            ...prev.shippingAddress,
+            fullName: editFullName.trim(),
+            phone: editPhone.trim(),
+            fullAddress: editAddress.trim(),
+            deliveryNotes: editNotes.trim(),
+          },
+        };
+      });
+
+      toast.success('Shipping address updated successfully!');
+      setIsEditModalOpen(false);
+    } catch (err: unknown) {
+      console.error('Update address error:', err);
+      const msg = err instanceof Error ? err.message : 'Failed to update address';
+      toast.error(msg);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center bg-secondary">
@@ -177,13 +246,15 @@ export default function OrderSuccess() {
     );
   }
 
+  const isPending = orderData.status === 'pending';
+
   return (
     <div className="bg-secondary min-h-screen py-6 sm:py-10 print:bg-white print:py-0 print:min-h-0 relative overflow-hidden">
       <Helmet>
         <title>{`Order Confirmed #${orderData.orderNumber} | ISAR Marketplace`}</title>
       </Helmet>
 
-      {/* Confetti Canvas (#16) */}
+      {/* Confetti Canvas */}
       <canvas 
         ref={canvasRef} 
         className="fixed inset-0 pointer-events-none z-50 print:hidden" 
@@ -191,7 +262,6 @@ export default function OrderSuccess() {
 
       <div className="container mx-auto px-4 max-w-3xl print:max-w-none print:px-0 relative z-10">
         
-        {/* Main Receipt Card (Optimized for 1-Page A4 Printing) */}
         <div className="bg-white rounded-3xl shadow-modern-lg border border-gray-100 p-6 md:p-8 space-y-6 print:shadow-none print:border-none print:p-4 print:space-y-4">
           
           {/* Print Header */}
@@ -207,7 +277,7 @@ export default function OrderSuccess() {
             </div>
           </div>
 
-          {/* Web Screen Success Header */}
+          {/* Web Success Header */}
           <div className="text-center space-y-2 pb-5 border-b border-gray-100 print:hidden">
             <div className="w-16 h-16 bg-brand-green/10 rounded-full flex items-center justify-center mx-auto text-brand-green mb-1 animate-bounce">
               <CheckCircle2 className="w-10 h-10 text-brand-green" />
@@ -240,6 +310,23 @@ export default function OrderSuccess() {
               </div>
             </div>
           </div>
+
+          {/* ⏰ ১০ মিনিট অর্ডার এডিট উইন্ডো নোটিশ (#20) */}
+          {isPending && (
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
+              <div className="flex items-center gap-2.5 text-amber-900 font-bold">
+                <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>ভুল থাকলে পার্সেল পাঠানোর আগেই আপনার ঠিকানা পরিবর্তন করুন</span>
+              </div>
+              <button
+                type="button"
+                onClick={openEditModal}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit className="w-3.5 h-3.5" /> ঠিকানা সংশোধন করুন
+              </button>
+            </div>
+          )}
 
           {/* Delivery Notice */}
           <div className="p-3.5 bg-primary/5 rounded-2xl border border-primary/10 flex items-center gap-3 text-xs text-navy print:hidden">
@@ -279,9 +366,26 @@ export default function OrderSuccess() {
               <p className="text-gray-500 text-[11px]">
                 {orderData.shippingAddress?.upazila}, {orderData.shippingAddress?.district}, {orderData.shippingAddress?.division}
               </p>
+              {orderData.shippingAddress?.deliveryNotes && (
+                <p className="text-[10px] text-gray-400 italic mt-0.5">Note: {orderData.shippingAddress.deliveryNotes}</p>
+              )}
             </div>
 
           </div>
+
+          {/* 🎁 গিফট প্যাকেজিং ও মেসেজ প্রিভিউ (#16, #17) */}
+          {(orderData as { isGiftWrap?: boolean })?.isGiftWrap && (
+            <div className="p-3.5 bg-pink-50 rounded-2xl border border-pink-200/80 space-y-1 text-xs">
+              <span className="font-black text-pink-900 flex items-center gap-1.5 text-xs">
+                <Gift className="w-4 h-4 text-pink-600" /> Premium Gift Packaging & Message Card
+              </span>
+              {(orderData as { giftMessage?: string })?.giftMessage && (
+                <p className="text-gray-700 italic bg-white p-2.5 rounded-xl border border-pink-100 mt-1 text-[11px]">
+                  "{(orderData as { giftMessage?: string }).giftMessage}"
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Purchased Items List */}
           <div className="space-y-2">
@@ -311,7 +415,7 @@ export default function OrderSuccess() {
             </div>
           </div>
 
-          {/* Payment & Invoice Breakdown */}
+          {/* Payment Breakdown */}
           <div className="p-4 bg-navy text-white rounded-2xl space-y-2 text-xs print:bg-white print:text-black print:border print:rounded-none">
             <div className="flex justify-between text-gray-300 print:text-gray-700">
               <span>Subtotal:</span>
@@ -321,6 +425,12 @@ export default function OrderSuccess() {
               <span>Delivery Charge:</span>
               <span className="font-semibold text-white print:text-black font-mono">{orderData.deliveryFee?.toLocaleString()} BDT</span>
             </div>
+            {(orderData as { giftWrapFee?: number })?.giftWrapFee ? (
+              <div className="flex justify-between text-pink-300 print:text-black">
+                <span>Gift Packaging:</span>
+                <span className="font-semibold font-mono">+{(orderData as { giftWrapFee?: number }).giftWrapFee} BDT</span>
+              </div>
+            ) : null}
             {(orderData.discount || 0) > 0 && (
               <div className="flex justify-between text-brand-green print:text-black">
                 <span>Discount:</span>
@@ -330,7 +440,7 @@ export default function OrderSuccess() {
             <div className="flex justify-between text-gray-300 print:text-gray-700">
               <span>Payment Method:</span>
               <span className="font-bold text-brand-green uppercase print:text-black">
-                {orderData.paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'bKash Online Payment'}
+                Cash on Delivery (COD)
               </span>
             </div>
             <div className="flex justify-between text-sm font-black text-white pt-2 border-t border-navy-light print:text-black print:border-t-2 print:border-black">
@@ -371,6 +481,94 @@ export default function OrderSuccess() {
         </div>
 
       </div>
+
+      {/* ১০ মিনিট এডিট অ্যাড্রেস মোডাল (#20) */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-gray-100 relative space-y-4">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-navy font-black text-sm">
+                <Edit className="w-4 h-4 text-primary" />
+                <span>ডেলিভারি ঠিকানা সংশোধন</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1 text-gray-400 hover:text-navy rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedAddress} className="space-y-3.5 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-navy block">আপনার নাম *</label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-navy font-bold focus:bg-white focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-navy block">১১ ডিজিটের মোবাইল নম্বর *</label>
+                <input
+                  type="tel"
+                  required
+                  maxLength={11}
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-navy font-mono font-bold focus:bg-white focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-navy block">বিস্তারিত বাসার ঠিকানা *</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-navy focus:bg-white focus:outline-none focus:border-primary resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-navy block">রাইডারের জন্য নোট (ঐচ্ছিক)</label>
+                <input
+                  type="text"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="e.g. গেটে এসে কল দিন"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-navy focus:bg-white focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-gray-500 hover:bg-gray-100 font-bold cursor-pointer"
+                >
+                  বাতিল
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-5 py-2 bg-primary hover:bg-primary-dark text-white font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'সংরক্ষণ করুন'}
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

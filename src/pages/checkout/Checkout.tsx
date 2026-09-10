@@ -16,7 +16,8 @@ import {
   Sparkles, 
   Plus, 
   Minus, 
-  X 
+  X,
+  Gift
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -59,16 +60,21 @@ export default function Checkout() {
   const subtotal = getSubtotal();
   const discount = getDiscount();
 
-  const [fullName, setFullName] = useState<string>('');
-  const [email, setEmail] = useState<string>(user?.email || '');
-  const [phone, setPhone] = useState<string>('');
+  // ফর্ম স্টেট (লোকালস্টোরেজ ড্রাফট অটো-রিস্টোর সহ - #14)
+  const [fullName, setFullName] = useState<string>(() => localStorage.getItem('isar_draft_name') || '');
+  const [email, setEmail] = useState<string>(() => user?.email || localStorage.getItem('isar_draft_email') || '');
+  const [phone, setPhone] = useState<string>(() => localStorage.getItem('isar_draft_phone') || '');
   const [alternatePhone, setAlternatePhone] = useState<string>('');
   
   const [division, setDivision] = useState<string>('Dhaka');
   const [district, setDistrict] = useState<string>('Dhaka');
   const [upazila, setUpazila] = useState<string>('Dhanmondi');
-  const [fullAddress, setFullAddress] = useState<string>('');
+  const [fullAddress, setFullAddress] = useState<string>(() => localStorage.getItem('isar_draft_address') || '');
   const [deliveryNotes, setDeliveryNotes] = useState<string>('');
+
+  // 🎁 গিফট বক্স ও মেসেজ স্টেট (#16, #17)
+  const [isGiftWrap, setIsGiftWrap] = useState<boolean>(false);
+  const [giftMessage, setGiftMessage] = useState<string>('');
 
   const [availableDistricts, setAvailableDistricts] = useState(() => getDistrictsByDivision('Dhaka'));
   const [availableUpazilas, setAvailableUpazilas] = useState(() => getUpazilasByDistrict('Dhaka', 'Dhaka'));
@@ -88,6 +94,14 @@ export default function Checkout() {
   const handleBackNavigation = () => {
     navigate(backButtonPath);
   };
+
+  // 💾 ইনপুট ড্রাফট অটো-সেভ (#14)
+  useEffect(() => {
+    if (fullName) localStorage.setItem('isar_draft_name', fullName);
+    if (email) localStorage.setItem('isar_draft_email', email);
+    if (phone) localStorage.setItem('isar_draft_phone', phone);
+    if (fullAddress) localStorage.setItem('isar_draft_address', fullAddress);
+  }, [fullName, email, phone, fullAddress]);
 
   // Auto-fill address from User Profile if logged in
   useEffect(() => {
@@ -133,7 +147,7 @@ export default function Checkout() {
     };
   }, [user?.uid]);
 
-  // Live dynamic weight & delivery charge calculation
+  // ওজনের ওপর ভিত্তি করে ডেলিভারি চার্জ
   const totalWeight = useMemo(() => {
     return items.reduce((sum, item) => {
       const weightPerItem = (item.product as { weightInKg?: number })?.weightInKg || 0.5;
@@ -149,9 +163,10 @@ export default function Checkout() {
     };
   }, [district, upazila, totalWeight]);
 
+  const giftFee = isGiftWrap ? 100 : 0;
   const total = useMemo(() => {
-    return Math.max(0, subtotal + deliveryFee - discount);
-  }, [subtotal, deliveryFee, discount]);
+    return Math.max(0, subtotal + deliveryFee - discount + giftFee);
+  }, [subtotal, deliveryFee, discount, giftFee]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -160,7 +175,7 @@ export default function Checkout() {
     }
   }, [items, navigate]);
 
-  // 🔴 Abandoned Cart Auto-Save Engine: নাম ও ফোন নাম্বার লিখলে স্বয়ংক্রিয় ড্রাফট সেভ হবে
+  // Abandoned Cart ড্রাফট সেভ
   useEffect(() => {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     if (cleanPhone.length < 11 || !fullName.trim() || items.length === 0) return;
@@ -276,9 +291,11 @@ export default function Checkout() {
       return false;
     }
 
+    // 🇧🇩 রিয়েল-টাইম বাংলাদেশি সব অপারেটরের ১১ ডিজিট ভ্যালিডেশন (#19)
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    if (cleanPhone.length < 11) {
-      toast.error('Please enter a valid 11-digit mobile number (01XXXXXXXXX)');
+    const bdPhoneRegex = /^(?:\+88|88)?(01[3-9]\d{8})$/;
+    if (!bdPhoneRegex.test(cleanPhone)) {
+      toast.error('অনুগ্রহ করে সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
       document.getElementById('checkout-phone')?.focus();
       return false;
     }
@@ -298,6 +315,13 @@ export default function Checkout() {
 
     try {
       setIsSubmitting(true);
+
+      // 📱 কাস্টমার ডিভাইস ডিটেকশন (#23) - কোনো অনুমতি ব্যতিরেকে
+      const detectedDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent) 
+        ? 'Apple iOS' 
+        : /Android/i.test(navigator.userAgent) 
+        ? 'Android Mobile' 
+        : 'Desktop / PC';
 
       const shippingAddress: ShippingAddress = {
         fullName: fullName.trim(),
@@ -329,13 +353,20 @@ export default function Checkout() {
         paymentStatus: 'pending',
         paidAmount: 0,
         dueAmount: total,
+        // নতুন প্যারামিটারসমূহ
+        isGiftWrap,
+        giftMessage: isGiftWrap ? giftMessage : undefined,
+        deviceInfo: detectedDevice,
       });
 
-      // 🔴 অর্ডার সফল হলে Abandoned Cart ড্রাফট মুছে ফেলা
+      // ড্রাফট ও লোকালস্টোরেজ ক্লিয়ার
       try {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
-        const draftRef = doc(db, 'abandoned_carts', `draft_${cleanPhone}`);
-        await deleteDoc(draftRef);
+        await deleteDoc(doc(db, 'abandoned_carts', `draft_${cleanPhone}`));
+        localStorage.removeItem('isar_draft_name');
+        localStorage.removeItem('isar_draft_email');
+        localStorage.removeItem('isar_draft_phone');
+        localStorage.removeItem('isar_draft_address');
       } catch (delErr) {
         console.warn('Draft cleanup note:', delErr);
       }
@@ -364,9 +395,10 @@ export default function Checkout() {
           },
         },
       });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Checkout error:', err);
-      toast.error('Failed to complete order. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Failed to complete order. Please try again.';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -402,7 +434,7 @@ export default function Checkout() {
 
         <form ref={formRef} onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           
-          {/* Left Column: Shipping & Payment */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             
             <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-modern border border-gray-100 space-y-5">
@@ -543,12 +575,50 @@ export default function Checkout() {
                     type="text"
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
-                    placeholder="e.g. Call before delivery"
+                    placeholder="e.g. Call before delivery / 5pm er por delivery din"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs sm:text-sm text-navy placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
 
               </div>
+            </div>
+
+            {/* 🎁 Gift Wrap & Personal Greeting Card Option (#16, #17) */}
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-modern border border-gray-100 space-y-3">
+              <label className="flex items-center justify-between cursor-pointer select-none">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-navy block">Send as a Gift? (প্রিমিয়াম গিফট র‍্যাপিং)</span>
+                    <span className="text-[11px] text-gray-500">Add luxury gift wrap & custom printed message card (+৳100)</span>
+                  </div>
+                </div>
+
+                <input
+                  type="checkbox"
+                  checked={isGiftWrap}
+                  onChange={(e) => setIsGiftWrap(e.target.checked)}
+                  className="w-5 h-5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
+                />
+              </label>
+
+              {isGiftWrap && (
+                <div className="pt-2 border-t border-gray-100 space-y-1.5 animate-in fade-in duration-200">
+                  <label htmlFor="checkout-giftMessage" className="text-xs font-bold text-navy block">
+                    Personal Message for Recipient (মেমোর সাথে প্রিন্ট হবে):
+                  </label>
+                  <textarea
+                    id="checkout-giftMessage"
+                    rows={2}
+                    value={giftMessage}
+                    onChange={(e) => setGiftMessage(e.target.value)}
+                    placeholder="e.g. শুভ জন্মদিন দোস্ত! আশা করি ব্যাগটি তোর পছন্দ হবে।"
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-xs text-navy focus:bg-white focus:outline-none focus:border-primary resize-none"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Payment Method */}
@@ -741,6 +811,13 @@ export default function Checkout() {
                   <span className="font-bold text-navy font-mono">{deliveryFee.toLocaleString()} BDT</span>
                 </div>
 
+                {isGiftWrap && (
+                  <div className="flex justify-between text-pink-600 font-bold">
+                    <span>Gift Wrap & Card:</span>
+                    <span className="font-mono">+100 BDT</span>
+                  </div>
+                )}
+
                 {discount > 0 && (
                   <div className="flex justify-between text-brand-green font-bold">
                     <span>Coupon Discount</span>
@@ -754,7 +831,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Confirm Button */}
+              {/* Confirm Order Button with Double Click Guard (#24) */}
               <button
                 type="submit"
                 disabled={isSubmitting}
