@@ -17,7 +17,10 @@ import {
   Printer,
   CheckSquare,
   Square,
-  Package
+  Package,
+  ShieldAlert,
+  ShieldCheck,
+  Award
 } from 'lucide-react';
 import { collection, getDocs, doc, updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -25,6 +28,14 @@ import toast from 'react-hot-toast';
 import { db } from '../../firebase/config';
 import { sendOrderToCourier } from '../../services/courierService';
 import type { Order, OrderStatus } from '../../types/order';
+
+interface CustomerRiskProfile {
+  phone: string;
+  totalOrders: number;
+  deliveredCount: number;
+  cancelledCount: number;
+  riskLevel: 'high_risk' | 'trusted' | 'new_buyer';
+}
 
 const getCollectableCOD = (order: Order): number => {
   if (order.paymentStatus === 'paid' || order.paymentMethod === 'bkash') {
@@ -81,7 +92,49 @@ export default function AdminOrders() {
     };
   }, [fetchOrders]);
 
-  // ⚖️ কুরিয়ার কালেকশন ব্যালেন্স রিকনসিলিয়েশন হিসেব (#27)
+  // 🚨 ফেক অর্ডার ও রিটার্ন ফ্রড স্কোরিং প্রোফাইল ম্যাপ (#13)
+  const customerRiskMap = useMemo(() => {
+    const map: Record<string, { total: number; delivered: number; cancelled: number }> = {};
+
+    orders.forEach((o) => {
+      const phone = o.customerPhone ? o.customerPhone.replace(/[^0-9]/g, '') : '';
+      if (!phone) return;
+
+      if (!map[phone]) {
+        map[phone] = { total: 0, delivered: 0, cancelled: 0 };
+      }
+
+      map[phone].total += 1;
+      if (o.status === 'delivered') {
+        map[phone].delivered += 1;
+      } else if (o.status === 'cancelled') {
+        map[phone].cancelled += 1;
+      }
+    });
+
+    const riskProfiles: Record<string, CustomerRiskProfile> = {};
+
+    Object.entries(map).forEach(([phone, stats]) => {
+      let riskLevel: 'high_risk' | 'trusted' | 'new_buyer' = 'new_buyer';
+      if (stats.cancelled > 0) {
+        riskLevel = 'high_risk';
+      } else if (stats.delivered >= 1) {
+        riskLevel = 'trusted';
+      }
+
+      riskProfiles[phone] = {
+        phone,
+        totalOrders: stats.total,
+        deliveredCount: stats.delivered,
+        cancelledCount: stats.cancelled,
+        riskLevel,
+      };
+    });
+
+    return riskProfiles;
+  }, [orders]);
+
+  // ⚖️ কুরিয়ার কালেকশন ব্যালেন্স রিকনসিলিয়েশন (#27)
   const reconciliationStats = useMemo(() => {
     let inTransitCOD = 0;
     let deliveredCOD = 0;
@@ -130,7 +183,6 @@ export default function AdminOrders() {
     }
   };
 
-  // ১-ক্লিক সিঙ্গেল ডিসপ্যাচ
   const handleDispatchCourier = async (order: Order) => {
     try {
       setDispatchingId(order.id);
@@ -170,7 +222,6 @@ export default function AdminOrders() {
     }
   };
 
-  // 📦 বাল্ক ১-ক্লিক কুরিয়ার ডিসপ্যাচ (#25)
   const handleBulkDispatch = async () => {
     const ordersToDispatch = orders.filter(
       (o) => selectedOrderIds.includes(o.id) && o.status !== 'shipped' && o.status !== 'delivered' && o.status !== 'cancelled'
@@ -277,6 +328,34 @@ export default function AdminOrders() {
     }
   };
 
+  // 🚨 কাস্টমার ফ্রড ও ট্রাস্ট ব্যাজ রেন্ডার (#13)
+  const getCustomerRiskBadge = (phone: string) => {
+    const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+    const profile = customerRiskMap[cleanPhone];
+
+    if (!profile || profile.riskLevel === 'new_buyer') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 px-1.5 py-0.5 rounded">
+          <User className="w-2.5 h-2.5" /> New Customer
+        </span>
+      );
+    }
+
+    if (profile.riskLevel === 'high_risk') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[9px] font-black text-red-700 bg-red-100 border border-red-300 px-1.5 py-0.5 rounded shadow-2xs">
+          <ShieldAlert className="w-2.5 h-2.5 text-red-600" /> High Risk ({profile.cancelledCount} Cancelled)
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 text-[9px] font-black text-brand-green bg-brand-green/10 border border-brand-green/30 px-1.5 py-0.5 rounded">
+        <Award className="w-2.5 h-2.5 text-brand-green" /> Trusted ({profile.deliveredCount} Delivered)
+      </span>
+    );
+  };
+
   const getPaymentBadge = (order: Order) => {
     const codDue = getCollectableCOD(order);
 
@@ -296,7 +375,7 @@ export default function AdminOrders() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       <Helmet>
         <title>Order Management | ISAR Admin</title>
       </Helmet>
@@ -306,7 +385,7 @@ export default function AdminOrders() {
         <div>
           <h1 className="text-2xl font-black text-navy">Order Management & Bulk Dispatch</h1>
           <p className="text-xs text-gray-500 mt-1">
-            Monitor cash on delivery collections and batch dispatch parcels to Steadfast Courier
+            Monitor cash on delivery collections, fraud detection alerts, and bulk dispatch parcels
           </p>
         </div>
 
@@ -365,7 +444,6 @@ export default function AdminOrders() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 📦 বাল্ক ডিসপ্যাচ বাটন (#25) */}
           {selectedOrderIds.length > 0 && (
             <button
               type="button"
@@ -427,7 +505,7 @@ export default function AdminOrders() {
                     </button>
                   </th>
                   <th className="py-3 px-3">Order ID</th>
-                  <th className="py-3 px-3">Customer & Address</th>
+                  <th className="py-3 px-3">Customer, Phone & Trust</th>
                   <th className="py-3 px-3">Total Value</th>
                   <th className="py-3 px-3">Payment & COD Due</th>
                   <th className="py-3 px-3">Status & Tracking</th>
@@ -462,12 +540,16 @@ export default function AdminOrders() {
                         )}
                       </td>
 
+                      {/* Customer, Phone & Trust Badge (#13) */}
                       <td className="py-4 px-3">
                         <span className="font-bold text-navy block">{order.customerName}</span>
                         <span className="text-[10px] text-gray-400 block font-mono">{order.customerPhone}</span>
-                        <span className="text-[10px] text-gray-500 block truncate max-w-44">
-                          {order.shippingAddress?.district}, {order.shippingAddress?.division}
-                        </span>
+                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          {getCustomerRiskBadge(order.customerPhone)}
+                          <span className="text-[10px] text-gray-400 block truncate max-w-32">
+                            {order.shippingAddress?.district}
+                          </span>
+                        </div>
                       </td>
 
                       <td className="py-4 px-3">
@@ -555,9 +637,11 @@ export default function AdminOrders() {
         )}
       </div>
 
-      {/* Order Details Modal */}
+      {/* Order Details Modal with Fraud & Risk Assessment (#13) */}
       {selectedOrder && (() => {
         const collectableCOD = getCollectableCOD(selectedOrder);
+        const cleanPhone = selectedOrder.customerPhone ? selectedOrder.customerPhone.replace(/[^0-9]/g, '') : '';
+        const riskProfile = customerRiskMap[cleanPhone];
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -585,11 +669,49 @@ export default function AdminOrders() {
                 </div>
               </div>
 
+              {/* 🚨 কাস্টমার ফ্রড ও রিক্স অ্যাসেসমেন্ট কার্ড (#13) */}
+              <div className={`p-4 rounded-2xl border text-xs space-y-1.5 ${
+                riskProfile?.riskLevel === 'high_risk' 
+                  ? 'bg-red-50/80 border-red-200 text-red-950' 
+                  : riskProfile?.riskLevel === 'trusted'
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                  : 'bg-blue-50/80 border-blue-200 text-blue-950'
+              }`}>
+                <div className="flex items-center justify-between font-black">
+                  <span className="flex items-center gap-1.5 text-xs">
+                    {riskProfile?.riskLevel === 'high_risk' ? (
+                      <>
+                        <ShieldAlert className="w-4 h-4 text-red-600" /> Fraud Risk Alert: অতীতের রিটার্ন রেকর্ড আছে
+                      </>
+                    ) : riskProfile?.riskLevel === 'trusted' ? (
+                      <>
+                        <ShieldCheck className="w-4 h-4 text-brand-green" /> Verified Genuine Buyer: বিশ্বস্ত গ্রাহক
+                      </>
+                    ) : (
+                      <>
+                        <User className="w-4 h-4 text-blue-600" /> New Customer: নতুন গ্রাহক
+                      </>
+                    )}
+                  </span>
+                  <span className="font-mono text-[11px]">
+                    Total Orders: {riskProfile?.totalOrders || 1}
+                  </span>
+                </div>
+
+                <p className="text-[11px] leading-relaxed">
+                  {riskProfile?.riskLevel === 'high_risk'
+                    ? `⚠️ এই নম্বর থেকে অতীতে ${riskProfile.cancelledCount}টি পার্সেল ক্যানসেল বা রিটার্ন হয়েছে। পার্সেল পাঠানোর আগে ফোনে কথা বলে নিন অথবা ডেলিভারি চার্জ অগ্রিম নিন।`
+                    : riskProfile?.riskLevel === 'trusted'
+                    ? `💎 এই গ্রাহক অতীতে সফলভাবে ${riskProfile.deliveredCount}টি পার্সেল রিসিভ করেছেন। এটি একটি ১০০% নিরাপদ ও অথেনটিক অর্ডার!`
+                    : `এই গ্রাহক প্রথমবার অর্ডার করেছেন। ডেলিভারি নিশ্চিত করতে একবার ফোন করে নেওয়া ভালো।`}
+                </p>
+              </div>
+
               {selectedOrder.trackingCode && (
                 <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200 flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2 text-purple-900 font-bold">
                     <Truck className="w-4 h-4 text-purple-700 shrink-0" />
-                    <span>Steadfast Tracking Code: <strong className="font-mono">{selectedOrder.trackingCode}</strong></span>
+                    <span>Steadfast Tracking Code: <strong className="font-mono text-purple-950">{selectedOrder.trackingCode}</strong></span>
                   </div>
                   <a
                     href={`https://steadfast.com.bd/t/${selectedOrder.trackingCode}`}
@@ -629,7 +751,7 @@ export default function AdminOrders() {
                 </div>
               </div>
 
-              {/* 🎁 গিফট মেসেজ যদি থাকে (#16, #17) */}
+              {/* 🎁 গিফট মেসেজ প্রিভিউ */}
               {(selectedOrder as { isGiftWrap?: boolean }).isGiftWrap && (
                 <div className="p-3.5 bg-pink-50 rounded-2xl border border-pink-200 text-xs space-y-1">
                   <span className="font-black text-pink-900 flex items-center gap-1">
