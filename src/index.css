@@ -4,9 +4,9 @@
   --color-primary: #2563eb;
   --color-primary-dark: #1d4ed8;
   --color-primary-light: #3b82f6;
-  --color-navy: #0f172a;
-  --color-navy-light: #1e293b;
-  --color-secondary: #f4f6f8; /* সফট চোখ-জুড়ানো লাক্সারি অফ-হোয়াইট */
+  --color-navy: #ffffff;
+  --color-navy-light: #1e2638;
+  --color-secondary: #070a0f;
   --color-brand-green: #10b981;
   --color-brand-gold: #f59e0b;
 }
@@ -14,100 +14,94 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    color-scheme: dark;
   }
   
-  /* ☀️ সান মোড: সফট অফ-হোয়াইট লাক্সারি আর্কিটেকচার */
+  /* 🌙 স্থায়ী ফুল-টাইম স্টিলথ ম্যাট ব্ল্যাক বডি */
   body {
-    background-color: #f4f6f8;
-    color: #0f172a;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    transition: background-color 0.25s ease, color 0.25s ease;
+    background-color: #070a0f !important;
+    color: #f8fafc !important;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
 
-/* ☀️ সান মোড (লাইট মোড) সুসংগত স্টাইলিং */
-html:not(.dark) body {
-  background-color: #f4f6f8 !important;
-}
-
-html:not(.dark) .bg-secondary {
-  background-color: #f4f6f8 !important;
-}
-
-html:not(.dark) .bg-white {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
-}
-
-html:not(.dark) .text-navy {
-  color: #0f172a !important;
-}
-
-html:not(.dark) .text-gray-500,
-html:not(.dark) .text-gray-400 {
-  color: #64748b !important;
-}
-
-/* =========================================================
-   🌙 মুন মোড: স্টিলথ ম্যাট অবসিডিয়ান ব্ল্যাক (Dark Mode)
-   ========================================================= */
-
-html.dark body {
-  background-color: #070a0f !important;
-  color: #f8fafc !important;
-}
-
-html.dark .bg-secondary {
+/* ১. সব ব্যাকগ্রাউন্ড ডিপ ম্যাট ব্ল্যাক */
+.bg-secondary {
   background-color: #070a0f !important;
 }
 
-html.dark .bg-white {
+/* ২. প্রোডাক্ট কার্ড ও সমস্ত বক্স লাক্সারি চারকোল */
+.bg-white {
   background-color: #0f141c !important;
   border-color: #1e2638 !important;
   color: #ffffff !important;
 }
 
-html.dark .bg-gray-50,
-html.dark .bg-gray-50\/50,
-html.dark .bg-gray-50\/60,
-html.dark .bg-gray-50\/70,
-html.dark .bg-gray-50\/80 {
+/* ৩. ছোট বাটন, ইনপুট ও থাম্বনেইল ব্যাকগ্রাউন্ড */
+.bg-gray-50,
+.bg-gray-50\/50,
+.bg-gray-50\/60,
+.bg-gray-50\/70,
+.bg-gray-50\/80,
+.bg-slate-50,
+.bg-slate-100 {
   background-color: #141b26 !important;
   border-color: #273142 !important;
 }
 
-html.dark .text-navy {
+/* ৪. টাইপোগ্রাফি ও শিরোনাম ক্রিস্প হোয়াইট */
+.text-navy,
+h1, h2, h3, h4 {
   color: #ffffff !important;
 }
 
-html.dark .text-slate-900,
-html.dark .text-slate-800,
-html.dark .text-slate-700 {
+.text-slate-900,
+.text-slate-800,
+.text-slate-700 {
   color: #f1f5f9 !important;
 }
 
-html.dark .text-gray-700,
-html.dark .text-gray-600 {
+.text-gray-700,
+.text-gray-600 {
   color: #cbd5e1 !important;
 }
 
-html.dark .text-gray-500,
-html.dark .text-gray-400 {
+.text-gray-500,
+.text-gray-400 {
   color: #94a3b8 !important;
 }
 
-html.dark .border-gray-100,
-html.dark .border-gray-200,
-html.dark .border-slate-100,
-html.dark .border-slate-200 {
+/* ৫. বর্ডার ও ডিভাইডার লাইন */
+.border-gray-100,
+.border-gray-200,
+.border-slate-100,
+.border-slate-200 {
   border-color: #1e2638 !important;
 }
 
-html.dark input,
-html.dark textarea,
-html.dark select {
+.divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+.divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e2638 !important;
+}
+
+/* ৬. ইনপুট বক্স, ড্রপডাউন ও টেক্সট এরিয়া */
+input,
+textarea,
+select {
   background-color: #141b26 !important;
   color: #ffffff !important;
   border-color: #273142 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* ৭. লাক্সারি ডার্ক শ্যাডো */
+.shadow-modern,
+.shadow-modern-lg,
+.shadow-md,
+.shadow-lg {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
 }

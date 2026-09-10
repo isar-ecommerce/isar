@@ -198,7 +198,6 @@ export default function Home() {
 
   const activeBanner = banners[currentBannerIndex] || DEFAULT_BANNERS[0];
 
-  // 🛍️ খাঁটি সুসংগত কার্ড (সান মোডে ঝকঝকে পিওর হোয়াইট, মুন মোডে ম্যাট চারকোল)
   const renderProductCard = (product: Product) => {
     const isOutOfStock = (product.stock <= 0) || (product.status === 'out-of-stock');
     const discountPercent = (product.originalPrice && product.originalPrice > product.price)
@@ -212,12 +211,12 @@ export default function Home() {
     return (
       <div 
         key={product.id} 
-        className="w-44 sm:w-52 md:w-60 bg-white dark:bg-[#0f141c] rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all group border border-slate-200/90 dark:border-[#1e2638] flex flex-col shrink-0"
+        className="w-44 sm:w-52 md:w-60 bg-[#0f141c] rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all group border border-navy-light flex flex-col shrink-0"
       >
-        <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-[#f0f2f5] dark:bg-[#141b26] p-2.5 flex items-center justify-center">
+        <Link to={`/products/${product.slug || product.id}`} className="relative aspect-square overflow-hidden bg-[#141b26] p-2.5 flex items-center justify-center">
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex items-center justify-center z-20">
-              <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-white">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center z-20">
+              <span className="text-red-500 font-black text-xs sm:text-sm tracking-widest uppercase border-2 border-red-500 py-0.5 px-2 rounded-lg -rotate-12 shadow-lg bg-black">
                 SOLD OUT
               </span>
             </div>
@@ -253,11 +252,11 @@ export default function Home() {
           </div>
         </Link>
 
-        <div className="p-3.5 flex flex-col grow bg-white dark:bg-[#0f141c]">
+        <div className="p-3.5 flex flex-col grow bg-[#0f141c]">
           {hasReviews ? (
             <div className="flex items-center gap-1 mb-1 text-amber-500">
               <Star className="w-3 h-3 fill-current" />
-              <span className="text-[11px] font-bold text-navy dark:text-white">{product.rating}</span>
+              <span className="text-[11px] font-bold text-white">{product.rating}</span>
               <span className="text-[9px] text-gray-400 font-medium">({product.reviewCount})</span>
             </div>
           ) : (
@@ -266,7 +265,7 @@ export default function Home() {
             </div>
           )}
 
-          <Link to={`/products/${product.slug || product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-navy dark:text-white mb-1.5 grow leading-snug">
+          <Link to={`/products/${product.slug || product.id}`} className="hover:text-primary transition-colors line-clamp-2 text-xs font-black text-white mb-1.5 grow leading-snug">
             {product.name}
           </Link>
           
@@ -277,12 +276,12 @@ export default function Home() {
             )}
           </div>
           
-          <div className="mt-auto pt-2 border-t border-gray-100 dark:border-[#1e2638]">
+          <div className="mt-auto pt-2 border-t border-navy-light">
             {isOutOfStock ? (
               <button 
                 type="button"
                 disabled
-                className="w-full py-1.5 px-2 rounded-xl border border-red-500 text-red-500 font-black text-[10px] uppercase tracking-wider bg-red-50/50 cursor-not-allowed text-center"
+                className="w-full py-1.5 px-2 rounded-xl border border-red-500 text-red-500 font-black text-[10px] uppercase tracking-wider bg-red-950/40 cursor-not-allowed text-center"
               >
                 Stock Out
               </button>
@@ -291,7 +290,7 @@ export default function Home() {
                 <button 
                   type="button"
                   onClick={(e) => handleBuyNow(e, product)}
-                  className="py-1.5 px-1 bg-navy dark:bg-slate-800 hover:bg-slate-800 text-white font-black text-[10px] rounded-xl shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                  className="py-1.5 px-1 bg-slate-800 hover:bg-slate-700 text-white font-black text-[10px] rounded-xl shadow-2xs transition-all hover:scale-[1.02] active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1 border border-slate-700"
                 >
                   <Zap className="w-3 h-3 fill-brand-gold text-brand-gold" />
                   <span>Buy Now</span>
@@ -300,7 +299,7 @@ export default function Home() {
                 <button 
                   type="button"
                   onClick={(e) => handleAddToCart(e, product)}
-                  className="py-1.5 px-1 bg-[#f0f2f5] dark:bg-[#141b26] hover:bg-gray-100 text-navy dark:text-white border border-gray-200 dark:border-[#273142] hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
+                  className="py-1.5 px-1 bg-[#141b26] hover:bg-navy-light text-white border border-[#273142] hover:border-primary font-black text-[10px] rounded-xl transition-all active:scale-95 text-center uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1"
                 >
                   <ShoppingBag className="w-3 h-3 text-primary" />
                   <span>Cart</span>
@@ -324,7 +323,7 @@ export default function Home() {
         />
       </Helmet>
 
-      {/* 🚀 Hero Banner Section (Clean Matte Obsidian Black) */}
+      {/* Hero Banner Section */}
       <section className="bg-transparent pt-2 sm:pt-4">
         <div className="container mx-auto px-3 sm:px-4">
           <div 
@@ -420,51 +419,49 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 🛡️ Trust Badges Bar (সান মোডে সফট ক্রিস্প হোয়াইট বক্স) */}
+      {/* Trust Badges */}
       <section className="container mx-auto px-3 sm:px-4">
-        <div className="bg-white dark:bg-[#0f141c] rounded-3xl p-3.5 sm:p-4 shadow-sm border border-slate-200/80 dark:border-[#1e2638]">
+        <div className="bg-[#0f141c] rounded-3xl p-3.5 sm:p-4 shadow-md border border-navy-light">
           <div className="flex sm:grid sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto no-scrollbar">
-            
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#141b26] sm:bg-transparent">
               <div className="w-9 h-9 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 <Truck className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Fast Delivery</h4>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">Nationwide 64 Districts</p>
+                <h4 className="text-xs font-bold text-white whitespace-nowrap">Fast Delivery</h4>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">Nationwide 64 Districts</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#141b26] sm:bg-transparent">
               <div className="w-9 h-9 rounded-2xl bg-brand-gold/15 flex items-center justify-center text-brand-gold shrink-0">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">100% Authentic</h4>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">Verified Quality QC</p>
+                <h4 className="text-xs font-bold text-white whitespace-nowrap">100% Authentic</h4>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">Verified Quality QC</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#141b26] sm:bg-transparent">
               <div className="w-9 h-9 rounded-2xl bg-brand-green/15 flex items-center justify-center text-brand-green shrink-0">
                 <CreditCard className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Cash on Delivery</h4>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">0 BDT Advance</p>
+                <h4 className="text-xs font-bold text-white whitespace-nowrap">Cash on Delivery</h4>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">0 BDT Advance</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#f0f2f5] dark:bg-[#141b26] sm:bg-transparent">
-              <div className="w-9 h-9 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0 px-3 py-1.5 rounded-2xl bg-[#141b26] sm:bg-transparent">
+              <div className="w-9 h-9 rounded-2xl bg-purple-900/30 flex items-center justify-center text-purple-400 shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-navy dark:text-white whitespace-nowrap">Dedicated Support</h4>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">Helpline Care</p>
+                <h4 className="text-xs font-bold text-white whitespace-nowrap">Dedicated Support</h4>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">Helpline Care</p>
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -478,7 +475,7 @@ export default function Home() {
       {categories.length > 0 && (
         <section className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
               <Layers className="w-4 h-4 text-primary" /> Product Categories
             </h2>
             <Link 
@@ -498,12 +495,12 @@ export default function Home() {
                 <Link 
                   key={category.id} 
                   to={`/products?category=${encodeURIComponent(categoryTarget)}`}
-                  className="bg-white dark:bg-[#0f141c] rounded-2xl p-3.5 flex flex-col items-center justify-center text-center gap-1.5 shadow-sm hover:shadow-md transition-all border border-slate-200/80 dark:border-[#1e2638] group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/50"
+                  className="bg-[#0f141c] rounded-2xl p-3.5 flex flex-col items-center justify-center text-center gap-1.5 shadow-md transition-all border border-navy-light group w-28 sm:w-36 shrink-0 min-h-24 cursor-pointer hover:border-primary/50"
                 >
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-2xs`}>
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <span className="text-[11px] sm:text-xs font-bold text-navy dark:text-white text-center line-clamp-1">{category.name}</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-white text-center line-clamp-1">{category.name}</span>
                 </Link>
               );
             })}
@@ -515,17 +512,17 @@ export default function Home() {
       <section className="container mx-auto px-3 sm:px-4 pt-2">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-1.5">
+            <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-1.5">
               <Flame className="w-4 h-4 text-amber-500" /> Trending Products
             </h2>
-            <p className="text-[11px] text-gray-500">Popular & frequently purchased gear</p>
+            <p className="text-[11px] text-gray-400">Popular & frequently purchased gear</p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => scrollSlider(trendingSliderRef, 'left')}
-              className="p-1.5 rounded-xl bg-white dark:bg-[#0f141c] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#1e2638] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+              className="p-1.5 rounded-xl bg-[#0f141c] hover:bg-primary hover:text-white border border-navy-light text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
               aria-label="Scroll left"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -533,7 +530,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => scrollSlider(trendingSliderRef, 'right')}
-              className="p-1.5 rounded-xl bg-white dark:bg-[#0f141c] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#1e2638] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+              className="p-1.5 rounded-xl bg-[#0f141c] hover:bg-primary hover:text-white border border-navy-light text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
               aria-label="Scroll right"
             >
               <ChevronRight className="w-4 h-4" />
@@ -546,9 +543,9 @@ export default function Home() {
         </div>
 
         {loading ? (
-          <div className="py-12 flex flex-col items-center justify-center bg-white dark:bg-[#0f141c] rounded-3xl border border-gray-100 dark:border-[#1e2638]">
+          <div className="py-12 flex flex-col items-center justify-center bg-[#0f141c] rounded-3xl border border-navy-light">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-            <span className="text-xs text-gray-500 font-medium">Loading live products...</span>
+            <span className="text-xs text-gray-400 font-medium">Loading live products...</span>
           </div>
         ) : (
           <div 
@@ -560,23 +557,23 @@ export default function Home() {
         )}
       </section>
 
-      {/* Section 2: Mega Deals (সফট লাক্সারি হোয়াইট কার্ড) */}
+      {/* Section 2: Mega Deals */}
       {discountedMegaDeals.length > 0 && (
         <section className="container mx-auto px-3 sm:px-4 pt-2">
-          <div className="bg-white dark:bg-[#0f141c] rounded-3xl p-4 sm:p-6 border border-amber-500/30 shadow-sm space-y-3">
+          <div className="bg-[#0f141c] rounded-3xl p-4 sm:p-6 border border-amber-500/30 shadow-md space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500" /> Best of Mega Deals
                 </h2>
-                <p className="text-[11px] text-gray-500">Biggest discounts & special price drops</p>
+                <p className="text-[11px] text-gray-400">Biggest discounts & special price drops</p>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => scrollSlider(megaDealsSliderRef, 'left')}
-                  className="p-1.5 rounded-xl bg-[#f0f2f5] dark:bg-[#141b26] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#273142] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  className="p-1.5 rounded-xl bg-[#141b26] hover:bg-primary hover:text-white border border-[#273142] text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
                   aria-label="Scroll left"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -584,7 +581,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => scrollSlider(megaDealsSliderRef, 'right')}
-                  className="p-1.5 rounded-xl bg-[#f0f2f5] dark:bg-[#141b26] hover:bg-primary hover:text-white border border-gray-200 dark:border-[#273142] text-navy dark:text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
+                  className="p-1.5 rounded-xl bg-[#141b26] hover:bg-primary hover:text-white border border-[#273142] text-white transition-all shadow-2xs hidden sm:flex items-center justify-center cursor-pointer"
                   aria-label="Scroll right"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -611,10 +608,10 @@ export default function Home() {
         <section className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-1.5">
+              <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-brand-green" /> New Arrivals
               </h2>
-              <p className="text-[11px] text-gray-500">Freshly added inventory items</p>
+              <p className="text-[11px] text-gray-400">Freshly added inventory items</p>
             </div>
 
             <Link to="/products" className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 group">
@@ -633,10 +630,10 @@ export default function Home() {
         <section key={section.title} className="container mx-auto px-3 sm:px-4 pt-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base sm:text-lg font-black text-navy dark:text-white flex items-center gap-1.5">
+              <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-primary" /> {section.title}
               </h2>
-              <p className="text-[11px] text-gray-500">Special curated collection</p>
+              <p className="text-[11px] text-gray-400">Special curated collection</p>
             </div>
 
             <Link 
